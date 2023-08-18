@@ -3,14 +3,10 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useAccount } from "wagmi";
-import { useSession } from "next-auth/react";
 
 const Home: NextPage = () => {
     const account = useAccount();
-    const session = useSession();
-    console.log(account);
-    console.log(session);
-    const isConnected = session.status === "authenticated";
+    const isConnected = account.isConnected;
     return (
         <div className={styles.container}>
             <Head>
@@ -24,7 +20,7 @@ const Home: NextPage = () => {
 
                 <div style={{ marginTop: "10vh" }}>
                     <a
-                        href={`dev-app://${session.data?.address}`}
+                        href={`connect-dev://${account.address}`}
                         style={{
                             opacity: isConnected ? 1 : 0.3,
                             cursor: isConnected ? "pointer" : "not-allowed",
