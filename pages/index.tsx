@@ -3,10 +3,16 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useAccount } from "wagmi";
+import { useRouter } from "next/router";
+import Connect from "../components/connect";
 
 const Home: NextPage = () => {
     const account = useAccount();
+    const router = useRouter();
     const isConnected = account.isConnected;
+
+    const connectId = router.query["connect"]?.toString();
+
     return (
         <div className={styles.container}>
             <Head>
@@ -16,20 +22,7 @@ const Home: NextPage = () => {
             </Head>
 
             <main className={styles.main}>
-                <ConnectButton />
-
-                <div style={{ marginTop: "10vh" }}>
-                    <a
-                        href={`connect-dev://${account.address}`}
-                        style={{
-                            opacity: isConnected ? 1 : 0.3,
-                            cursor: isConnected ? "pointer" : "not-allowed",
-                            pointerEvents: isConnected ? "all" : "none",
-                        }}
-                    >
-                        <h2>Open Connect</h2>
-                    </a>
-                </div>
+                {connectId && <Connect connectId={connectId} />}
             </main>
         </div>
     );
