@@ -1,16 +1,12 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/router";
-import Connect from "../components/connect";
+import Connect from "../components/connect-flow";
 
 const Home: NextPage = () => {
-    const account = useAccount();
     const router = useRouter();
-    const isConnected = account.isConnected;
-
     const connectId = router.query["connect"]?.toString();
 
     return (

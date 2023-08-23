@@ -13,7 +13,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const challenge = req.body.challenge?.toString();
     const signedChallenge = req.body.signedChallenge?.toString();
     if (!address || !publicKey || !challenge || !signedChallenge) {
-        res.status(400).end();
+        res.status(400).json({});
         return;
     }
 

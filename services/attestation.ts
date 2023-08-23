@@ -1,5 +1,11 @@
-import { EAS, SchemaEncoder } from "@ethereum-attestation-service/eas-sdk";
+import {
+    EAS,
+    SchemaEncoder,
+    ZERO_BYTES32,
+} from "@ethereum-attestation-service/eas-sdk";
+import EASContract from "@ethereum-attestation-service/eas-contracts/artifacts/contracts/EAS.sol/EAS.json";
 import type { SignerOrProvider } from "@ethereum-attestation-service/eas-sdk/dist/transaction";
+import { Contract, Signer } from "ethers";
 
 export type Attestation = {
     id: string;
@@ -27,6 +33,7 @@ export async function getConnectAttestation(
     address: string,
     publicKey: string
 ): Promise<ConnectAttestation | undefined> {
+    console.log(address, publicKey);
     const result = await fetch(`${process.env.NEXT_PUBLIC_EAS_SCAN}/graphql`, {
         method: "POST",
         headers: {
@@ -50,7 +57,9 @@ export async function getConnectAttestation(
             },
             operationName: "ConnectQuery",
         }),
-    }).then((res) => res.json());
+    })
+        .then((res) => res.json())
+        .catch((error) => console.error(error));
 
     const attestation = result.data?.findFirstAttestation as Attestation;
     if (!attestation) {
@@ -88,10 +97,7 @@ export function checkConnectAttestation(
     );
 }
 
-export async function attestConnect(
-    signer: SignerOrProvider,
-    publicKey: string
-) {
+export async function attestConnect(signer: Signer, publicKey: string) {
     const eas = new EAS(EASContractAddress, { signerOrProvider: signer });
 
     const encodedData = schemaEncoder.encodeData([
@@ -102,7 +108,7 @@ export async function attestConnect(
     const tx = await eas.attest({
         schema: SchemaUID,
         data: {
-            recipient: "0x9F7F0721335dd004D3e848Fd1202264603Bb7397",
+            recipient: await signer.getAddress(), // TODO
             expirationTime: BigInt(0),
             revocable: true,
             data: encodedData,
@@ -122,4 +128,27 @@ export async function revokeConnectAttestation(
     const eas = new EAS(EASContractAddress, { signerOrProvider: signer });
     const tx = await eas.revoke({ schema: SchemaUID, data: { uid: id } });
     return tx.wait();
+}
+
+export async function estimateAttestGas(
+    signer: SignerOrProvider,
+    publicKey: string
+) {
+    const encodedData = schemaEncoder.encodeData([
+        { name: "type", value: "connect", type: "string" },
+        { name: "publicKey", value: publicKey, type: "string" },
+    ]);
+
+    const contract = new Contract(EASContractAddress, EASContract.abi, signer);
+    return contract.attest.estimateGas({
+        schema: SchemaUID,
+        data: {
+            recipient: await signer.getAddress(), // TODO
+            expirationTime: BigInt(0),
+            revocable: true,
+            data: encodedData,
+            refUID: ZERO_BYTES32,
+            value: 0,
+        },
+    });
 }

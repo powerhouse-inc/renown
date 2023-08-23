@@ -1,23 +1,38 @@
-import { useAccount } from "wagmi";
+import { useAccount, useFeeData } from "wagmi";
 import { useEthersSigner } from ".";
 import { useEffect, useState } from "react";
 import {
     ConnectAttestation,
     attestConnect,
     checkConnectAttestation,
+    estimateAttestGas,
     getConnectAttestation,
     revokeConnectAttestation,
 } from "../services/attestation";
+import { atom, useAtom } from "jotai";
+
+const attestationAtom = atom<ConnectAttestation | undefined>(undefined);
+const checkingAttom = atom(false);
+const attestingAtom = atom(false);
+const revokingAtom = atom(false);
+const attestGasCostAtom = atom<bigint | undefined>(undefined);
 
 export const useAttestation = (connectId: string) => {
     const account = useAccount();
     const signer = useEthersSigner();
-    const [attestation, setAttestation] = useState<
-        ConnectAttestation | undefined
-    >(undefined);
-    const [checking, setChecking] = useState(false);
-    const [attesting, setAttesting] = useState(false);
-    const [revoking, setRevoking] = useState(false);
+    const [attestation, setAttestation] = useAtom(attestationAtom);
+    const [checking, setChecking] = useAtom(checkingAttom);
+    const [attesting, setAttesting] = useAtom(attestingAtom);
+    const [revoking, setRevoking] = useAtom(revokingAtom);
+    const [attestGasCost, setAttestGasCost] = useAtom(attestGasCostAtom);
+    const { data: feeData } = useFeeData();
+    useEffect(() => {
+        if (signer && feeData?.gasPrice) {
+            estimateAttestGas(signer, connectId).then((value) =>
+                setAttestGasCost(value)
+            );
+        }
+    }, [signer, connectId, feeData]);
 
     async function getAttestation(connectId: string, address: string) {
         try {
@@ -92,5 +107,9 @@ export const useAttestation = (connectId: string) => {
         revoking,
         attest,
         revoke,
-    };
+        attestGasCost:
+            feeData?.gasPrice && attestGasCost
+                ? feeData.gasPrice * attestGasCost
+                : 0,
+    } as const;
 };

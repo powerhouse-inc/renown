@@ -5,6 +5,9 @@ import type { AppProps } from "next/app";
 import { configureChains, createConfig, WagmiConfig } from "wagmi";
 import { baseGoerli } from "wagmi/chains";
 import { publicProvider } from "wagmi/providers/public";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 const { chains, publicClient, webSocketPublicClient } = configureChains(
     [baseGoerli],
@@ -26,11 +29,13 @@ const wagmiConfig = createConfig({
 
 function MyApp({ Component, pageProps }: AppProps) {
     return (
-        <WagmiConfig config={wagmiConfig}>
-            <RainbowKitProvider chains={chains}>
-                <Component {...pageProps} />
-            </RainbowKitProvider>
-        </WagmiConfig>
+        <main className={inter.className}>
+            <WagmiConfig config={wagmiConfig}>
+                <RainbowKitProvider chains={chains}>
+                    <Component {...pageProps} />
+                </RainbowKitProvider>
+            </WagmiConfig>
+        </main>
     );
 }
 

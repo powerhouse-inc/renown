@@ -13,14 +13,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const address = req.body.address?.toString();
     const publicKey = req.body.publicKey?.toString();
     if (!address || !publicKey) {
-        res.status(400).end();
+        res.status(400).json({});
         return;
     }
 
     const attestation = await getConnectAttestation(address, publicKey);
 
     if (!attestation || !checkConnectAttestation(attestation, publicKey)) {
-        res.status(403).end();
+        res.status(403).json({});
         return;
     }
 

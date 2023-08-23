@@ -11,7 +11,7 @@ export async function generateJWT(accountAddress: string, publicKey: string) {
     const alg = "ES512";
     const privateKey = await importPrivateKey();
 
-    const jwt = await new jose.SignJWT({ publicKey })
+    const jwt = await new jose.SignJWT({ publicKey, address: accountAddress })
         .setProtectedHeader({ alg })
         .setSubject(accountAddress.toLowerCase())
         .setIssuedAt()
@@ -19,6 +19,9 @@ export async function generateJWT(accountAddress: string, publicKey: string) {
         // .setAudience('urn:example:audience')
         // .setExpirationTime('2h')
         .sign(privateKey);
-    console.log(jwt);
     return jwt;
+}
+
+export async function readJWT(token: string) {
+    return jose.decodeJwt(token);
 }
