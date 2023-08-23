@@ -3,7 +3,9 @@ import * as jose from "jose";
 import { executeOnce } from "../utils";
 
 const alg = "ES512";
-const pkcs8 = readFileSync("./.secret/private.key", "utf-8");
+const pkcs8 =
+    process.env.JWT_PRIVATE_KEY ||
+    readFileSync("./.secret/private.key", "utf-8");
 
 const importPrivateKey = executeOnce(() => jose.importPKCS8(pkcs8, alg));
 
