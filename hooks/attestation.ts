@@ -28,6 +28,7 @@ export const useAttestation = (connectId: string) => {
     const { data: feeData } = useFeeData();
     useEffect(() => {
         if (signer && feeData?.gasPrice) {
+            // @ts-ignore
             estimateAttestGas(signer, connectId).then((value) =>
                 setAttestGasCost(value)
             );
@@ -90,6 +91,7 @@ export const useAttestation = (connectId: string) => {
                 connectId
             );
             if (attestation?.id) {
+                // @ts-ignore
                 await revokeConnectAttestation(signer, attestation.id);
                 setAttestation(undefined);
             }

@@ -33,7 +33,6 @@ export async function getConnectAttestation(
     address: string,
     publicKey: string
 ): Promise<ConnectAttestation | undefined> {
-    console.log(address, publicKey);
     const result = await fetch(`${process.env.NEXT_PUBLIC_EAS_SCAN}/graphql`, {
         method: "POST",
         headers: {
@@ -98,6 +97,7 @@ export function checkConnectAttestation(
 }
 
 export async function attestConnect(signer: Signer, publicKey: string) {
+    // @ts-ignore
     const eas = new EAS(EASContractAddress, { signerOrProvider: signer });
 
     const encodedData = schemaEncoder.encodeData([
@@ -139,10 +139,12 @@ export async function estimateAttestGas(
         { name: "publicKey", value: publicKey, type: "string" },
     ]);
 
+    // @ts-ignore
     const contract = new Contract(EASContractAddress, EASContract.abi, signer);
     return contract.attest.estimateGas({
         schema: SchemaUID,
         data: {
+            // @ts-ignore
             recipient: await signer.getAddress(), // TODO
             expirationTime: BigInt(0),
             revocable: true,
