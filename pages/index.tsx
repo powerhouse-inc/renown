@@ -1,13 +1,13 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
-import { useAccount } from "wagmi";
 import { useRouter } from "next/router";
 import Connect from "../components/connect-flow";
 
 const Home: NextPage = () => {
     const router = useRouter();
     const connectId = router.query["connect"]?.toString();
+    const deeplink = router.query["deeplink"]?.toString();
 
     return (
         <div className={styles.container}>
@@ -18,7 +18,9 @@ const Home: NextPage = () => {
             </Head>
 
             <main className={styles.main}>
-                {connectId && <Connect connectId={connectId} />}
+                {connectId && (
+                    <Connect connectId={connectId} deeplink={deeplink} />
+                )}
             </main>
         </div>
     );

@@ -12,6 +12,7 @@ import { ethers } from "ethers";
 
 interface IProps {
     connectId: string;
+    deeplink?: string;
 }
 
 function ConnectIdText(id: string) {
@@ -61,10 +62,14 @@ const ConfirmAuthorization: React.FC<IProps> = ({ connectId }) => {
     );
 };
 
-const ConnectFlow: React.FC<IProps> = ({ connectId }) => {
+const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
     const account = useAccount();
     const { chain } = useNetwork();
     const { attestation } = useAttestation(connectId);
+    const address = encodeURIComponent(account.address ?? "");
+    const url = deeplink
+        ? `${deeplink}://${address}`
+        : `${connectUrl}?address=${address}`;
     return (
         <div className="flex flex-col items-center">
             <div className="max-w-[482px] overflow-auto rounded-3xl shadow-modal">
@@ -112,9 +117,7 @@ const ConnectFlow: React.FC<IProps> = ({ connectId }) => {
                     ) : null}
                     {account.address && attestation ? (
                         <a
-                            href={`${connectUrl}?address=${encodeURIComponent(
-                                account.address
-                            )}`}
+                            href={url}
                             className="text-center block w-full mt-12"
                         >
                             <Button primary className="w-full">
