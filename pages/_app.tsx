@@ -6,6 +6,7 @@ import { configureChains, createConfig, WagmiConfig } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { publicProvider } from "wagmi/providers/public";
 import { Inter } from "next/font/google";
+// import { VeramoProvider } from "@veramo-community/veramo-react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,7 +33,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         <main className={inter.className}>
             <WagmiConfig config={wagmiConfig}>
                 <RainbowKitProvider chains={chains}>
+                    {/* <VeramoProvider> */}
                     <Component {...pageProps} />
+                    {/* </VeramoProvider> */}
                 </RainbowKitProvider>
             </WagmiConfig>
         </main>

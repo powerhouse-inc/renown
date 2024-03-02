@@ -2,14 +2,20 @@ import { BrowserProvider, JsonRpcSigner } from "ethers";
 import React from "react";
 import { WalletClient, useWalletClient } from "wagmi";
 
-export function walletClientToSigner(walletClient: WalletClient) {
-    const { account, chain, transport } = walletClient;
+export function walletClientToProvider(walletClient: WalletClient) {
+    const { chain, transport } = walletClient;
     const network = {
         chainId: chain.id,
         name: chain.name,
         ensAddress: chain.contracts?.ensRegistry?.address,
     };
     const provider = new BrowserProvider(transport, network);
+    return provider;
+}
+
+export function walletClientToSigner(walletClient: WalletClient) {
+    const { account } = walletClient;
+    const provider = walletClientToProvider(walletClient);
     const signer = new JsonRpcSigner(provider, account.address);
     return signer;
 }
@@ -19,6 +25,14 @@ export function useEthersSigner({ chainId }: { chainId?: number } = {}) {
     const { data: walletClient } = useWalletClient({ chainId });
     return React.useMemo(
         () => (walletClient ? walletClientToSigner(walletClient) : undefined),
+        [walletClient]
+    );
+}
+
+export function useEthersProvider({ chainId }: { chainId?: number } = {}) {
+    const { data: walletClient } = useWalletClient({ chainId });
+    return React.useMemo(
+        () => (walletClient ? walletClientToProvider(walletClient) : undefined),
         [walletClient]
     );
 }
