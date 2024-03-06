@@ -20,6 +20,11 @@ import { Web3KeyManagementSystem } from "@veramo/kms-web3";
 import { IDataStore } from "@veramo/data-store";
 import { BrowserProvider } from "ethers";
 import { DIDResolverPlugin } from "@veramo/did-resolver";
+import {
+    CredentialIssuerEIP712,
+    ICredentialIssuerEIP712,
+} from "@veramo/credential-eip712";
+import { PkhDIDProvider, getDidPkhResolver } from "@veramo/did-provider-pkh";
 
 const INFURA_PROJECT_ID = process.env.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID;
 if (!INFURA_PROJECT_ID) {
@@ -34,36 +39,42 @@ if (!DB_SECRET_KEY) {
 const localStorageStore = BrowserLocalStorageStore.fromLocalStorage("veramo");
 
 export function createAgent(provider: BrowserProvider) {
-    return _createAgent<IResolver & IKeyManager & IDIDManager & IDataStore>({
+    const web3KeyManagementSystem = new Web3KeyManagementSystem({
+        wagmi: provider as any,
+    });
+    web3KeyManagementSystem.listKeys().then(console.log);
+
+    return _createAgent<
+        IResolver &
+            IKeyManager &
+            IDIDManager &
+            IDataStore &
+            ICredentialIssuerEIP712
+    >({
         plugins: [
             new KeyManager({
                 store: new KeyStoreJson(localStorageStore),
                 kms: {
-                    web3: new Web3KeyManagementSystem({
-                        wagmi: provider as any,
-                    }),
+                    web3: web3KeyManagementSystem,
                 },
             }),
             new DIDResolverPlugin({
                 resolver: new Resolver({
+                    ...getDidPkhResolver(),
                     ...ethrDidResolver({ infuraProjectId: INFURA_PROJECT_ID }),
                 }),
             }),
             new DIDManager({
                 store: new DIDStoreJson(localStorageStore),
-                defaultProvider: "did:ethr:sepolia",
+                defaultProvider: "did:pkh",
                 providers: {
-                    "did:ethr:sepolia": new EthrDIDProvider({
-                        defaultKms: "local",
-                        network: "sepolia",
-                        name: "sepolia",
-                        rpcUrl:
-                            "https://sepolia.infura.io/v3/" + INFURA_PROJECT_ID,
-                        gas: 1000001,
-                        ttl: 31104001,
+                    "did:pkh": new PkhDIDProvider({
+                        defaultKms: "web3",
+                        chainId: "eip155", // Sepolia
                     }),
                 },
             }),
+            new CredentialIssuerEIP712(),
             new DataStoreJson(localStorageStore),
         ],
     });

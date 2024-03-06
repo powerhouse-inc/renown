@@ -1,38 +1,109 @@
 import { atom, useAtom } from "jotai";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useAccount, useFeeData, useSignTypedData } from "wagmi";
 import { createAgent } from "../services/veramo";
 import { useEthersProvider, useEthersSigner } from "./index";
 import { BrowserProvider } from "ethers";
-import { DIDResolutionResult } from "@veramo/core-types";
+import {
+    IIdentifier,
+    MinimalImportableKey,
+    VerifiableCredential,
+} from "@veramo/core-types";
 
-const didAtom = atom<DIDResolutionResult | undefined>(undefined);
+const didAtom = atom<VerifiableCredential | undefined>(undefined);
 const checkingAttom = atom(false);
 const attestingAtom = atom(false);
 const revokingAtom = atom(false);
 const attestGasCostAtom = atom<bigint | undefined>(undefined);
 
-export function useAgent(provider: BrowserProvider) {
-    const agent = createAgent(provider);
+export function useAgent(provider: BrowserProvider | undefined) {
+    return useMemo(() => {
+        if (!provider) {
+            return undefined;
+        }
+        const agent = createAgent(provider);
+        return {
+            importAddress(address: string) {
+                const did = `did:pkh:eip155:1:${address}`;
+                const controllerKeyId = `wagmi-${address}`;
+                return agent.didManagerImport({
+                    did,
+                    provider: "did:pkh",
+                    controllerKeyId,
+                    keys: [
+                        {
+                            kid: controllerKeyId,
+                            type: "Secp256k1",
+                            kms: "web3",
+                            privateKeyHex: "",
+                            publicKeyHex: "",
+                            meta: {
+                                address,
+                                provider: "did:pkh",
+                                algorithms: [
+                                    "eth_signMessage",
+                                    "eth_signTypedData",
+                                ],
+                            },
+                        } as MinimalImportableKey,
+                    ],
+                });
+            },
+            getIdentifier() {
+                return agent.didManagerGet();
+            },
+            resolveDID(address: string) {
+                return agent.resolveDid({ didUrl: buildDidId(address) });
+            },
+            getCredential(hash: string) {
+                return agent.dataStoreGetVerifiableCredential({ hash });
+            },
+            async generateCredential(address: string, publicKey: string) {
+                let identifier: IIdentifier | undefined;
 
-    function resolveDID(address: string) {
-        return agent.resolveDid({
-            didUrl: `did:ethr:sepolia:${address}`,
-        });
-    }
-
-    function generateDID(address: string, publicKey: string) {
-        return agent.didManagerCreate();
-    }
-
-    return { resolveDID, generateDID };
+                try {
+                    identifier = await agent.didManagerGetOrCreate({
+                        alias: "default",
+                        provider: "did:pkh",
+                    });
+                } catch (error) {
+                    identifier = await this.importAddress(address);
+                }
+                const verifiableCredential =
+                    await agent.createVerifiableCredentialEIP712({
+                        credential: {
+                            issuer: { id: identifier.did },
+                            issuanceDate: new Date().toISOString(),
+                            credentialSubject: {
+                                id: identifier.did,
+                                type: "powerhouse-connect",
+                                publicKey: publicKey,
+                            },
+                            type: [
+                                "VerifiableCredential",
+                                "PowerhouseConnectCredential",
+                            ],
+                        },
+                    });
+                const hash = await agent.dataStoreSaveVerifiableCredential({
+                    verifiableCredential,
+                });
+                console.log(verifiableCredential);
+                console.log("Credential saved with hash:", hash);
+                return verifiableCredential;
+            },
+            async verifyCredential(credential: VerifiableCredential) {
+                return agent.verifyCredentialEIP712({ credential });
+            },
+        };
+    }, [provider]);
 }
 
 export const useDID = (connectId: string) => {
     const account = useAccount();
     const provider = useEthersProvider();
-    const veramo = useAgent(provider!);
-    const [did, setDid] = useAtom(didAtom);
+    const veramo = useAgent(provider);
+    const [credential, setCredential] = useAtom(didAtom);
     const [checking, setChecking] = useAtom(checkingAttom);
     const [generating, setGenerating] = useAtom(attestingAtom);
     const [revoking, setRevoking] = useAtom(revokingAtom);
@@ -65,16 +136,22 @@ export const useDID = (connectId: string) => {
         });
     }
 
-    async function getDid(publicKey: string, address: string) {
+    async function getCredential(address: string, publicKey: string) {
+        setChecking(true);
+        let credential: VerifiableCredential | undefined;
         try {
-            veramo.generateDID("", "").then(console.log);
-            setChecking(true);
-            const didDoc = await resolveDID(address);
+            credential = await veramo?.getCredential(address);
+        } catch {}
+        try {
             if (
-                didDoc
+                credential
                 // TODO check if publicKey is approved && checkConnectAttestation(attestation, connectId)
             ) {
-                setDid(didDoc);
+                const valid = await veramo?.verifyCredential(credential);
+                if (valid) {
+                    setCredential(credential);
+                    return credential;
+                }
             }
         } catch (error) {
             console.error(error);
@@ -84,25 +161,33 @@ export const useDID = (connectId: string) => {
     }
 
     useEffect(() => {
-        if (account?.address) {
-            getDid(connectId, account.address);
-        }
-    }, [connectId, account?.address]);
+        (async () => {
+            if (!account?.address || !veramo || !connectId) {
+                return;
+            }
+            const credential = await getCredential(account.address, connectId);
+            if (!credential) {
+                const credential = await generateCredential(
+                    account.address,
+                    connectId
+                );
+            }
+        })();
+    }, [connectId, account?.address, veramo]);
 
-    async function generateDID() {
+    async function generateCredential(address: string, publicKey: string) {
         if (!veramo) {
             return;
         }
         try {
             setGenerating(true);
-            const uId = await attestConnect(signer, connectId);
-            console.log("Attestation id:", uId);
-            if (uId) {
-                const attestation = await getConnectAttestation(
-                    signer.address,
-                    connectId
-                );
-                setAttestation(attestation);
+            const credential = await veramo.generateCredential(
+                address,
+                publicKey
+            );
+            console.log("Credential id:", credential.id);
+            if (credential) {
+                setCredential(credential);
             }
         } catch (error) {
             console.error(error);
@@ -111,13 +196,10 @@ export const useDID = (connectId: string) => {
         }
     }
 
-    async function revoke() {
-        if (!signer || !account.address) {
-            return;
-        }
+    async function revoke(address: string, publicKey: string) {
         try {
             setRevoking(true);
-            const attestation = await getConnectAttestation(
+            const attestation = await veramo?.generateCredential(
                 account.address,
                 connectId
             );
@@ -134,11 +216,11 @@ export const useDID = (connectId: string) => {
     }
 
     return {
-        did,
+        credential,
         checking,
         generating,
         revoking,
-        generateDID,
+        generateCredential,
         revoke,
         attestGasCost:
             feeData?.gasPrice && attestGasCost

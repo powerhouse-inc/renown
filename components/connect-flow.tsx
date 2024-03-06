@@ -9,6 +9,7 @@ import Button from "./button";
 import WalletButton from "./wallet-button";
 import { useAttestation } from "../hooks/attestation";
 import { ethers } from "ethers";
+import { useDID } from "../hooks/did";
 // import { useDID } from "../hooks/did";
 
 interface IProps {
@@ -67,7 +68,7 @@ const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
     const account = useAccount();
     const { chain } = useNetwork();
     const { attestation } = useAttestation(connectId);
-    // const did = useDID(connectId);
+    const did = useDID(connectId);
     const address = encodeURIComponent(account.address ?? "");
     const url = deeplink
         ? `${deeplink}://${address}`
