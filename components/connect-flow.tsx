@@ -1,14 +1,15 @@
+"use client";
+
 import { useAccount, useNetwork } from "wagmi";
 import Image from "next/image";
-import Attestation from "./attestation";
 import Header from "../assets/images/header.jpg";
 import IconRenown from "../assets/icons/renown.svg";
 import IconConnect from "../assets/icons/connect.svg";
 import IconConnectWhite from "../assets/icons/connect-white.svg";
 import Button from "./button";
-import WalletButton from "./wallet-button";
-import { useAttestation } from "../hooks/attestation";
-import { ethers } from "ethers";
+import { useCredential } from "../hooks/credential";
+import { ConfirmAuthorization } from "./confirm-authorization";
+import Credential from "./credential";
 
 interface IProps {
     connectId: string;
@@ -21,55 +22,15 @@ function ConnectIdText(id: string) {
 
 const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
 
-const ConfirmAuthorization: React.FC<IProps> = ({ connectId }) => {
-    const account = useAccount();
-    const { chain } = useNetwork();
-    const { attest, attesting, attestGasCost } = useAttestation(connectId);
-
-    return (
-        <>
-            <WalletButton className={account.isConnected ? "mb-10" : "mb-3"} />
-            {account.isConnected ? (
-                <Button
-                    primary
-                    onClick={attest}
-                    className={`w-full mb-3 ${
-                        attesting ? "animate-pulse" : ""
-                    }`}
-                    disabled={
-                        !account.isConnected ||
-                        !!chain?.unsupported ||
-                        attesting
-                    }
-                >
-                    Confirm Authorization
-                </Button>
-            ) : null}
-            <Button secondary className="w-full hover:bg-neutral-1">
-                Cancel
-            </Button>
-            {attestGasCost ? (
-                <p className="mt-3 text-neutral-4 text-xs font-medium">
-                    Estimated cost:{" "}
-                    {ethers
-                        .formatEther(attestGasCost)
-                        .toLocaleString()
-                        .slice(0, 8)}
-                    ETH
-                </p>
-            ) : null}
-        </>
-    );
-};
-
 const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
     const account = useAccount();
     const { chain } = useNetwork();
-    const { attestation } = useAttestation(connectId);
-    const address = encodeURIComponent(account.address ?? "");
+    const { hasCredential, credential } = useCredential(connectId);
+    const address = encodeURIComponent(credential?.issuer.id ?? "");
     const url = deeplink
         ? `${deeplink}://${address}`
         : `${connectUrl}?address=${address}`;
+
     return (
         <div className="flex flex-col items-center">
             <div className="max-w-[482px] overflow-auto rounded-3xl shadow-modal">
@@ -107,15 +68,12 @@ const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
                             </p>
                         </div>
                     </div>
-                    {!attestation ? (
+                    {!hasCredential ? (
                         <ConfirmAuthorization connectId={connectId} />
                     ) : account.address ? (
-                        <Attestation
-                            connectId={connectId}
-                            address={account.address}
-                        />
+                        <Credential connectId={connectId} />
                     ) : null}
-                    {account.address && attestation ? (
+                    {account.address && hasCredential ? (
                         <a
                             href={url}
                             className="text-center block w-full mt-12"
