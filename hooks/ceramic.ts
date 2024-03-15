@@ -15,7 +15,7 @@ import {
 
 const sessionAtom = atom<DIDSession | undefined>(undefined);
 
-export function useCeramic(provider?: WalletClient) {
+export function useCeramic(provider?: WalletClient | null) {
     const [session, setSession] = useAtom(sessionAtom);
 
     async function login() {
@@ -54,6 +54,7 @@ export function useCeramic(provider?: WalletClient) {
         if (result.errors?.length) {
             throw result.errors[0];
         }
+        return result.data?.verifiableCredentialEIP712Index.edges[0]?.node;
         const issuerId = getAddressDID(address, chainId);
         const ceramicCredential =
             result.data?.verifiableCredentialEIP712Index.edges.find(
