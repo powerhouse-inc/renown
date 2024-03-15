@@ -10,7 +10,9 @@ import { PowerhouseVerifiableCredential, getAddressDID } from "./credential";
 export type CeramicPowerhouseVerifiableCredential = Omit<
     PowerhouseVerifiableCredential,
     "@context"
-> & { context: PowerhouseVerifiableCredential["@context"] };
+> & {
+    context: PowerhouseVerifiableCredential["@context"];
+};
 
 export const compose = new ComposeClient({
     ceramic: process.env.NEXT_PUBLIC_CERAMIC_URL || "http://localhost:7007",
@@ -23,8 +25,8 @@ export async function getCredentials(
     connectId: string
 ) {
     const issuerId = getAddressDID(address, chainId);
-    const query = `query VerifiableCredentialEIP712 {
-      verifiableCredentialEIP712Index(first: 1, sorting: { issuanceDate: DESC }) {
+    const query = `query VerifiableCredentialEIP712($input: VerifiableCredentialEIP712FiltersInput!) {
+      verifiableCredentialEIP712Index(first: 1, sorting: { issuanceDate: DESC }, filters: $input) {
         edges {
           node {
             controller {
@@ -40,7 +42,9 @@ export async function getCredentials(
               type
             }
             credentialSubject {
-              id
+              id {
+                id
+              }
               app
               name
             }
@@ -87,11 +91,23 @@ export async function getCredentials(
       }
     }`;
 
+    const now = new Date().toISOString();
     return compose.executeQuery<{
         verifiableCredentialEIP712Index: {
             edges: { node: CeramicPowerhouseVerifiableCredential }[];
         };
-    }>(query);
+    }>(query, {
+        input: {
+            where: {
+                issuerId: {
+                    equalTo: issuerId,
+                },
+                subjectId: {
+                    equalTo: connectId,
+                },
+            },
+        },
+    });
 }
 
 export async function storeCredential(
@@ -105,6 +121,8 @@ export async function storeCredential(
       mutation {
         createVerifiableCredentialEIP712(input: {
           content: {
+              issuerId: "${credential.issuer.id}"
+              subjectId: "${credential.credentialSubject.id}"
               context: [${credential["@context"]
                   .map((c) => `"${c}"`)
                   .join(", ")}]
@@ -150,8 +168,10 @@ export async function storeCredential(
             issuanceDate
             type
             context
-            credentialSubject{
-              id
+            credentialSubject {
+              id {
+                id
+              }
               app
               name
             }

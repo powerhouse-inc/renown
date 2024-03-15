@@ -46,15 +46,6 @@ export function useCredential(connectId: string): ICredential {
         "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"
     >(credential ? "SUCCESS" : "INITIAL");
 
-    const checkLogin = useCallback(async () => {
-        if (session?.isAuthorized()) {
-            return session;
-        } else {
-            const session = await login();
-            return session;
-        }
-    }, [login, session]);
-
     async function getCredential(
         address: string,
         chainId: number,
@@ -72,6 +63,7 @@ export function useCredential(connectId: string): ICredential {
             }
             setState("SUCCESS");
         } catch (e) {
+            console.error(e);
             setState("ERROR");
         }
     }
@@ -88,7 +80,6 @@ export function useCredential(connectId: string): ICredential {
                 );
 
                 console.log("Credential created", credential);
-                await checkLogin();
                 const document = await storeCredential(credential);
                 console.log("Credential stored", document);
                 setCredential(credential);
@@ -99,7 +90,7 @@ export function useCredential(connectId: string): ICredential {
                 setState("ERROR");
             }
         },
-        [checkLogin, setCredential, signTypedDataAsync, storeCredential]
+        [setCredential, signTypedDataAsync, storeCredential]
     );
 
     if (
@@ -125,6 +116,14 @@ export function useCredential(connectId: string): ICredential {
                 return createCredential(address, chainId, connectId);
             },
         }),
-        [address, chainId, connectId, credential, session, state, login]
+        [
+            credential,
+            session,
+            state,
+            address,
+            createCredential,
+            chainId,
+            connectId,
+        ]
     );
 }
