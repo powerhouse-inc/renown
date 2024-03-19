@@ -8,10 +8,10 @@ interface IProps {
 }
 
 const Credential: React.FC<IProps> = ({ connectId }) => {
-    const { hasCredential, credential } = useCredential(connectId);
+    const { hasCredential, credential, revokeCredential } =
+        useCredential(connectId);
     const dialogRef = useRef<HTMLDialogElement>(null);
     let revoking = false;
-    let revoke = () => {};
 
     if (!hasCredential) {
         return null;
@@ -38,8 +38,8 @@ const Credential: React.FC<IProps> = ({ connectId }) => {
                             className={`text-red underline underline-offset-4 ${
                                 revoking && "animate-pulse pointer-events-none"
                             }`}
-                            disabled={revoking}
-                            onClick={revoke}
+                            disabled={revoking || !credential}
+                            onClick={() => revokeCredential()}
                         >
                             Revoke
                         </button>

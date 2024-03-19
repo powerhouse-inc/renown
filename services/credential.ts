@@ -27,6 +27,7 @@ interface IVerifiableCredentialPayload<Subject, Issuer> {
     issuer: IssuerType<Issuer>;
     issuanceDate: string;
     expirationDate?: string;
+    revocationDate?: string;
     credentialSubject: CredentialSubjecType<Subject>;
     credentialStatus?: CredentialStatus;
     credentialSchema: CredentialSchema;
@@ -139,7 +140,7 @@ export async function createPowerhouseVerifiableCredential(
     signTypedData: SignTypedData
 ): Promise<PowerhouseVerifiableCredential> {
     const credential = {
-        id: crypto.randomUUID(),
+        id: "",
         issuer: {
             id: getAddressDID(address, chainId),
             ethereumAddress: address,

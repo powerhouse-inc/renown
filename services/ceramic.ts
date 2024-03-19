@@ -22,13 +22,15 @@ export const compose = new ComposeClient({
 export async function getCredentials(
     address: string,
     chainId: number,
-    connectId: string
+    connectId: string,
+    date: string = new Date().toISOString()
 ) {
     const issuerId = getAddressDID(address, chainId);
     const query = `query VerifiableCredentialEIP712($input: VerifiableCredentialEIP712FiltersInput!) {
       verifiableCredentialEIP712Index(first: 1, sorting: { issuanceDate: DESC }, filters: $input) {
         edges {
           node {
+            id
             controller {
               id
             }
@@ -49,6 +51,8 @@ export async function getCredentials(
               name
             }
             issuanceDate
+            expirationDate
+            revocationDate
             proof {
               verificationMethod
               created
@@ -91,21 +95,42 @@ export async function getCredentials(
       }
     }`;
 
-    const now = new Date().toISOString();
     return compose.executeQuery<{
         verifiableCredentialEIP712Index: {
             edges: { node: CeramicPowerhouseVerifiableCredential }[];
         };
     }>(query, {
         input: {
-            where: {
-                issuerId: {
-                    equalTo: issuerId,
+            and: [
+                {
+                    where: {
+                        issuerId: {
+                            equalTo: issuerId,
+                        },
+                        subjectId: {
+                            equalTo: connectId,
+                        },
+                    },
                 },
-                subjectId: {
-                    equalTo: connectId,
+                {
+                    or: [
+                        {
+                            where: {
+                                revocationDate: {
+                                    greaterThan: date,
+                                },
+                            },
+                        },
+                        {
+                            where: {
+                                revocationDate: {
+                                    isNull: true,
+                                },
+                            },
+                        },
+                    ],
                 },
-            },
+            ],
         },
     });
 }
@@ -116,108 +141,182 @@ export async function storeCredential(
     await compose.did?.authenticate();
 
     const { verifyingContract, ...domain } = credential.proof.eip712.domain;
-
     const query = `
-      mutation {
-        createVerifiableCredentialEIP712(input: {
-          content: {
-              issuerId: "${credential.issuer.id}"
-              subjectId: "${credential.credentialSubject.id}"
-              context: [${credential["@context"]
-                  .map((c) => `"${c}"`)
-                  .join(", ")}]
-              issuer: {
-                  id: "${credential.issuer.id}"
-                  ethereumAddress: "${credential.issuer["ethereumAddress"]}"
-              }
-              type: [${credential["type"].map((t) => `"${t}"`).join(", ")}]
-              credentialSchema: {
-                id: "${credential.credentialSchema.id}"
-                type: "${credential.credentialSchema.type}"
-              }
-              issuanceDate: "${credential.issuanceDate}"
-              credentialSubject: ${JSON.stringify(
-                  credential.credentialSubject
-              ).replace(/"([^"]+)":/g, "$1:")}
-              proof: {
-                proofPurpose: "${credential.proof.proofPurpose}"
-                type: "${credential.proof.type}"
-                created: "${credential.proof.created}"
-                verificationMethod: "${credential.proof.verificationMethod}"
-                proofValue: "${credential.proof.proofValue}"
-                eip712: {
-                  domain: ${JSON.stringify(domain).replace(
-                      /"([^"]+)":/g,
-                      "$1:"
-                  )}
-                  types: ${JSON.stringify(
-                      credential.proof.eip712.types
-                  ).replace(/"([^"]+)":/g, "$1:")}
-                  primaryType: "${credential.proof.eip712.primaryType}"
-                }
-              }
+    mutation {
+      createVerifiableCredentialEIP712(input: {
+        content: {
+          issuerId: "${credential.issuer.id}"
+          subjectId: "${credential.credentialSubject.id}"
+          context: [${credential["@context"].map((c) => `"${c}"`).join(", ")}]
+          issuer: {
+              id: "${credential.issuer.id}"
+              ethereumAddress: "${credential.issuer["ethereumAddress"]}"
+          }
+          issuanceDate: "${credential.issuanceDate}"
+          credentialSubject: ${JSON.stringify(
+              credential.credentialSubject
+          ).replace(/"([^"]+)":/g, "$1:")}
+          type: [${credential["type"].map((t) => `"${t}"`).join(", ")}]
+          credentialSchema: {
+            id: "${credential.credentialSchema.id}"
+            type: "${credential.credentialSchema.type}"
+          }
+          proof: {
+            proofPurpose: "${credential.proof.proofPurpose}"
+            type: "${credential.proof.type}"
+            created: "${credential.proof.created}"
+            verificationMethod: "${credential.proof.verificationMethod}"
+            proofValue: "${credential.proof.proofValue}"
+            eip712: {
+              domain: ${JSON.stringify(domain).replace(/"([^"]+)":/g, "$1:")}
+              types: ${JSON.stringify(credential.proof.eip712.types).replace(
+                  /"([^"]+)":/g,
+                  "$1:"
+              )}
+              primaryType: "${credential.proof.eip712.primaryType}"
             }
-        }) 
-        {
-          document {
+          }
+        }
+      }) 
+      {
+        document {
+          id
+          issuer {
             id
-            issuer {
+            ethereumAddress
+          }
+          issuanceDate
+          type
+          context
+          credentialSubject {
+            id {
               id
-              ethereumAddress
             }
-            issuanceDate
+            app
+            name
+          }
+          proof{
             type
-            context
-            credentialSubject {
-              id {
-                id
+            proofPurpose
+            verificationMethod
+            proofValue
+            created
+            eip712{
+              domain{
+                name
+                version
+                chainId
               }
-              app
-              name
-            }
-            proof{
-              type
-              proofPurpose
-              verificationMethod
-              proofValue
-              created
-              eip712{
-                domain{
+              types {
+                EIP712Domain {
                   name
-                  version
-                  chainId
+                  type
                 }
-                types {
-                  EIP712Domain {
-                    name
-                    type
-                  }
-                  CredentialSchema {
-                    name
-                    type
-                  }
-                  CredentialSubject {
-                    name
-                    type
-                  }
-                  Issuer {
-                    name
-                    type
-                  }
-                  VerifiableCredential {
-                    name
-                    type
-                  }
+                CredentialSchema {
+                  name
+                  type
                 }
-                primaryType
+                CredentialSubject {
+                  name
+                  type
+                }
+                Issuer {
+                  name
+                  type
+                }
+                VerifiableCredential {
+                  name
+                  type
+                }
               }
+              primaryType
             }
           }
         }
       }
-    `;
+    }
+  `;
     return compose.executeQuery<{
         createVerifiableCredentialEIP712: {
+            document: CeramicPowerhouseVerifiableCredential;
+        };
+    }>(query);
+}
+
+export async function revokeCredential(id: string) {
+    await compose.did?.authenticate();
+
+    const now = new Date().toISOString();
+    const query = `
+    mutation {
+      updateVerifiableCredentialEIP712(input: {
+        id: "${id}"
+        content: {
+          revocationDate: "${now}"
+        }
+      }) 
+      {
+        document {
+          id
+          issuer {
+            id
+            ethereumAddress
+          }
+          issuanceDate
+          expirationDate
+          revocationDate
+          type
+          context
+          credentialSubject {
+            id {
+              id
+            }
+            app
+            name
+          }
+          proof {
+            type
+            proofPurpose
+            verificationMethod
+            proofValue
+            created
+            eip712{
+              domain{
+                name
+                version
+                chainId
+              }
+              types {
+                EIP712Domain {
+                  name
+                  type
+                }
+                CredentialSchema {
+                  name
+                  type
+                }
+                CredentialSubject {
+                  name
+                  type
+                }
+                Issuer {
+                  name
+                  type
+                }
+                VerifiableCredential {
+                  name
+                  type
+                }
+              }
+              primaryType
+            }
+          }
+        }
+      }
+    }
+  `;
+    return compose.executeQuery<{
+        updateVerifiableCredentialEIP712: {
             document: CeramicPowerhouseVerifiableCredential;
         };
     }>(query);

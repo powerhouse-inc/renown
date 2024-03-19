@@ -4,6 +4,7 @@ import { PowerhouseVerifiableCredential } from "../../../services/credential";
 import {
     authenticateDID,
     getCredentials,
+    revokeCredential,
     storeCredential,
 } from "../../../services/ceramic";
 
@@ -51,6 +52,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             res.status(500).json(e);
             return;
         }
+    } else if (req.method === "DELETE") {
+        const { id } = req.query;
+        if (!id) {
+            res.status(400).json({});
+            return;
+        }
+        const result = await revokeCredential(id as string);
+        if (result.errors?.length) {
+            throw result.errors[0];
+        }
+        res.status(200).json({
+            credential: result.data?.updateVerifiableCredentialEIP712.document,
+        });
     } else {
         res.status(405).json({});
     }
