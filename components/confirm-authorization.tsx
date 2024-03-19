@@ -1,8 +1,6 @@
-import { ethers } from "ethers";
 import { useAccount, useNetwork } from "wagmi";
 import Button from "./button";
 import WalletButton from "./wallet-button";
-import { useAttestation } from "../hooks/attestation";
 import { useCredential } from "../hooks/credential";
 
 interface IProps {

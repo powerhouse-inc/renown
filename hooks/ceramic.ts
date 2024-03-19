@@ -3,15 +3,12 @@ import { EthereumWebAuth, getAccountId } from "@didtools/pkh-ethereum";
 import { atom, useAtom } from "jotai";
 import {
     compose,
-    storeCredential as ceramicStoreCredential,
     getCredentials as ceramicGetCredentials,
     CeramicPowerhouseVerifiableCredential,
 } from "../services/ceramic";
 import type { WalletClient } from "wagmi";
-import {
-    PowerhouseVerifiableCredential,
-    getAddressDID,
-} from "../services/credential";
+import { PowerhouseVerifiableCredential } from "../services/credential";
+import { useMemo } from "react";
 
 const sessionAtom = atom<DIDSession | undefined>(undefined);
 
@@ -54,14 +51,9 @@ export function useCeramic(provider?: WalletClient | null) {
         if (result.errors?.length) {
             throw result.errors[0];
         }
-        return result.data?.verifiableCredentialEIP712Index.edges[0]?.node;
-        const issuerId = getAddressDID(address, chainId);
+
         const ceramicCredential =
-            result.data?.verifiableCredentialEIP712Index.edges.find(
-                (e) =>
-                    e.node.issuer.id === issuerId &&
-                    e.node.credentialSubject.id === connectId
-            )?.node;
+            result.data?.verifiableCredentialEIP712Index.edges[0]?.node;
         if (ceramicCredential) {
             const { context, ...credential } = ceramicCredential;
             return {
@@ -93,10 +85,35 @@ export function useCeramic(provider?: WalletClient | null) {
         }
     }
 
-    return {
-        session,
-        login,
-        getCredential,
-        storeCredential,
-    };
+    async function revokeCredential(id: string) {
+        try {
+            const response = await fetch(
+                `/api/auth/credential?id=${encodeURIComponent(id)}`,
+                {
+                    method: "DELETE",
+                }
+            );
+            if (response.ok) {
+                const body = await response.json();
+                return body.credential as CeramicPowerhouseVerifiableCredential;
+            } else {
+                throw new Error(
+                    `Failed to revoke credential: ${response.statusText}`
+                );
+            }
+        } catch (e) {
+            throw e;
+        }
+    }
+
+    return useMemo(
+        () => ({
+            session,
+            login,
+            getCredential,
+            storeCredential,
+            revokeCredential,
+        }),
+        [session]
+    );
 }

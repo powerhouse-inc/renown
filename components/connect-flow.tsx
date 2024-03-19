@@ -26,10 +26,10 @@ const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
     const account = useAccount();
     const { chain } = useNetwork();
     const { hasCredential, credential } = useCredential(connectId);
-    const address = encodeURIComponent(credential?.issuer.id ?? "");
+    const user = encodeURIComponent(credential?.issuer.id ?? "");
     const url = deeplink
-        ? `${deeplink}://${address}`
-        : `${connectUrl}?address=${address}`;
+        ? `${deeplink}://${user}`
+        : `${connectUrl}?user=${user}`;
 
     return (
         <div className="flex flex-col items-center">

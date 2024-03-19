@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useMemo } from "react";
 import { atom, useAtom } from "jotai";
 import { useCallback } from "react";
+import credential from "../pages/api/auth/credential";
 
 interface ICredential {
     credential: PowerhouseVerifiableCredential | undefined;
@@ -22,6 +23,7 @@ interface ICredential {
     hasCredential: boolean;
     loading: boolean;
     createCredential: () => Promise<PowerhouseVerifiableCredential | undefined>;
+    revokeCredential: () => Promise<void>;
 }
 
 const credentialAtom = atom<PowerhouseVerifiableCredential | undefined>(
@@ -35,9 +37,9 @@ export function useCredential(connectId: string): ICredential {
     const { signTypedDataAsync } = useSignTypedData();
     const {
         session,
-        login,
         getCredential: _getCredential,
         storeCredential,
+        revokeCredential: _revokeCredential,
     } = useCeramic(walletClient);
     const [credential, setCredential] = useAtom<
         PowerhouseVerifiableCredential | undefined
@@ -46,27 +48,25 @@ export function useCredential(connectId: string): ICredential {
         "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"
     >(credential ? "SUCCESS" : "INITIAL");
 
-    async function getCredential(
-        address: string,
-        chainId: number,
-        connectId: string
-    ) {
-        setState("FETCHING_CREDENTIAL");
-        try {
-            const credential = await _getCredential(
-                address,
-                chainId,
-                connectId
-            );
-            if (credential) {
+    const getCredential = useCallback(
+        async (address: string, chainId: number, connectId: string) => {
+            setState("FETCHING_CREDENTIAL");
+            try {
+                const credential = await _getCredential(
+                    address,
+                    chainId,
+                    connectId
+                );
                 setCredential(credential);
+                setState("SUCCESS");
+            } catch (e) {
+                setCredential(undefined);
+                console.error(e);
+                setState("ERROR");
             }
-            setState("SUCCESS");
-        } catch (e) {
-            console.error(e);
-            setState("ERROR");
-        }
-    }
+        },
+        [_getCredential, setCredential]
+    );
 
     const createCredential = useCallback(
         async (address: `0x${string}`, chainId: number, connectId: string) => {
@@ -82,7 +82,7 @@ export function useCredential(connectId: string): ICredential {
                 console.log("Credential created", credential);
                 const document = await storeCredential(credential);
                 console.log("Credential stored", document);
-                setCredential(credential);
+                setCredential({ ...credential, id: document.id });
                 setState("SUCCESS");
                 return credential;
             } catch (e) {
@@ -92,6 +92,26 @@ export function useCredential(connectId: string): ICredential {
         },
         [setCredential, signTypedDataAsync, storeCredential]
     );
+
+    const revokeCredential = useCallback(async () => {
+        try {
+            if (!credential) {
+                return;
+            }
+            await _revokeCredential(credential?.id);
+            address && getCredential(address, chainId, connectId);
+        } catch (e) {
+            console.error(e);
+            setState("ERROR");
+        }
+    }, [
+        _revokeCredential,
+        address,
+        chainId,
+        connectId,
+        credential,
+        getCredential,
+    ]);
 
     if (
         state === "INITIAL" &&
@@ -115,11 +135,13 @@ export function useCredential(connectId: string): ICredential {
                 }
                 return createCredential(address, chainId, connectId);
             },
+            revokeCredential,
         }),
         [
             credential,
             session,
             state,
+            revokeCredential,
             address,
             createCredential,
             chainId,
