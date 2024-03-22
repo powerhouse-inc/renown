@@ -28,7 +28,7 @@ const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
     const { hasCredential, credential } = useCredential(connectId);
     const user = encodeURIComponent(credential?.issuer.id ?? "");
     const url = deeplink
-        ? `${deeplink}://${user}`
+        ? `${deeplink}://login/${user}`
         : `${connectUrl}?user=${user}`;
 
     return (
