@@ -4,7 +4,7 @@ import { DID } from "dids";
 import { Ed25519Provider } from "key-did-provider-ed25519";
 import KeyResolver from "key-did-resolver";
 import { fromString } from "uint8arrays/from-string";
-import { definition } from "../__generated__/definition.js";
+import { definition } from "../ceramic/__generated__/definition.js";
 import { PowerhouseVerifiableCredential, getAddressDID } from "./credential";
 
 export type CeramicPowerhouseVerifiableCredential = Omit<
