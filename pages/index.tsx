@@ -14,6 +14,7 @@ const Home: NextPage = () => {
     const router = useRouter();
     const connectId = router.query["connect"]?.toString();
     const deeplink = router.query["deeplink"]?.toString();
+    const returnUrl = router.query["returnUrl"]?.toString();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -55,7 +56,11 @@ const Home: NextPage = () => {
 
                 <main className={styles.main}>
                     {connectId && isClient && (
-                        <Connect connectId={connectId} deeplink={deeplink} />
+                        <Connect
+                            connectId={connectId}
+                            deeplink={deeplink}
+                            returnUrl={returnUrl}
+                        />
                     )}
                 </main>
             </div>

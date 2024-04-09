@@ -14,6 +14,7 @@ import Credential from "./credential";
 interface IProps {
     connectId: string;
     deeplink?: string;
+    returnUrl?: string;
 }
 
 function ConnectIdText(id: string) {
@@ -22,14 +23,24 @@ function ConnectIdText(id: string) {
 
 const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
 
-const ConnectFlow: React.FC<IProps> = ({ connectId, deeplink }) => {
+function buildUrl(returnUrl: string, user: string) {
+    const url = new URL(returnUrl);
+    url.searchParams.set("user", user);
+    return url.toString();
+}
+
+const ConnectFlow: React.FC<IProps> = ({
+    connectId,
+    deeplink,
+    returnUrl = connectUrl,
+}) => {
     const account = useAccount();
     const { chain } = useNetwork();
     const { hasCredential, credential } = useCredential(connectId);
     const user = encodeURIComponent(credential?.issuer.id ?? "");
     const url = deeplink
         ? `${deeplink}://login/${user}`
-        : `${connectUrl}?user=${user}`;
+        : buildUrl(returnUrl ?? "", user);
 
     return (
         <div className="flex flex-col items-center">
