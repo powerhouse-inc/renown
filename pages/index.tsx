@@ -22,29 +22,33 @@ const Home: NextPage = () => {
     }, []);
 
     return (
-        <div className="relative">
+        <div className="relative overflow-hidden">
             <div className="absolute w-screen h-screen overflow-hidden z-0 fill-[#404040]">
                 <Image
+                    priority
                     src={LandingGradient}
                     alt="background"
                     className="absolute w-[101vw] max-w-none h-screen z-0 object-cover"
                 />
                 <Image
+                    priority
                     src={Noise}
                     alt="noise"
                     className="absolute w-[101vw] max-w-none h-screen z-0 object-cover"
                 />
                 <Image
+                    priority
+                    src={PhIcons}
+                    alt="Renown"
+                    className="absolute left-0 bottom-0 pointer-events-none"
+                />
+                <Image
+                    priority
                     src={RenownLight}
                     alt="Renown"
                     width={154}
                     height={48}
                     className="absolute left-8 top-3"
-                />
-                <Image
-                    src={PhIcons}
-                    alt="Renown"
-                    className="absolute left-0 bottom-0 pointer-events-none"
                 />
             </div>
             <div className={styles.container}>

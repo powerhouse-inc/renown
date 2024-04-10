@@ -8,7 +8,6 @@ import {
 } from "wagmi";
 import {
     createPowerhouseVerifiableCredential,
-    EIP712VC_CHAIN_ID,
     PowerhouseVerifiableCredential,
 } from "../services/credential";
 import { useState } from "react";
@@ -115,7 +114,6 @@ export function useCredential(connectId: string): ICredential {
 
     if (
         state === "INITIAL" &&
-        chainId === EIP712VC_CHAIN_ID &&
         address &&
         connectId
         // TODO check if credential is valid (address changed)

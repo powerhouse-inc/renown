@@ -72,7 +72,6 @@ export type PowerhouseVerifiableCredential = IVerifiableCredential<
     IPowerhouseIssuerType
 >;
 
-export const EIP712VC_CHAIN_ID = process.env.EIP712VC_CHAIN_ID || 11155111;
 const EIP712VC_NAME = process.env.NEXT_PUBLIC_EIP712VC_NAME || "Renown";
 const EIP712VC_VERSION = process.env.NEXT_PUBLIC_EIP712VC_ERSION || "0.1";
 const EIP712VC_VERIFYING_CONTRACT =
