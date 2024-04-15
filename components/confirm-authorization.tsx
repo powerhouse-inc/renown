@@ -28,7 +28,13 @@ export const ConfirmAuthorization: React.FC<IProps> = ({ connectId }) => {
                     Confirm Authorization
                 </Button>
             ) : null}
-            <Button secondary className="w-full hover:bg-neutral-1">
+            <Button
+                secondary
+                className="w-full hover:bg-neutral-1"
+                onClick={() => {
+                    history.back();
+                }}
+            >
                 Cancel
             </Button>
         </>
