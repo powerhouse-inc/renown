@@ -13,11 +13,17 @@ const inter = Inter({ subsets: ["latin"] });
 
 const INFURA_PROJECT_ID = process.env.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID;
 
-function initWagmi(networkId: string) {
-    const id = parseInt(networkId);
+function initWagmi(networkId: string, chainId: string) {
+    if (networkId !== "eip155") {
+        throw new Error(
+            `Network '${networkId}' is not supported. Supported networks: eip155`
+        );
+    }
+
+    const id = parseInt(chainId);
     const chain = getChain(id);
     if (!chain) {
-        throw new Error(`Chain with network id '${networkId}' found`);
+        throw new Error(`Chain with id '${chainId}' found`);
     }
 
     const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -47,9 +53,10 @@ function initWagmi(networkId: string) {
 
 function MyApp({ Component, pageProps, router }: AppProps) {
     const networkId = router.query["network"]?.toString();
+    const chainId = router.query["chain"]?.toString();
     const { wagmiConfig, chains } = useMemo(
-        () => initWagmi(networkId ?? "1"),
-        [networkId]
+        () => initWagmi(networkId ?? "eip155", chainId ?? "1"),
+        [networkId, chainId]
     );
     return (
         <main className={inter.className}>
