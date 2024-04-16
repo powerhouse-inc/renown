@@ -154,7 +154,7 @@ export async function createPowerhouseVerifiableCredential(
         "@context": [DEFAULT_CONTEXT, EIP712_CONTEXT],
         type: [DEFAULT_VC_TYPE, VC_TYPE],
         credentialSchema: {
-            id: "https://example.com/degree.jsonld",
+            id: "https://www.powerhouse.inc/renown/credential.jsonld",
             type: "JsonSchemaValidator2018",
         },
     };
