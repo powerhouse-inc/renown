@@ -8,9 +8,12 @@ import {
     storeCredential,
 } from "../../../services/ceramic";
 
+console.time("authenticateDID");
 await authenticateDID();
+console.timeEnd("authenticateDID");
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+    console.time("handler");
     if (req.method === "GET") {
         const { address, chainId, connectId } = req.query;
         if (!connectId || !chainId || !address) {
@@ -68,6 +71,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } else {
         res.status(405).json({});
     }
+    console.timeEnd("handler");
 }
 
 export default allowCors(handler);

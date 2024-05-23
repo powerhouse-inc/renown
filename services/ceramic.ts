@@ -138,7 +138,9 @@ export async function getCredentials(
 export async function storeCredential(
     credential: PowerhouseVerifiableCredential
 ) {
+    console.time("compose.did.authenticate");
     await compose.did?.authenticate();
+    console.timeEnd("compose.did.authenticate");
 
     const { verifyingContract, ...domain } = credential.proof.eip712.domain;
     const query = `
@@ -236,15 +238,20 @@ export async function storeCredential(
       }
     }
   `;
-    return compose.executeQuery<{
+    console.time("createVerifiableCredentialEIP712");
+    const result = compose.executeQuery<{
         createVerifiableCredentialEIP712: {
             document: CeramicPowerhouseVerifiableCredential;
         };
     }>(query);
+    console.timeEnd("createVerifiableCredentialEIP712");
+    return result
 }
 
 export async function revokeCredential(id: string) {
+    console.time("compose.did.authenticate");
     await compose.did?.authenticate();
+    console.timeEnd("compose.did.authenticate");
 
     const now = new Date().toISOString();
     const query = `
@@ -315,11 +322,15 @@ export async function revokeCredential(id: string) {
       }
     }
   `;
-    return compose.executeQuery<{
+
+   console.time("updateVerifiableCredentialEIP712");
+   const result = compose.executeQuery<{
         updateVerifiableCredentialEIP712: {
             document: CeramicPowerhouseVerifiableCredential;
         };
     }>(query);
+    console.timeEnd("updateVerifiableCredentialEIP712");
+    return result;
 }
 
 export async function authenticateDID() {
@@ -328,13 +339,20 @@ export async function authenticateDID() {
     if (!CERAMIC_SEED) {
         throw new Error("CERAMIC_SEED is not defined");
     }
+
+    console.time('staticDid.fromString');
     const key = fromString(CERAMIC_SEED, "base16");
+    console.timeEnd('staticDid.fromString');
     const provider = new Ed25519Provider(key);
+    console.time('staticDid.new');
     const staticDid = new DID({
         resolver: KeyResolver.getResolver(),
         provider,
     });
+    console.timeEnd('staticDid.new');
+    console.time('staticDid.authenticate');
     await staticDid.authenticate();
+    console.timeEnd('staticDid.authenticate');
     compose.setDID(staticDid);
     return staticDid;
 }
