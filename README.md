@@ -1,4 +1,12 @@
-This is a [RainbowKit](https://rainbowkit.com) + [wagmi](https://wagmi.sh) + [Next.js](https://nextjs.org/) project bootstrapped with [`create-rainbowkit`](https://github.com/rainbow-me/rainbowkit/tree/main/packages/create-rainbowkit).
+# Powerhouse Renown
+
+![app](./.github/app.png)
+
+## Decentralized identity + reputation hub
+
+- Create a pseudonymous contributor identity, tethered to your Ethereum address. Build up reputation points in various professional fields by successfully delivering projects.
+- Share your pseudonymous profile as a resume with organizations you want to work for.
+- Define gamification rewards to incentivize value-aligned behavior within the organization, reducing the need for a management hierarchy
 
 ## Getting Started
 
