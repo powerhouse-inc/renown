@@ -10,10 +10,20 @@
 
 ## Getting Started
 
+### Prerequisites
+
+- Install [**Node (LTS)**](https://nodejs.org/en/download/)
+- Clone this repository
+- Install [pnpm](https://pnpm.io/): `npm install -g pnpm`
+- Run `pnpm install` or `npm install` to install dependencies
+
 First, run the development server:
 
 ```bash
 npm run dev
+# OR
+pnpm dev
+
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
