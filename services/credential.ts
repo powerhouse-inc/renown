@@ -73,7 +73,7 @@ export type PowerhouseVerifiableCredential = IVerifiableCredential<
 >;
 
 const EIP712VC_NAME = process.env.NEXT_PUBLIC_EIP712VC_NAME || "Renown";
-const EIP712VC_VERSION = process.env.NEXT_PUBLIC_EIP712VC_ERSION || "0.1";
+const EIP712VC_VERSION = process.env.NEXT_PUBLIC_EIP712VC_VERSION || "0.1";
 const EIP712VC_VERIFYING_CONTRACT =
     (process.env.NEXT_PUBLIC_VERIFYING_CONTRACT as `0x${string}`) ||
     "0x0000000000000000000000000000000000000000";
