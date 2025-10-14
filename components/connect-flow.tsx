@@ -1,6 +1,6 @@
 "use client";
 
-import { useAccount, useNetwork } from "wagmi";
+import { useAccount, useEnsName, useDisconnect } from "wagmi";
 import Image from "next/image";
 import Header from "../assets/images/header.jpg";
 import IconRenown from "../assets/icons/renown.svg";
@@ -10,6 +10,7 @@ import Button from "./button";
 import { useCredential } from "../hooks/credential";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
+import WalletButton from "./wallet-button";
 
 interface IProps {
     connectId: string;
@@ -34,8 +35,9 @@ const ConnectFlow: React.FC<IProps> = ({
     deeplink,
     returnUrl = connectUrl,
 }) => {
-    const account = useAccount();
-    const { chain } = useNetwork();
+    const { address, isConnected, chain } = useAccount();
+    const { data: ensName } = useEnsName({ address });
+    const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId);
     const user = encodeURIComponent(credential?.issuer.id ?? "");
     const url = deeplink
@@ -60,7 +62,7 @@ const ConnectFlow: React.FC<IProps> = ({
                 </div>
                 <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10">
                     <h2 className="mb-3 text-3xl font-semibold">
-                        {account.isConnected && !chain?.unsupported
+                        {isConnected && chain
                             ? "Confirm Authorization"
                             : "Connect Wallet"}
                     </h2>
@@ -68,23 +70,67 @@ const ConnectFlow: React.FC<IProps> = ({
                         Click on the button below to start signing messages in
                         Connect on behalf of your Ethereum identity
                     </p>
-                    <div className="rounded-xl p-4 text-center mb-10 bg-neutral-2-light flex gap-3">
-                        <Image src={IconConnect} alt="Renown" />
-                        <div className="max-w-[284px] text-left">
-                            <h3 className="text-neutral-5-light font-medium">
-                                Powerhouse Connect
-                            </h3>
-                            <p className="text-neutral-4 whitespace-nowrap overflow-hidden text-ellipsis">
-                                Device ID: {ConnectIdText(connectId)}
-                            </p>
+                    {/* Ethereum Profile Card */}
+                    {address && (
+                        <div className="rounded-xl p-4 mb-6 bg-neutral-2-light flex gap-3 w-full">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
+                                {address.slice(2, 4).toUpperCase()}
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-neutral-5-light font-medium">
+                                    {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
+                                </h3>
+                                <p className="text-neutral-4 text-sm">
+                                    {address.slice(0, 6)}...{address.slice(-4)}
+                                </p>
+                                <div className="flex gap-3 mt-1">
+                                    <button className="text-link text-sm underline underline-offset-4" onClick={() => {
+                                        window.open(`/profile/${address}`, '_blank');
+                                    }}>
+                                        View profile
+                                    </button>
+                                    <button className="text-red text-sm underline underline-offset-4" onClick={() => disconnect()}>
+                                        Disconnect
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    {!hasCredential ? (
-                        <ConfirmAuthorization connectId={connectId} />
-                    ) : account.address ? (
-                        <Credential connectId={connectId} />
-                    ) : null}
-                    {account.address && hasCredential ? (
+                    )}
+
+                    {/* Authorization Status */}
+                    {!address ? (
+                        <div className="flex flex-col w-full gap-3">
+                            {/* Connected Application Card */}
+                            <div className="rounded-xl p-4 bg-neutral-2-light flex gap-3 w-full mb-3">
+                                <Image src={IconConnect} alt="Application" width={36} height={36} />
+                                <div className="flex-1">
+                                    <h3 className="font-medium">
+                                        {returnUrl ? new URL(returnUrl).hostname : 'Powerhouse: Connect'}
+                                    </h3>
+                                    <p className="text-sm">
+                                        Device ID: {ConnectIdText(connectId)}
+                                    </p>
+                                </div>
+                            </div>
+                            <WalletButton />
+                            <Button
+                                secondary
+                                className="w-full hover:bg-neutral-1"
+                                onClick={() => {
+                                    history.back();
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    ) : !hasCredential ? (
+                        <ConfirmAuthorization connectId={connectId} returnUrl={returnUrl} />
+                    ) : (
+                        <Credential connectId={connectId} returnUrl={returnUrl} />
+                    )}
+
+                    
+                    {address && hasCredential ? (
                         <a
                             href={url}
                             className="text-center block w-full mt-12"
