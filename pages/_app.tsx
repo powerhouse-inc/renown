@@ -1,19 +1,43 @@
 import "../styles/globals.css";
-import "@rainbow-me/rainbowkit/styles.css";
-import { getDefaultWallets, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import type { AppProps } from "next/app";
-import { configureChains, createConfig, WagmiConfig } from "wagmi";
-import { infuraProvider } from "wagmi/providers/infura";
-import { publicProvider } from "wagmi/providers/public";
+import { createConfig, WagmiProvider, http } from "wagmi";
+import { injected, walletConnect } from "wagmi/connectors";
 import { Inter } from "next/font/google";
 import { getChain } from "../utils/viem";
-import { useMemo } from "react";
+import { useRef } from "react";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
+import '@rainbow-me/rainbowkit/styles.css';
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Suppress known Next.js 13.5.11 + React 18.3 fetchPriority warning
+const originalError = console.error;
+console.error = (...args) => {
+    if (
+        typeof args[0] === 'string' &&
+        args[0].includes('React does not recognize the `fetchPriority` prop')
+    ) {
+        return;
+    }
+    originalError.apply(console, args);
+};
+
 const INFURA_PROJECT_ID = process.env.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID;
 
+const queryClient = new QueryClient();
+
+// Cache wagmi configs to prevent multiple WalletConnect initializations
+const wagmiConfigCache = new Map<string, ReturnType<typeof createConfig>>();
+
 function initWagmi(networkId: string, chainId: string) {
+    const cacheKey = `${networkId}-${chainId}`;
+    
+    // Return cached config if it exists
+    if (wagmiConfigCache.has(cacheKey)) {
+        return wagmiConfigCache.get(cacheKey)!;
+    }
+
     if (networkId !== "eip155") {
         throw new Error(
             `Network '${networkId}' is not supported. Supported networks: eip155`
@@ -26,45 +50,48 @@ function initWagmi(networkId: string, chainId: string) {
         throw new Error(`Chain with id '${chainId}' found`);
     }
 
-    const { chains, publicClient, webSocketPublicClient } = configureChains(
-        [chain],
-        [
-            INFURA_PROJECT_ID
-                ? infuraProvider({ apiKey: INFURA_PROJECT_ID })
-                : publicProvider(),
-        ]
-    );
-
-    const { connectors } = getDefaultWallets({
-        appName: "Renown",
-        projectId: process.env.NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID || "",
-        chains,
-    });
-
     const wagmiConfig = createConfig({
-        autoConnect: true,
-        connectors,
-        publicClient,
-        webSocketPublicClient,
+        chains: [chain],
+        connectors: [
+            injected(),
+            walletConnect({
+                projectId: process.env.NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID || "",
+                showQrModal: false,
+            }),
+        ],
+        transports: {
+            [chain.id]: http(
+                INFURA_PROJECT_ID
+                    ? `https://${chain.name.toLowerCase().replace(/\s+/g, '-')}.infura.io/v3/${INFURA_PROJECT_ID}`
+                    : undefined
+            ),
+        },
     });
 
-    return { wagmiConfig, chains } as const;
+    // Cache the config
+    wagmiConfigCache.set(cacheKey, wagmiConfig);
+    return wagmiConfig;
 }
 
 function MyApp({ Component, pageProps, router }: AppProps) {
-    const networkId = router.query["network"]?.toString();
-    const chainId = router.query["chain"]?.toString();
-    const { wagmiConfig, chains } = useMemo(
-        () => initWagmi(networkId ?? "eip155", chainId ?? "1"),
-        [networkId, chainId]
-    );
+    const networkId = router.query["network"]?.toString() ?? "eip155";
+    const chainId = router.query["chain"]?.toString() ?? "1";
+    const configRef = useRef<ReturnType<typeof createConfig> | null>(null);
+    
+    // Only create config once per network/chain combination
+    if (!configRef.current) {
+        configRef.current = initWagmi(networkId, chainId);
+    }
+    
     return (
         <main className={inter.className}>
-            <WagmiConfig config={wagmiConfig}>
-                <RainbowKitProvider chains={chains}>
-                    <Component {...pageProps} />
-                </RainbowKitProvider>
-            </WagmiConfig>
+            <WagmiProvider config={configRef.current}>
+                <QueryClientProvider client={queryClient}>
+                    <RainbowKitProvider>
+                        <Component {...pageProps} />
+                    </RainbowKitProvider>
+                </QueryClientProvider>
+            </WagmiProvider>
         </main>
     );
 }
