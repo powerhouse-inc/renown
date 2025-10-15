@@ -2,7 +2,8 @@ import { NextApiRequest, NextApiResponse } from "next/types";
 import { allowCors } from "./[utils]";
 import { GraphQLClient } from "graphql-request";
 
-const RENOWN_ENDPOINT = process.env.NEXT_PUBLIC_RENOWN_ENDPOINT || "http://localhost:4001/graphql";
+const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "https://switchboard.renown-staging.vetra.io/graphql";
+const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || "renown-profiles";
 
 const GET_PROFILE_QUERY = `
     query ($input: GetProfileInput!) {
@@ -18,8 +19,11 @@ const GET_PROFILE_QUERY = `
 `;
 
 interface GetProfileInput {
+    driveId: string;
+    id?: string;
     ethAddress?: string;
     username?: string;
+    searchInput?: string;
 }
 
 interface Profile {
@@ -33,15 +37,23 @@ interface Profile {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === "POST") {
-        const input = req.body as GetProfileInput;
+        const body = req.body;
 
-        if (!input.ethAddress && !input.username) {
-            res.status(400).json({ error: "Either ethAddress or username is required" });
+        if (!body.id && !body.ethAddress && !body.username && !body.searchInput) {
+            res.status(400).json({ error: "Either id, ethAddress, username, or searchInput is required" });
             return;
         }
 
+        const input: GetProfileInput = {
+            driveId: body.driveId || DEFAULT_DRIVE_ID,
+            ...(body.id && { id: body.id }),
+            ...(body.ethAddress && { ethAddress: body.ethAddress }),
+            ...(body.username && { username: body.username }),
+            ...(body.searchInput && { searchInput: body.searchInput }),
+        };
+
         try {
-            const client = new GraphQLClient(RENOWN_ENDPOINT);
+            const client = new GraphQLClient(SWITCHBOARD_ENDPOINT);
             const data = await client.request<{ getProfile: Profile }>(
                 GET_PROFILE_QUERY,
                 { input }

@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next/types";
 import { allowCors } from "../[utils]";
 import { GraphQLClient } from "graphql-request";
 
-const RENOWN_ENDPOINT = process.env.NEXT_PUBLIC_RENOWN_ENDPOINT || "http://localhost:4001/graphql";
+const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "https://switchboard.renown-staging.vetra.io/graphql";
 
 const CREATE_DOCUMENT_MUTATION = `
     mutation RenownCredential_createDocument(
@@ -57,7 +57,7 @@ interface RevokeCredentialInput {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-    const client = new GraphQLClient(RENOWN_ENDPOINT);
+    const client = new GraphQLClient(SWITCHBOARD_ENDPOINT);
 
     if (req.method === "POST") {
         // Create/Init a credential
