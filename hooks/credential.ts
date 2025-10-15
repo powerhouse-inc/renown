@@ -1,95 +1,55 @@
-import { useEffect } from "react";
-import { useCeramic } from "./ceramic";
-import {
-    useAccount,
-    useWalletClient,
-    useSignTypedData,
-    useChainId,
-} from "wagmi";
-import {
-    createPowerhouseVerifiableCredential,
-    PowerhouseVerifiableCredential,
-} from "../services/credential";
-import { useState } from "react";
-import { useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useAccount, useChainId } from "wagmi";
 import { atom, useAtom } from "jotai";
-import { useCallback } from "react";
-import credential from "../pages/api/auth/credential";
+import { useAuth } from "./auth";
 
 interface ICredential {
-    credential: PowerhouseVerifiableCredential | undefined;
+    credential: string | undefined; // Now stores JWT instead of VC
     isAuth: boolean;
     hasCredential: boolean;
     loading: boolean;
-    createCredential: () => Promise<PowerhouseVerifiableCredential | undefined>;
+    createCredential: () => Promise<string | undefined>;
     revokeCredential: () => Promise<void>;
 }
 
-const credentialAtom = atom<PowerhouseVerifiableCredential | undefined>(
-    undefined
-);
+const credentialAtom = atom<string | undefined>(undefined);
 
 export function useCredential(connectId: string): ICredential {
-    const { data: walletClient } = useWalletClient();
     const { address } = useAccount();
     const chainId = useChainId();
-    const { signTypedDataAsync } = useSignTypedData();
-    const {
-        session,
-        getCredential: _getCredential,
-        storeCredential,
-        revokeCredential: _revokeCredential,
-    } = useCeramic(walletClient);
-    const [credential, setCredential] = useAtom<
-        PowerhouseVerifiableCredential | undefined
-    >(credentialAtom);
+    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
+    const [credential, setCredential] = useAtom<string | undefined>(credentialAtom);
     const [state, setState] = useState<
         "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"
     >(credential ? "SUCCESS" : "INITIAL");
 
-    const getCredential = useCallback(
-        async (address: string, chainId: number, connectId: string) => {
-            setState("FETCHING_CREDENTIAL");
-            try {
-                const credential = await _getCredential(
-                    address,
-                    chainId,
-                    connectId
-                );
-                setCredential(credential);
-                setState("SUCCESS");
-            } catch (e) {
-                setCredential(undefined);
-                console.error(e);
-                setState("ERROR");
-            }
-        },
-        [_getCredential, setCredential]
-    );
+    // Sync JWT from useAuth to local credential state
+    useEffect(() => {
+        if (jwt) {
+            setCredential(jwt);
+            setState("SUCCESS");
+        } else {
+            setCredential(undefined);
+            setState("INITIAL");
+        }
+    }, [jwt, setCredential]);
 
     const createCredential = useCallback(
         async (address: `0x${string}`, chainId: number, connectId: string) => {
             setState("FETCHING_CREDENTIAL");
             try {
-                const credential = await createPowerhouseVerifiableCredential(
-                    address,
-                    chainId,
-                    { id: connectId, app: "Connect" },
-                    signTypedDataAsync
-                );
-
-                console.log("Credential created", credential);
-                const document = await storeCredential(credential);
-                console.log("Credential stored", document);
-                setCredential({ ...credential, id: document.id });
+                // Use the JWT authentication system
+                const jwtToken = await login(connectId);
+                console.log("JWT credential created and stored", jwtToken);
+                setCredential(jwtToken);
                 setState("SUCCESS");
-                return credential;
+                return jwtToken;
             } catch (e) {
                 console.error(e);
                 setState("ERROR");
             }
         },
-        [setCredential, signTypedDataAsync, storeCredential]
+        [login, setCredential]
     );
 
     const revokeCredential = useCallback(async () => {
@@ -97,36 +57,25 @@ export function useCredential(connectId: string): ICredential {
             if (!credential) {
                 return;
             }
-            await _revokeCredential(credential?.id);
-            address && getCredential(address, chainId, connectId);
+            await logout();
+            setCredential(undefined);
+            setState("INITIAL");
         } catch (e) {
             console.error(e);
             setState("ERROR");
         }
     }, [
-        _revokeCredential,
-        address,
-        chainId,
-        connectId,
+        logout,
         credential,
-        getCredential,
+        setCredential,
     ]);
-
-    if (
-        state === "INITIAL" &&
-        address &&
-        connectId
-        // TODO check if credential is valid (address changed)
-    ) {
-        getCredential(address, chainId, connectId);
-    }
 
     return useMemo(
         () => ({
             credential,
-            isAuth: session?.isAuthorized() ?? false,
+            isAuth: isAuthenticated,
             hasCredential: !!credential,
-            loading: state === "FETCHING_CREDENTIAL",
+            loading: state === "FETCHING_CREDENTIAL" || authLoading,
             createCredential: () => {
                 if (!address) {
                     throw new Error("Address is not set");
@@ -137,8 +86,9 @@ export function useCredential(connectId: string): ICredential {
         }),
         [
             credential,
-            session,
+            isAuthenticated,
             state,
+            authLoading,
             revokeCredential,
             address,
             createCredential,

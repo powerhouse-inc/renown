@@ -11,6 +11,7 @@ import { useCredential } from "../hooks/credential";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import WalletButton from "./wallet-button";
+import { decodeJWT } from "../services/did-jwt-auth";
 
 interface IProps {
     connectId: string;
@@ -39,7 +40,12 @@ const ConnectFlow: React.FC<IProps> = ({
     const { data: ensName } = useEnsName({ address });
     const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId);
-    const user = encodeURIComponent(credential?.issuer.id ?? "");
+
+    // Extract issuer DID from JWT credential
+    const user = credential
+        ? encodeURIComponent(decodeJWT(credential).iss ?? "")
+        : "";
+
     const url = deeplink
         ? `${deeplink}://login/${user}`
         : buildUrl(returnUrl ?? "", user);
