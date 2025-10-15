@@ -1,3 +1,8 @@
+## <small>1.0.1 (2025-10-15)</small>
+
+* fix: removed public dir from dockerfile ([be18ceb](https://github.com/powerhouse-inc/renown/commit/be18ceb))
+* chore: removed old workflows ([edcebde](https://github.com/powerhouse-inc/renown/commit/edcebde))
+
 ## 1.0.0 (2025-10-15)
 
 * fix: docker build ([0a00d49](https://github.com/powerhouse-inc/renown/commit/0a00d49))
