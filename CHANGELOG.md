@@ -1,3 +1,7 @@
+## 1.1.0 (2025-10-15)
+
+* feat: added profile page ([51f43b2](https://github.com/powerhouse-inc/renown/commit/51f43b2))
+
 ## <small>1.0.1 (2025-10-15)</small>
 
 * fix: removed public dir from dockerfile ([be18ceb](https://github.com/powerhouse-inc/renown/commit/be18ceb))
