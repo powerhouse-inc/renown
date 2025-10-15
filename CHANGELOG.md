@@ -1,3 +1,7 @@
+## <small>1.1.1 (2025-10-15)</small>
+
+* fix: use new switchboard endpoint env var ([b97a526](https://github.com/powerhouse-inc/renown/commit/b97a526))
+
 ## 1.1.0 (2025-10-15)
 
 * feat: added profile page ([51f43b2](https://github.com/powerhouse-inc/renown/commit/51f43b2))
