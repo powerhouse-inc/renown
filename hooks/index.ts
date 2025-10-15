@@ -3,6 +3,9 @@ import React from "react";
 import { useWalletClient } from "wagmi";
 import type { WalletClient } from "viem";
 
+export { useRenownSwitchboard } from "./renown-switchboard";
+export { useAuth } from "./auth";
+
 export function walletClientToProvider(walletClient: WalletClient) {
   const { chain, transport } = walletClient;
   if (!chain) {
