@@ -1,3 +1,7 @@
+## <small>1.1.3 (2025-10-16)</small>
+
+* fix: did jwt auth ([c292bb8](https://github.com/powerhouse-inc/renown/commit/c292bb8))
+
 ## <small>1.1.2 (2025-10-16)</small>
 
 * fix: eth sign ([fd1e085](https://github.com/powerhouse-inc/renown/commit/fd1e085))
