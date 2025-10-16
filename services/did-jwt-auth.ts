@@ -37,7 +37,10 @@ function createWagmiES256KSigner(walletClient: WalletClient) {
     }
 
     // Convert data to Uint8Array if it's a string
-    const dataBytes = typeof data === "string" ? hexToBytes(data) : data;
+    // The data from did-jwt is typically a UTF-8 string that needs to be converted to bytes
+    const dataBytes = typeof data === "string"
+      ? new TextEncoder().encode(data)
+      : data;
 
     // Convert to hex string with 0x prefix for wagmi
     const hexData = `0x${bytesToHex(dataBytes)}` as `0x${string}`;
