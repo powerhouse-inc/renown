@@ -4,6 +4,7 @@ import {
   JWTPayload,
   JWTVerified,
   ES256KSigner,
+  bytesToBase64url,
 } from "did-jwt";
 import { Resolver } from "did-resolver";
 import { getResolver } from "ethr-did-resolver";
@@ -51,8 +52,27 @@ function createWagmiES256KSigner(walletClient: WalletClient) {
       message: { raw: hexData },
     });
 
-    // Remove the '0x' prefix and return
-    return signature.slice(2);
+    // wagmi returns signature as 0x + 130 hex chars (65 bytes)
+    // Format: r (32 bytes) + s (32 bytes) + v (1 byte)
+    // Remove '0x' prefix and convert to bytes
+    const signatureBytes = hexToBytes(signature.slice(2));
+
+    // The signature should be 65 bytes (r + s + recovery)
+    if (signatureBytes.length !== 65) {
+      throw new Error(`Invalid signature length: expected 65 bytes, got ${signatureBytes.length}`);
+    }
+
+    // Ethereum uses v = 27 or 28, but did-jwt expects recovery param 0 or 1
+    // Convert v to recovery param by subtracting 27
+    const recoveryParam = signatureBytes[64] >= 27 ? signatureBytes[64] - 27 : signatureBytes[64];
+
+    // Create the final signature with the corrected recovery param
+    const finalSignature = new Uint8Array(65);
+    finalSignature.set(signatureBytes.slice(0, 64), 0); // r + s
+    finalSignature[64] = recoveryParam; // recovery param (0 or 1)
+
+    // Return as base64url-encoded string
+    return bytesToBase64url(finalSignature);
   };
 }
 
