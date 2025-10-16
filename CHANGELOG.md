@@ -1,3 +1,8 @@
+## <small>1.1.2 (2025-10-16)</small>
+
+* fix: eth sign ([fd1e085](https://github.com/powerhouse-inc/renown/commit/fd1e085))
+* fix: node version ([2b23ee0](https://github.com/powerhouse-inc/renown/commit/2b23ee0))
+
 ## <small>1.1.1 (2025-10-15)</small>
 
 * fix: use new switchboard endpoint env var ([b97a526](https://github.com/powerhouse-inc/renown/commit/b97a526))
