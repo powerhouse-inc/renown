@@ -1,9 +1,9 @@
 import { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
-import Image from 'next/image'
 import { getProfile, RenownProfile } from '../../services/switchboard'
 import styles from '../../styles/Home.module.css'
-import RenownLight from '../../assets/images/Renown-light.svg'
+import RenownCard from '../../components/renown-card'
+import PageBackground from '../../components/page-background'
 
 interface ProfilePageProps {
   profile: RenownProfile | null
@@ -59,28 +59,18 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
     : null
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+    <PageBackground>
       <Head>
-        <title>{displayName} - Renown Profile</title>
-        <meta content={`${displayName}'s Renown profile`} name="description" />
+        <title>{String(displayName)} - Renown Profile</title>
+        <meta content={`${String(displayName)}'s Renown profile`} name="description" />
         <link href="/favicon.ico" rel="icon" />
       </Head>
 
-      {/* Header */}
-      <header className="absolute left-0 right-0 top-0 z-10 p-6">
-        <Image src={RenownLight} alt="Renown" width={154} height={48} />
-      </header>
-
       {/* Main Content */}
-      <main className="flex min-h-screen items-center justify-center px-4 pb-12 pt-24">
+      <main className="relative flex min-h-screen items-center justify-center px-4 pb-12 pt-24">
         <div className="w-full max-w-2xl">
-          {/* Profile Card */}
-          <div className="overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-lg">
-            {/* Profile Header */}
-            <div className="h-32 bg-gradient-to-r from-purple-600 to-blue-600" />
-
-            {/* Profile Content */}
-            <div className="-mt-16 p-8">
+          <RenownCard>
+            <div className="mt-4 p-8">
               {/* Avatar */}
               <div className="mb-4 flex justify-center">
                 {profile.userImage ? (
@@ -112,7 +102,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
               <div className="mt-8 space-y-4">
                 <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">Document ID</span>
+                    <span className="text-sm text-gray-400">RenownID</span>
                     <span className="break-all font-mono text-sm text-white">
                       {profile.documentId}
                     </span>
@@ -146,10 +136,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
                 )}
               </div>
             </div>
-          </div>
+          </RenownCard>
         </div>
       </main>
-    </div>
+    </PageBackground>
   )
 }
 

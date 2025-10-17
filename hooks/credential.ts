@@ -55,13 +55,16 @@ export function useCredential(connectId: string): ICredential {
     const revokeCredential = useCallback(async () => {
         try {
             if (!credential) {
+                console.log('No credential to revoke');
                 return;
             }
+            console.log('Revoking credential...');
             await logout();
+            console.log('Logout successful, clearing credential state');
             setCredential(undefined);
             setState("INITIAL");
         } catch (e) {
-            console.error(e);
+            console.error('Error revoking credential:', e);
             setState("ERROR");
         }
     }, [

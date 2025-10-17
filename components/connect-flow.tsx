@@ -2,8 +2,6 @@
 
 import { useAccount, useEnsName, useDisconnect } from "wagmi";
 import Image from "next/image";
-import Header from "../assets/images/header.jpg";
-import IconRenown from "../assets/icons/renown.svg";
 import IconConnect from "../assets/icons/connect.svg";
 import IconConnectWhite from "../assets/icons/connect-white.svg";
 import Button from "./button";
@@ -12,6 +10,7 @@ import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import WalletButton from "./wallet-button";
 import { decodeJWT } from "../services/did-jwt-auth";
+import RenownCard from "./renown-card";
 
 interface IProps {
     connectId: string;
@@ -52,20 +51,7 @@ const ConnectFlow: React.FC<IProps> = ({
 
     return (
         <div className="flex flex-col items-center">
-            <div className="max-w-[482px] overflow-auto rounded-3xl shadow-modal">
-                <div className="relative">
-                    <Image
-                        priority
-                        src={Header}
-                        alt="Powerhouse"
-                        className="h-[106px]"
-                    />
-                    <Image
-                        src={IconRenown}
-                        alt="Renown"
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform"
-                    />
-                </div>
+            <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
                 <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10">
                     <h2 className="mb-3 text-3xl font-semibold">
                         {isConnected && chain
@@ -153,7 +139,7 @@ const ConnectFlow: React.FC<IProps> = ({
                         </a>
                     ) : null}
                 </div>
-            </div>
+            </RenownCard>
         </div>
     );
 };

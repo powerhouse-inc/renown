@@ -110,17 +110,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             input: RevokeCredentialInput;
         };
 
+        console.log("DELETE /api/credential/renown called");
+        console.log("Request body:", { driveId, docId, input });
+
         try {
+            console.log("Sending revoke mutation with:", { driveId, docId, input });
             const data = await client.request(REVOKE_CREDENTIAL_MUTATION, {
                 driveId,
                 docId,
                 input,
             });
 
+            console.log("Revoke mutation successful:", data);
             res.status(200).json({ result: data });
         } catch (e) {
             console.error("Failed to revoke credential:", e);
-            res.status(500).json({ error: "Failed to revoke credential" });
+            res.status(500).json({ error: "Failed to revoke credential", details: String(e) });
         }
     } else {
         res.status(405).json({ error: "Method not allowed" });

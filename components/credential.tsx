@@ -1,8 +1,9 @@
 import IconCheck from "../assets/icons/check.svg";
 import Image from "next/image";
 import { useCredential } from "../hooks/credential";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import IconConnect from "../assets/icons/connect.svg";
+import { useVerifyToken } from "../hooks/useVerifyToken";
 interface IProps {
     connectId: string;
     returnUrl?: string;
@@ -15,7 +16,8 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
     const { hasCredential, credential, revokeCredential } =
         useCredential(connectId);
     const dialogRef = useRef<HTMLDialogElement>(null);
-    let revoking = false;
+    const [revoking, setRevoking] = useState(false);
+    const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
 
     if (!hasCredential) {
         return null;
@@ -39,15 +41,54 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
                             View details
                         </button>
                         <button
+                            className={`text-link underline underline-offset-4 text-sm ${
+                                isVerifying && "animate-pulse pointer-events-none"
+                            }`}
+                            disabled={isVerifying || !credential}
+                            onClick={async () => {
+                                if (credential) {
+                                    await verifyToken(credential);
+                                }
+                            }}
+                        >
+                            {isVerifying ? 'Verifying...' : 'Verify'}
+                        </button>
+                        <button
                             className={`text-red underline underline-offset-4 text-sm ${
                                 revoking && "animate-pulse pointer-events-none"
                             }`}
                             disabled={revoking || !credential}
-                            onClick={() => revokeCredential()}
+                            onClick={async () => {
+                                console.log('=== REVOKE BUTTON CLICKED ===');
+                                console.log('Current credential:', credential);
+                                console.log('Revoking state:', revoking);
+                                setRevoking(true);
+                                try {
+                                    console.log('Calling revokeCredential()...');
+                                    await revokeCredential();
+                                    console.log('revokeCredential() completed');
+                                } catch (error) {
+                                    console.error('Failed to revoke credential:', error);
+                                } finally {
+                                    setRevoking(false);
+                                    console.log('=== REVOKE PROCESS FINISHED ===');
+                                }
+                            }}
                         >
                             Revoke
                         </button>
                     </div>
+                    {verificationResult && (
+                        <div className={`mt-2 p-2 rounded text-xs ${
+                            verificationResult.valid
+                                ? 'bg-green-500/10 text-green-600'
+                                : 'bg-red-500/10 text-red-600'
+                        }`}>
+                            {verificationResult.valid
+                                ? '✓ Token is valid'
+                                : `✗ ${verificationResult.error || 'Token is invalid'}`}
+                        </div>
+                    )}
                 </div>
                 <dialog
                     ref={dialogRef}
