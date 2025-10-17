@@ -1,3 +1,7 @@
+## 1.2.0 (2025-10-17)
+
+* feat: sign jwts ([a504720](https://github.com/powerhouse-inc/renown/commit/a504720))
+
 ## <small>1.1.3 (2025-10-16)</small>
 
 * fix: did jwt auth ([c292bb8](https://github.com/powerhouse-inc/renown/commit/c292bb8))
