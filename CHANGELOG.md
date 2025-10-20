@@ -1,3 +1,7 @@
+## <small>1.3.4 (2025-10-20)</small>
+
+* fix: renown credential creation ([1019f4d](https://github.com/powerhouse-inc/renown/commit/1019f4d))
+
 ## <small>1.3.3 (2025-10-20)</small>
 
 * fix: api auth credential route ([3ef7cb6](https://github.com/powerhouse-inc/renown/commit/3ef7cb6))
