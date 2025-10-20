@@ -1,3 +1,8 @@
+## <small>1.3.3 (2025-10-20)</small>
+
+* fix: api auth credential route ([3ef7cb6](https://github.com/powerhouse-inc/renown/commit/3ef7cb6))
+* chore: updated dockerfile to node22 ([67500ee](https://github.com/powerhouse-inc/renown/commit/67500ee))
+
 ## <small>1.3.2 (2025-10-20)</small>
 
 * fix: reenabled deprecated route for backward compatibility ([a0fda2b](https://github.com/powerhouse-inc/renown/commit/a0fda2b))
