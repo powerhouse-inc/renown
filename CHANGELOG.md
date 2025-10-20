@@ -1,3 +1,7 @@
+## <small>1.3.2 (2025-10-20)</small>
+
+* fix: reenabled deprecated route for backward compatibility ([a0fda2b](https://github.com/powerhouse-inc/renown/commit/a0fda2b))
+
 ## <small>1.3.1 (2025-10-20)</small>
 
 * fix: use new renown credential mutations ([afbd9c4](https://github.com/powerhouse-inc/renown/commit/afbd9c4))
