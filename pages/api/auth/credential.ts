@@ -14,7 +14,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     // Get credentials by address/connectId
-    const { address, connectId, driveId } = req.query
+    const { address, connectId, driveId, includeRevoked } = req.query
 
     if (!address) {
       res.status(400).json({ error: 'Address is required' })
@@ -24,64 +24,61 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const finalDriveId = (driveId as string) || DEFAULT_DRIVE_ID
 
     try {
-      // Query RenownUser to get their credentials
-      const GET_USER_QUERY = `
-        query GetRenownUser($input: RenownUsersInput!) {
-          renownUsers(input: $input) {
+      // Query RenownCredential documents by eth address
+      const GET_CREDENTIALS_QUERY = `
+        query GetRenownCredentials($input: RenownCredentialsInput!) {
+          renownCredentials(input: $input) {
             documentId
-            ethAddress
-            authorizations {
+            jwt
+            jwtPayload
+            issuer
+            credentialSubject
+            credentialStatus {
               id
-              jwt
-              issuer
-              subject
-              audience
-              payload
-              revoked
-              createdAt
-              revokedAt
+              type
             }
+            revoked
+            revokedAt
+            revocationReason
+            createdAt
+            updatedAt
           }
         }
       `
 
-      const userData = await client.request<{
-        renownUsers: Array<{
+      const credentialsData = await client.request<{
+        renownCredentials: Array<{
           documentId: string
-          ethAddress: string
-          authorizations: Array<{
-            id: string
-            jwt: string
-            issuer: string | null
-            subject: string | null
-            audience: string | null
-            payload: string | null
-            revoked: boolean
-            createdAt: string | null
-            revokedAt: string | null
-          }>
+          jwt: string | null
+          jwtPayload: string | null
+          issuer: string | null
+          credentialSubject: string | null
+          credentialStatus: {
+            id: string | null
+            type: string | null
+          } | null
+          revoked: boolean
+          revokedAt: string | null
+          revocationReason: string | null
+          createdAt: string | null
+          updatedAt: string | null
         }>
-      }>(GET_USER_QUERY, {
+      }>(GET_CREDENTIALS_QUERY, {
         input: {
           driveId: finalDriveId,
-          ethAddresses: [address],
+          ethAddress: address,
+          includeRevoked: includeRevoked === 'true',
         },
       })
 
-      if (userData.renownUsers.length === 0) {
-        res.status(200).json({ credentials: [] })
-        return
-      }
-
-      const user = userData.renownUsers[0]
-      let credentials = user.authorizations
+      let credentials = credentialsData.renownCredentials
 
       // Filter by connectId if provided
       if (connectId) {
-        credentials = credentials.filter((auth) => {
-          if (!auth.payload) return false
+        credentials = credentials.filter((cred) => {
+          if (!cred.jwtPayload) return false
           try {
-            const payload = JSON.parse(auth.payload)
+            const payload = JSON.parse(cred.jwtPayload)
             return payload.connectId === connectId
           } catch {
             return false
@@ -91,15 +88,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       res.status(200).json({
         credentials: credentials.map((cred) => ({
-          id: cred.id,
+          id: cred.documentId,
           jwt: cred.jwt,
           issuer: cred.issuer,
-          subject: cred.subject,
-          audience: cred.audience,
-          payload: cred.payload ? JSON.parse(cred.payload) : null,
+          credentialSubject: cred.credentialSubject ? JSON.parse(cred.credentialSubject) : null,
+          jwtPayload: cred.jwtPayload ? JSON.parse(cred.jwtPayload) : null,
+          credentialStatus: cred.credentialStatus,
           revoked: cred.revoked,
-          createdAt: cred.createdAt,
           revokedAt: cred.revokedAt,
+          revocationReason: cred.revocationReason,
+          createdAt: cred.createdAt,
+          updatedAt: cred.updatedAt,
         })),
       })
     } catch (e) {
