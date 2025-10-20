@@ -60,24 +60,13 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
                             }`}
                             disabled={revoking || !credential}
                             onClick={async () => {
-                                console.log('=== REVOKE BUTTON CLICKED ===');
-                                console.log('Current credential:', credential);
-                                console.log('Has credential:', hasCredential);
-                                console.log('Revoking state:', revoking);
                                 setRevoking(true);
                                 try {
-                                    console.log('Calling revokeCredential()...');
                                     await revokeCredential();
-                                    console.log('revokeCredential() completed');
-                                    console.log('After revoke - credential:', credential);
-                                    console.log('After revoke - hasCredential:', hasCredential);
                                 } catch (error) {
                                     console.error('Failed to revoke credential:', error);
                                 } finally {
                                     setRevoking(false);
-                                    console.log('=== REVOKE PROCESS FINISHED ===');
-                                    console.log('Final state - credential:', credential);
-                                    console.log('Final state - hasCredential:', hasCredential);
                                 }
                             }}
                         >

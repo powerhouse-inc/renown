@@ -190,61 +190,34 @@ export function useAuth(): UseAuthReturn {
    */
   const logout = useCallback(
     async (driveId?: string, docId?: string) => {
-      console.log('Logout called with driveId:', driveId, 'docId:', docId);
-      console.log('Current JWT:', jwt?.slice(0, 20) + '...');
-      console.log('Stored docId:', storedDocId);
-      console.log('Current address:', address);
-
-      // Revoke on Renown Switchboard if we have a JWT
-      if (jwt) {
+      // Revoke on Renown Switchboard if we have a credential ID
+      if (jwt && storedDocId) {
         try {
-          // Use the provided docId, or fall back to the stored one
-          const finalDocId = docId || storedDocId
-          console.log('Using finalDocId for revoke:', finalDocId);
-
           const response = await fetch('/api/credential/renown', {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              driveId,
-              docId: finalDocId,
-              ethAddress: address, // Pass ethAddress so endpoint can find the document
-              input: {
-                jwt,
-              },
+              credentialId: storedDocId,
+              reason: 'User logged out',
             }),
           })
 
-          console.log('Revoke response status:', response.status);
-
-          let responseData;
-          try {
-            responseData = await response.json();
-            console.log('Revoke response data:', responseData);
-          } catch (parseError) {
-            console.error('Failed to parse response JSON:', parseError);
-          }
-
           if (!response.ok) {
+            const responseData = await response.json();
             console.error('Failed to revoke credential on Renown Switchboard', responseData)
-          } else {
-            console.log('Successfully revoked credential on switchboard');
           }
         } catch (e) {
           console.error('Error revoking credential on Renown Switchboard:', e)
         }
-      } else {
-        console.log('No JWT found, skipping switchboard revoke');
       }
 
-      console.log('Clearing local JWT and docId');
       setJwt(null)
       setStoredDocId(null)
       setError(null)
     },
-    [jwt, storedDocId, address, setJwt, setStoredDocId],
+    [jwt, storedDocId, setJwt, setStoredDocId],
   )
 
   /**

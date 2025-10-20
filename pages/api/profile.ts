@@ -1,9 +1,11 @@
-import { NextApiRequest, NextApiResponse } from "next/types";
-import { allowCors } from "./[utils]";
-import { GraphQLClient } from "graphql-request";
+import { NextApiRequest, NextApiResponse } from 'next/types'
+import { allowCors } from './[utils]'
+import { GraphQLClient } from 'graphql-request'
 
-const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "http://localhost:4001/graphql";
-const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || "renown-profiles";
+const SWITCHBOARD_ENDPOINT =
+  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
+  'https://switchboard.renown-staging.vetra.io/graphql'
+const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || 'renown-profiles'
 
 const GET_PROFILE_QUERY = `
     query ($input: RenownUsersInput!) {
@@ -16,57 +18,54 @@ const GET_PROFILE_QUERY = `
             username
         }
     }
-`;
+`
 
 interface RenownUsersInput {
-    driveId?: string;
-    phids?: string[];
-    ethAddresses?: string[];
-    usernames?: string[];
+  driveId?: string
+  phids?: string[]
+  ethAddresses?: string[]
+  usernames?: string[]
 }
 
 interface Profile {
-    createdAt: string;
-    documentId: string;
-    ethAddress: string;
-    updatedAt: string;
-    userImage?: string;
-    username?: string;
+  createdAt: string
+  documentId: string
+  ethAddress: string
+  updatedAt: string
+  userImage?: string
+  username?: string
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method === "POST") {
-        const body = req.body;
+  if (req.method === 'POST') {
+    const body = req.body
 
-        if (!body.id && !body.ethAddress && !body.username) {
-            res.status(400).json({ error: "Either id, ethAddress, or username is required" });
-            return;
-        }
-
-        const input: RenownUsersInput = {
-            driveId: body.driveId || DEFAULT_DRIVE_ID,
-            ...(body.id && { phids: [body.id] }),
-            ...(body.ethAddress && { ethAddresses: [body.ethAddress] }),
-            ...(body.username && { usernames: [body.username] }),
-        };
-
-        try {
-            const client = new GraphQLClient(SWITCHBOARD_ENDPOINT);
-            const data = await client.request<{ renownUsers: Profile[] }>(
-                GET_PROFILE_QUERY,
-                { input }
-            );
-
-            // Return first result or null
-            const profile = data.renownUsers.length > 0 ? data.renownUsers[0] : null;
-            res.status(200).json({ profile });
-        } catch (e) {
-            console.error("Failed to fetch profile:", e);
-            res.status(500).json({ error: "Failed to fetch profile" });
-        }
-    } else {
-        res.status(405).json({ error: "Method not allowed" });
+    if (!body.id && !body.ethAddress && !body.username) {
+      res.status(400).json({ error: 'Either id, ethAddress, or username is required' })
+      return
     }
+
+    const input: RenownUsersInput = {
+      driveId: body.driveId || DEFAULT_DRIVE_ID,
+      ...(body.id && { phids: [body.id] }),
+      ...(body.ethAddress && { ethAddresses: [body.ethAddress] }),
+      ...(body.username && { usernames: [body.username] }),
+    }
+
+    try {
+      const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
+      const data = await client.request<{ renownUsers: Profile[] }>(GET_PROFILE_QUERY, { input })
+
+      // Return first result or null
+      const profile = data.renownUsers.length > 0 ? data.renownUsers[0] : null
+      res.status(200).json({ profile })
+    } catch (e) {
+      console.error('Failed to fetch profile:', e)
+      res.status(500).json({ error: 'Failed to fetch profile' })
+    }
+  } else {
+    res.status(405).json({ error: 'Method not allowed' })
+  }
 }
 
-export default allowCors(handler);
+export default allowCors(handler)

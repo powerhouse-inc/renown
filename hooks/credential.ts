@@ -40,12 +40,11 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
             try {
                 // Use the JWT authentication system
                 const jwtToken = await login(connectId, undefined, undefined, returnUrl);
-                console.log("JWT credential created and stored", jwtToken);
                 setCredential(jwtToken);
                 setState("SUCCESS");
                 return jwtToken;
             } catch (e) {
-                console.error(e);
+                console.error("Failed to create credential:", e);
                 setState("ERROR");
             }
         },
@@ -54,23 +53,19 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
 
     const revokeCredential = useCallback(async () => {
         try {
-            if (!credential) {
-                console.log('No credential to revoke');
+            if (!jwt) {
                 return;
             }
-            console.log('Revoking credential...');
             await logout();
-            console.log('Logout successful, clearing credential state');
-            setCredential(undefined);
-            setState("INITIAL");
+            // Don't manually clear credential here - let the useEffect handle it
+            // when jwt becomes null, to avoid race conditions
         } catch (e) {
-            console.error('Error revoking credential:', e);
+            console.error('Failed to revoke credential:', e);
             setState("ERROR");
         }
     }, [
         logout,
-        credential,
-        setCredential,
+        jwt,
     ]);
 
     return useMemo(
