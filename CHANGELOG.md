@@ -1,3 +1,7 @@
+## 1.3.0 (2025-10-20)
+
+* feat: store verifiable credential ([91737a8](https://github.com/powerhouse-inc/renown/commit/91737a8))
+
 ## <small>1.2.2 (2025-10-20)</small>
 
 * fix: updated profile graphql query ([2e0b7e5](https://github.com/powerhouse-inc/renown/commit/2e0b7e5))
