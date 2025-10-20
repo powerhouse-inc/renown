@@ -1,3 +1,7 @@
+## <small>1.2.1 (2025-10-20)</small>
+
+* fix: use new renown package queries ([f4b21f7](https://github.com/powerhouse-inc/renown/commit/f4b21f7))
+
 ## 1.2.0 (2025-10-17)
 
 * feat: sign jwts ([a504720](https://github.com/powerhouse-inc/renown/commit/a504720))
