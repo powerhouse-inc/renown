@@ -94,6 +94,7 @@ export async function createAuthJWT(
   chainId: number,
   payload: Partial<JWTAuthPayload> = {},
   expiresIn: number = 60 * 60 * 24 * 7, // 7 days default
+  audience: string = 'renown-app',
 ): Promise<string> {
   if (!walletClient.account?.address) {
     throw new Error('Wallet not connected')
@@ -111,7 +112,8 @@ export async function createAuthJWT(
     chainId,
     ...payload,
     iss: did,
-    aud: 'renown-app',
+    sub: payload.connectId || did,
+    aud: audience,
     exp: Math.floor(Date.now() / 1000) + expiresIn,
     iat: Math.floor(Date.now() / 1000),
   }
@@ -135,11 +137,11 @@ export async function createAuthJWT(
 /**
  * Verify a JWT
  */
-export async function verifyAuthJWT(jwt: string): Promise<JWTVerified> {
+export async function verifyAuthJWT(jwt: string, audience?: string): Promise<JWTVerified> {
   try {
     const verified = await verifyJWT(jwt, {
       resolver,
-      audience: 'renown-app',
+      audience: audience || 'renown-app',
     })
     return verified
   } catch (error) {

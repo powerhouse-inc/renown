@@ -14,7 +14,7 @@ interface ICredential {
 
 const credentialAtom = atom<string | undefined>(undefined);
 
-export function useCredential(connectId: string): ICredential {
+export function useCredential(connectId: string, returnUrl?: string): ICredential {
     const { address } = useAccount();
     const chainId = useChainId();
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
@@ -35,11 +35,11 @@ export function useCredential(connectId: string): ICredential {
     }, [jwt, setCredential]);
 
     const createCredential = useCallback(
-        async (address: `0x${string}`, chainId: number, connectId: string) => {
+        async (address: `0x${string}`, chainId: number, connectId: string, returnUrl?: string) => {
             setState("FETCHING_CREDENTIAL");
             try {
                 // Use the JWT authentication system
-                const jwtToken = await login(connectId);
+                const jwtToken = await login(connectId, undefined, undefined, returnUrl);
                 console.log("JWT credential created and stored", jwtToken);
                 setCredential(jwtToken);
                 setState("SUCCESS");
@@ -83,7 +83,7 @@ export function useCredential(connectId: string): ICredential {
                 if (!address) {
                     throw new Error("Address is not set");
                 }
-                return createCredential(address, chainId, connectId);
+                return createCredential(address, chainId, connectId, returnUrl);
             },
             revokeCredential,
         }),
@@ -97,6 +97,7 @@ export function useCredential(connectId: string): ICredential {
             createCredential,
             chainId,
             connectId,
+            returnUrl,
         ]
     );
 }

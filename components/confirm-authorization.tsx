@@ -17,7 +17,7 @@ function ConnectIdText(id: string) {
 
 export const ConfirmAuthorization: React.FC<IProps> = ({ connectId, returnUrl  }) => {
     const { isConnected, chain } = useAccount();
-    const { createCredential, loading } = useCredential(connectId);
+    const { createCredential, loading } = useCredential(connectId, returnUrl);
 
     return (
         <div className="flex flex-col w-full ">

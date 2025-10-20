@@ -24,7 +24,7 @@ export interface UseAuthReturn {
   isAuthenticated: boolean
   isLoading: boolean
   error: Error | null
-  login: (connectId?: string, driveId?: string, docId?: string) => Promise<string>
+  login: (connectId?: string, driveId?: string, docId?: string, returnUrl?: string) => Promise<string>
   logout: (driveId?: string, docId?: string) => Promise<void>
   refreshToken: () => Promise<string | null>
 }
@@ -100,7 +100,7 @@ export function useAuth(): UseAuthReturn {
    * Login and create a new JWT
    */
   const login = useCallback(
-    async (connectId?: string, driveId?: string, docId?: string): Promise<string> => {
+    async (connectId?: string, driveId?: string, docId?: string, returnUrl?: string): Promise<string> => {
       if (!walletClient || !address) {
         throw new Error('Wallet not connected')
       }
@@ -114,7 +114,18 @@ export function useAuth(): UseAuthReturn {
           payload.connectId = connectId
         }
 
-        const newJwt = await createAuthJWT(walletClient, chainId, payload)
+        // Convert returnUrl to did:web format for audience
+        let audience = 'renown-app'
+        if (returnUrl) {
+          try {
+            const url = new URL(returnUrl)
+            audience = `did:web:${url.hostname}`
+          } catch (e) {
+            console.error('Failed to parse returnUrl:', e)
+          }
+        }
+
+        const newJwt = await createAuthJWT(walletClient, chainId, payload, undefined, audience)
 
         // Verify the JWT was created correctly
         // Note: Verification is disabled because ES256K-R with Ethereum's signMessage

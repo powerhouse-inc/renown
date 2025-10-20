@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next/types";
 import { allowCors } from "../[utils]";
 import { GraphQLClient } from "graphql-request";
 import { storeAuthorization, revokeAuthorization } from "../../../services/authorization";
+import { decodeJWT } from "../../../services/did-jwt-auth";
 
 const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "http://localhost:4001/graphql";
 const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || "renown-profiles";
@@ -41,12 +42,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
             // If no docId provided, we need to find or create a RenownUser document
             if (!finalDocId) {
-                // Extract eth address from the JWT subject
-                // JWT subject format is typically "did:ethr:0x..."
-                const ethAddress = input.subject?.replace(/^did:ethr:0x/, '0x') || input.subject;
+                // Decode the JWT to extract the address from the payload
+                let ethAddress: string | undefined;
+
+                try {
+                    const decoded = decodeJWT(input.jwt);
+                    ethAddress = decoded.address as string | undefined;
+                } catch (e) {
+                    console.error("Failed to decode JWT:", e);
+                }
+
+                // Fallback: extract from issuer if address not in payload
+                // Issuer format: "did:pkh:eip155:chainId:address"
+                if (!ethAddress && input.issuer) {
+                    const issuerParts = input.issuer.split(':');
+                    if (issuerParts.length >= 5 && issuerParts[0] === 'did' && issuerParts[1] === 'pkh') {
+                        ethAddress = issuerParts[4];
+                    }
+                }
 
                 if (!ethAddress) {
-                    res.status(400).json({ error: "Cannot determine user identity - JWT subject is required" });
+                    res.status(400).json({ error: "Cannot determine user identity - address not found in JWT" });
                     return;
                 }
 

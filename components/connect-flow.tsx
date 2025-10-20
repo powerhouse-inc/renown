@@ -38,7 +38,7 @@ const ConnectFlow: React.FC<IProps> = ({
     const { address, isConnected, chain } = useAccount();
     const { data: ensName } = useEnsName({ address });
     const { disconnect } = useDisconnect();
-    const { hasCredential, credential } = useCredential(connectId);
+    const { hasCredential, credential } = useCredential(connectId, returnUrl);
 
     // Extract issuer DID from JWT credential
     const user = credential
