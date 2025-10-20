@@ -2,7 +2,7 @@ import { GraphQLClient } from 'graphql-request'
 
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown-staging.vetra.io/graphql'
+  'http://localhost:4001/graphql'
 
 const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 

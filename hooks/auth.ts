@@ -182,6 +182,7 @@ export function useAuth(): UseAuthReturn {
       console.log('Logout called with driveId:', driveId, 'docId:', docId);
       console.log('Current JWT:', jwt?.slice(0, 20) + '...');
       console.log('Stored docId:', storedDocId);
+      console.log('Current address:', address);
 
       // Revoke on Renown Switchboard if we have a JWT
       if (jwt) {
@@ -198,6 +199,7 @@ export function useAuth(): UseAuthReturn {
             body: JSON.stringify({
               driveId,
               docId: finalDocId,
+              ethAddress: address, // Pass ethAddress so endpoint can find the document
               input: {
                 jwt,
               },
@@ -231,7 +233,7 @@ export function useAuth(): UseAuthReturn {
       setStoredDocId(null)
       setError(null)
     },
-    [jwt, storedDocId, setJwt, setStoredDocId],
+    [jwt, storedDocId, address, setJwt, setStoredDocId],
   )
 
   /**

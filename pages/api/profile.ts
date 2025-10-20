@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next/types";
 import { allowCors } from "./[utils]";
 import { GraphQLClient } from "graphql-request";
 
-const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "https://switchboard.renown-staging.vetra.io/graphql";
+const SWITCHBOARD_ENDPOINT = process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || "http://localhost:4001/graphql";
 const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || "renown-profiles";
 
 const GET_PROFILE_QUERY = `
