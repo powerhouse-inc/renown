@@ -1,3 +1,7 @@
+## <small>1.3.1 (2025-10-20)</small>
+
+* fix: use new renown credential mutations ([afbd9c4](https://github.com/powerhouse-inc/renown/commit/afbd9c4))
+
 ## 1.3.0 (2025-10-20)
 
 * feat: store verifiable credential ([91737a8](https://github.com/powerhouse-inc/renown/commit/91737a8))
