@@ -11,7 +11,6 @@ export interface GetProfileInput {
   id?: string
   username?: string
   ethAddress?: string
-  searchInput?: string
 }
 
 export interface RenownProfile {
@@ -23,9 +22,16 @@ export interface RenownProfile {
   updatedAt?: string | null
 }
 
+interface RenownUsersInput {
+  driveId?: string
+  phids?: string[]
+  ethAddresses?: string[]
+  usernames?: string[]
+}
+
 const GET_PROFILE_QUERY = `
-  query GetProfile($input: GetProfileInput!) {
-    getProfile(input: $input) {
+  query RenownUsers($input: RenownUsersInput!) {
+    renownUsers(input: $input) {
       documentId
       username
       ethAddress
@@ -38,10 +44,19 @@ const GET_PROFILE_QUERY = `
 
 export async function getProfile(input: GetProfileInput): Promise<RenownProfile | null> {
   try {
-    const data = await client.request<{ getProfile: RenownProfile }>(GET_PROFILE_QUERY, {
-      input,
+    const renownUsersInput: RenownUsersInput = {
+      driveId: input.driveId,
+      ...(input.id && { phids: [input.id] }),
+      ...(input.ethAddress && { ethAddresses: [input.ethAddress] }),
+      ...(input.username && { usernames: [input.username] }),
+    }
+
+    const data = await client.request<{ renownUsers: RenownProfile[] }>(GET_PROFILE_QUERY, {
+      input: renownUsersInput,
     })
-    return data.getProfile
+
+    // Return first result or null
+    return data.renownUsers.length > 0 ? data.renownUsers[0] : null
   } catch (error) {
     console.error('Failed to fetch profile from switchboard:', error)
     return null

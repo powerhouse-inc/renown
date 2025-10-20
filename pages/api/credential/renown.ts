@@ -54,8 +54,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
                 // Try to find existing RenownUser document by eth address
                 const GET_PROFILE_QUERY = `
-                    query GetProfile($input: GetProfileInput!) {
-                        getProfile(input: $input) {
+                    query RenownUsers($input: RenownUsersInput!) {
+                        renownUsers(input: $input) {
                             documentId
                             ethAddress
                         }
@@ -64,16 +64,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
                 try {
                     const profileData = await client.request<{
-                        getProfile: { documentId: string; ethAddress: string } | null;
+                        renownUsers: { documentId: string; ethAddress: string }[];
                     }>(GET_PROFILE_QUERY, {
                         input: {
                             driveId: finalDriveId,
-                            ethAddress,
+                            ethAddresses: [ethAddress],
                         },
                     });
 
-                    if (profileData.getProfile) {
-                        finalDocId = profileData.getProfile.documentId;
+                    if (profileData.renownUsers.length > 0) {
+                        finalDocId = profileData.renownUsers[0].documentId;
                         console.log("Found existing RenownUser document:", finalDocId);
                     }
                 } catch (e) {
@@ -166,24 +166,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 console.log("Looking for RenownUser with ethAddress:", ethAddress);
 
                 const GET_PROFILE_QUERY = `
-                    query GetProfile($input: GetProfileInput!) {
-                        getProfile(input: $input) {
+                    query RenownUsers($input: RenownUsersInput!) {
+                        renownUsers(input: $input) {
                             documentId
                         }
                     }
                 `;
 
                 const profileData = await client.request<{
-                    getProfile: { documentId: string } | null;
+                    renownUsers: { documentId: string }[];
                 }>(GET_PROFILE_QUERY, {
                     input: {
                         driveId: finalDriveId,
-                        ethAddress,
+                        ethAddresses: [ethAddress],
                     },
                 });
 
-                if (profileData.getProfile) {
-                    finalDocId = profileData.getProfile.documentId;
+                if (profileData.renownUsers.length > 0) {
+                    finalDocId = profileData.renownUsers[0].documentId;
                     console.log("Found RenownUser document:", finalDocId);
                 }
             }
