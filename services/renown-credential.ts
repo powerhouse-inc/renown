@@ -1,4 +1,5 @@
 import { request, gql } from 'graphql-request'
+import { decodeJWT } from './did-jwt-auth'
 
 const SWITCHBOARD_URL =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -13,6 +14,15 @@ const CREATE_CREDENTIAL_MUTATION = gql`
 const INIT_CREDENTIAL_MUTATION = gql`
   mutation RenownCredential_init($docId: PHID!, $input: RenownCredential_InitInput!) {
     RenownCredential_init(docId: $docId, input: $input)
+  }
+`
+
+const UPDATE_CREDENTIAL_SUBJECT_MUTATION = gql`
+  mutation RenownCredential_updateCredentialSubject(
+    $docId: PHID!
+    $input: RenownCredential_UpdateCredentialSubjectInput!
+  ) {
+    RenownCredential_updateCredentialSubject(docId: $docId, input: $input)
   }
 `
 
@@ -31,6 +41,9 @@ export async function storeCredential(params: {
   ethAddress: string
 }): Promise<{ success: boolean; credentialId?: string }> {
   try {
+    // Decode JWT to extract information
+    const decoded = decodeJWT(params.jwt)
+
     // Create a new RenownCredential document
     const createResult = (await request(SWITCHBOARD_URL, CREATE_CREDENTIAL_MUTATION, {
       name: `Credential for ${params.ethAddress.slice(0, 8)}...`,
@@ -51,8 +64,26 @@ export async function storeCredential(params: {
       },
     })) as { RenownCredential_init: number }
 
+    if (initResult.RenownCredential_init === 0) {
+      throw new Error('Failed to initialize credential with JWT')
+    }
+
+    // Update credential subject with DID/address information
+    const credentialSubject = {
+      id: decoded.sub || decoded.iss || `did:pkh:eip155:1:${params.ethAddress}`,
+      address: params.ethAddress,
+      ...(decoded.connectId && { connectId: decoded.connectId }),
+    }
+
+    await request(SWITCHBOARD_URL, UPDATE_CREDENTIAL_SUBJECT_MUTATION, {
+      docId: credentialId,
+      input: {
+        credentialSubject: JSON.stringify(credentialSubject),
+      },
+    })
+
     return {
-      success: initResult.RenownCredential_init > 0,
+      success: true,
       credentialId,
     }
   } catch (error) {
