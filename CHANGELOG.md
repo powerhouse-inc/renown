@@ -1,3 +1,7 @@
+## <small>1.3.5 (2025-10-21)</small>
+
+* fix: use proper vc as renown credential payload ([b1ff6b6](https://github.com/powerhouse-inc/renown/commit/b1ff6b6))
+
 ## <small>1.3.4 (2025-10-20)</small>
 
 * fix: renown credential creation ([1019f4d](https://github.com/powerhouse-inc/renown/commit/1019f4d))
