@@ -3,6 +3,7 @@ import { useWalletClient, useAccount, useChainId } from 'wagmi'
 import { atom, useAtom } from 'jotai'
 import {
   createAuthJWT,
+  createVerifiableCredential,
   verifyAuthJWT,
   isJWTExpired,
   getEthereumDID,
@@ -109,23 +110,34 @@ export function useAuth(): UseAuthReturn {
       setError(null)
 
       try {
-        const payload: Partial<JWTAuthPayload> = {}
-        if (connectId) {
-          payload.connectId = connectId
+        // Build credential subject with user's information
+        const credentialSubject: Record<string, any> = {
+          address: address,
+          chainId: chainId,
         }
 
-        // Convert returnUrl to did:web format for audience
-        let audience = 'renown-app'
+        if (connectId) {
+          credentialSubject.connectId = connectId
+        }
+
+        // Add audience as a claim if returnUrl is provided
         if (returnUrl) {
           try {
             const url = new URL(returnUrl)
-            audience = `did:web:${url.hostname}`
+            credentialSubject.audience = `did:web:${url.hostname}`
           } catch (e) {
             console.error('Failed to parse returnUrl:', e)
           }
         }
 
-        const newJwt = await createAuthJWT(walletClient, chainId, payload, undefined, audience)
+        // Create W3C Verifiable Credential JWT with RenownCredential type
+        const newJwt = await createVerifiableCredential(
+          walletClient,
+          chainId,
+          credentialSubject,
+          ['VerifiableCredential', 'RenownCredential'],
+          60 * 60 * 24 * 7 // 7 days
+        )
 
         // Verify the JWT was created correctly
         // Note: Verification is disabled because ES256K-R with Ethereum's signMessage
@@ -230,7 +242,18 @@ export function useAuth(): UseAuthReturn {
 
     try {
       setIsLoading(true)
-      const newJwt = await createAuthJWT(walletClient, chainId)
+      // Build basic credential subject for refresh
+      const credentialSubject = {
+        address: address,
+        chainId: chainId,
+      }
+      const newJwt = await createVerifiableCredential(
+        walletClient,
+        chainId,
+        credentialSubject,
+        ['VerifiableCredential', 'RenownCredential'],
+        60 * 60 * 24 * 7 // 7 days
+      )
       setJwt(newJwt)
       return newJwt
     } catch (e) {
