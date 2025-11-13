@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
 import { GraphQLClient } from 'graphql-request'
-import { storeCredential, revokeCredential } from '../../../services/renown-credential'
-import { decodeJWT } from '../../../services/did-jwt-auth'
+import { revokeCredential } from '../../../services/renown-credential'
 
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -13,15 +12,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 
   if (req.method === 'GET') {
-    // Get credentials by address/connectId
-    const { address, connectId, driveId, includeRevoked } = req.query
+    // Get credentials by address/chainId/connectId
+    const { address, chainId, connectId, driveId, includeRevoked } = req.query
 
     if (!address) {
       res.status(400).json({ error: 'Address is required' })
       return
     }
 
-    const finalDriveId = (driveId as string) || DEFAULT_DRIVE_ID
+    // Use user-specific drive based on their address
+    const userDriveId = `renown-${(address as string).toLowerCase()}`
+    const finalDriveId = (driveId as string) || userDriveId
 
     try {
       // Query RenownCredential documents by eth address
@@ -29,14 +30,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         query GetRenownCredentials($input: RenownCredentialsInput!) {
           renownCredentials(input: $input) {
             documentId
-            jwt
-            jwtPayload
-            issuer
-            credentialSubject
-            credentialStatus {
-              id
-              type
-            }
+            credentialId
+            context
+            type
+            issuerId
+            issuerEthereumAddress
+            issuanceDate
+            expirationDate
+            credentialSubjectId
+            credentialSubjectApp
+            credentialStatusId
+            credentialStatusType
+            credentialSchemaId
+            credentialSchemaType
+            proofVerificationMethod
+            proofEthereumAddress
+            proofCreated
+            proofPurpose
+            proofType
+            proofValue
+            proofEip712Domain
+            proofEip712PrimaryType
             revoked
             revokedAt
             revocationReason
@@ -49,14 +63,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const credentialsData = await client.request<{
         renownCredentials: Array<{
           documentId: string
-          jwt: string | null
-          jwtPayload: string | null
-          issuer: string | null
-          credentialSubject: string | null
-          credentialStatus: {
-            id: string | null
-            type: string | null
-          } | null
+          credentialId: string
+          context: string[]
+          type: string[]
+          issuerId: string
+          issuerEthereumAddress: string
+          issuanceDate: string
+          expirationDate: string | null
+          credentialSubjectId: string | null
+          credentialSubjectApp: string
+          credentialStatusId: string | null
+          credentialStatusType: string | null
+          credentialSchemaId: string
+          credentialSchemaType: string
+          proofVerificationMethod: string
+          proofEthereumAddress: string
+          proofCreated: string
+          proofPurpose: string
+          proofType: string
+          proofValue: string
+          proofEip712Domain: string
+          proofEip712PrimaryType: string
           revoked: boolean
           revokedAt: string | null
           revocationReason: string | null
@@ -73,92 +100,100 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       let credentials = credentialsData.renownCredentials
 
-      // Filter by connectId if provided
-      if (connectId) {
-        credentials = credentials.filter((cred) => {
-          if (!cred.jwtPayload) return false
-          try {
-            const payload = JSON.parse(cred.jwtPayload)
-            return payload.connectId === connectId
-          } catch {
-            return false
-          }
-        })
+      console.log(`Found ${credentials.length} credentials for address ${address}`)
+
+      // If no credentials at all, return 404 immediately
+      if (credentials.length === 0) {
+        res.status(404).json({ error: 'Credential not found' })
+        return
       }
 
+      // Filter by chainId if provided
+      // The issuerId format is: did:pkh:eip155:chainId:address
+      if (chainId) {
+        const normalizedAddress = (address as string).toLowerCase()
+        const expectedIssuerId = `did:pkh:eip155:${chainId}:${normalizedAddress}`
+
+        const filtered = credentials.filter((cred) => {
+          return cred.issuerId.toLowerCase() === expectedIssuerId.toLowerCase()
+        })
+
+        console.log(`After chainId filter (${chainId}): ${filtered.length} credentials`)
+        if (filtered.length > 0) {
+          credentials = filtered
+        }
+      }
+
+      // Filter by connectId if provided
+      // connectId is stored in credentialSubjectId
+      if (connectId) {
+        const filtered = credentials.filter((cred) => {
+          return cred.credentialSubjectId === connectId
+        })
+
+        console.log(`After connectId filter (${connectId}): ${filtered.length} credentials`)
+        if (filtered.length > 0) {
+          credentials = filtered
+        }
+      }
+
+      // Return the first valid credential (SDK expects a single credential, not an array)
+      const credential = credentials[0]
+
+      // Parse EIP-712 domain from JSON string
+      let eip712Domain
+      try {
+        eip712Domain = JSON.parse(credential.proofEip712Domain)
+      } catch {
+        eip712Domain = null
+      }
+
+      // Transform to SDK format (PowerhouseVerifiableCredential)
       res.status(200).json({
-        credentials: credentials.map((cred) => ({
-          id: cred.documentId,
-          jwt: cred.jwt,
-          issuer: cred.issuer,
-          credentialSubject: cred.credentialSubject ? JSON.parse(cred.credentialSubject) : null,
-          jwtPayload: cred.jwtPayload ? JSON.parse(cred.jwtPayload) : null,
-          credentialStatus: cred.credentialStatus,
-          revoked: cred.revoked,
-          revokedAt: cred.revokedAt,
-          revocationReason: cred.revocationReason,
-          createdAt: cred.createdAt,
-          updatedAt: cred.updatedAt,
-        })),
+        credential: {
+          '@context': credential.context,
+          id: credential.credentialId,
+          type: credential.type,
+          issuer: {
+            id: credential.issuerId,
+            ethereumAddress: credential.issuerEthereumAddress as `0x${string}`,
+          },
+          issuanceDate: credential.issuanceDate,
+          expirationDate: credential.expirationDate || undefined,
+          credentialSubject: {
+            id: credential.credentialSubjectId || credential.issuerId,
+            app: credential.credentialSubjectApp,
+          },
+          credentialStatus: credential.credentialStatusId
+            ? {
+                id: credential.credentialStatusId,
+                type: credential.credentialStatusType!,
+              }
+            : undefined,
+          credentialSchema: {
+            id: credential.credentialSchemaId,
+            type: credential.credentialSchemaType,
+          },
+          proof: {
+            verificationMethod: credential.proofVerificationMethod,
+            ethereumAddress: credential.proofEthereumAddress as `0x${string}`,
+            created: credential.proofCreated,
+            proofPurpose: credential.proofPurpose,
+            type: credential.proofType,
+            proofValue: credential.proofValue,
+            eip712: eip712Domain
+              ? {
+                  domain: eip712Domain.domain,
+                  types: eip712Domain.types,
+                  primaryType: credential.proofEip712PrimaryType as 'VerifiableCredential',
+                }
+              : undefined,
+          },
+        },
       })
     } catch (e) {
       console.error('Failed to fetch credentials:', e)
       res.status(500).json({ error: 'Failed to fetch credentials', details: String(e) })
-    }
-  } else if (req.method === 'POST') {
-    // Create/store a new credential
-    const { jwt, driveId } = req.body
-
-    if (!jwt) {
-      res.status(400).json({ error: 'JWT is required' })
-      return
-    }
-
-    const finalDriveId = driveId || DEFAULT_DRIVE_ID
-
-    try {
-      // Decode JWT to extract address
-      let ethAddress: string | undefined
-      try {
-        const decoded = decodeJWT(jwt)
-        ethAddress = decoded.address as string | undefined
-
-        // Fallback: extract from issuer if address not in payload
-        if (!ethAddress && decoded.iss) {
-          const issuerParts = decoded.iss.split(':')
-          if (issuerParts.length >= 5 && issuerParts[0] === 'did' && issuerParts[1] === 'pkh') {
-            ethAddress = issuerParts[4]
-          }
-        }
-      } catch (e) {
-        console.error('Failed to decode JWT:', e)
-      }
-
-      if (!ethAddress) {
-        res.status(400).json({ error: 'Cannot determine user identity - address not found in JWT' })
-        return
-      }
-
-      // Store credential using RenownCredential mutations
-      const result = await storeCredential({
-        driveId: finalDriveId,
-        jwt,
-        ethAddress,
-      })
-
-      if (result.success && result.credentialId) {
-        res.status(200).json({
-          credential: {
-            id: result.credentialId,
-            jwt,
-          },
-        })
-      } else {
-        res.status(500).json({ error: 'Failed to store credential' })
-      }
-    } catch (e) {
-      console.error('Failed to store credential:', e)
-      res.status(500).json({ error: 'Failed to store credential', details: String(e) })
     }
   } else if (req.method === 'DELETE') {
     // Revoke a credential

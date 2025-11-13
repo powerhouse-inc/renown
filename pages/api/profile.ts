@@ -45,8 +45,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return
     }
 
+    // Use user-specific drive when querying by ethAddress
+    let driveId = body.driveId
+    if (!driveId && body.ethAddress) {
+      driveId = `renown-${body.ethAddress.toLowerCase()}`
+    } else if (!driveId) {
+      driveId = DEFAULT_DRIVE_ID
+    }
+
     const input: RenownUsersInput = {
-      driveId: body.driveId || DEFAULT_DRIVE_ID,
+      driveId,
       ...(body.id && { phids: [body.id] }),
       ...(body.ethAddress && { ethAddresses: [body.ethAddress] }),
       ...(body.username && { usernames: [body.username] }),

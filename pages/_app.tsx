@@ -42,7 +42,9 @@ function getOrCreateWagmiConfig(networkId: string, chainId: string) {
   // If we have a config but for a different chain, log a warning but return the existing one
   // to avoid multiple WalletConnect initializations
   if (globalWagmiConfig && globalConfigKey !== cacheKey) {
-    console.warn(`Attempting to switch from ${globalConfigKey} to ${cacheKey}, but reusing existing config to avoid WalletConnect re-initialization`)
+    console.warn(
+      `Attempting to switch from ${globalConfigKey} to ${cacheKey}, but reusing existing config to avoid WalletConnect re-initialization`,
+    )
     return globalWagmiConfig
   }
 
@@ -70,9 +72,7 @@ function getOrCreateWagmiConfig(networkId: string, chainId: string) {
     ],
     transports: {
       [chain.id]: http(
-        INFURA_PROJECT_ID
-          ? `https://wandering-wispy-brook.quiknode.pro/73b42df6ef3dd79922efd590b4785be884ed4cb4/`
-          : undefined,
+        INFURA_PROJECT_ID ? `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}` : undefined,
       ),
     },
   })

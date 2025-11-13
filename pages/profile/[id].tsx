@@ -156,25 +156,27 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   }
 
   try {
-    // Try to fetch by ID first, then by username, then by ethAddress
-    let profile = await getProfile({
-      driveId: DEFAULT_DRIVE_ID,
-      id,
-    })
+    let profile = null
 
-    if (!profile) {
+    // Check if it looks like an eth address
+    if (id.startsWith('0x')) {
+      // For eth addresses, query the user-specific drive
+      const userDriveId = `renown-${id.toLowerCase()}`
+      profile = await getProfile({
+        driveId: userDriveId,
+        ethAddress: id,
+      })
+    } else {
+      // For other IDs (documentId or username), try the default drive first
       profile = await getProfile({
         driveId: DEFAULT_DRIVE_ID,
-        username: id,
+        id,
       })
-    }
 
-    if (!profile) {
-      // Check if it looks like an eth address
-      if (id.startsWith('0x')) {
+      if (!profile) {
         profile = await getProfile({
           driveId: DEFAULT_DRIVE_ID,
-          ethAddress: id,
+          username: id,
         })
       }
     }

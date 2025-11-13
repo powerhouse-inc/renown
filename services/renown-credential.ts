@@ -1,5 +1,4 @@
 import { request, gql } from 'graphql-request'
-import { decodeJWT } from './did-jwt-auth'
 
 const SWITCHBOARD_URL =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -17,36 +16,53 @@ const INIT_CREDENTIAL_MUTATION = gql`
   }
 `
 
-const UPDATE_CREDENTIAL_SUBJECT_MUTATION = gql`
-  mutation RenownCredential_updateCredentialSubject(
-    $docId: PHID!
-    $input: RenownCredential_UpdateCredentialSubjectInput!
-  ) {
-    RenownCredential_updateCredentialSubject(docId: $docId, input: $input)
-  }
-`
-
 const REVOKE_CREDENTIAL_MUTATION = gql`
   mutation RenownCredential_revoke($docId: PHID!, $input: RenownCredential_RevokeInput!) {
     RenownCredential_revoke(docId: $docId, input: $input)
   }
 `
 
+interface EIP712Domain {
+  version: string
+  chainId: bigint | number
+}
+
+interface EIP712Credential {
+  '@context': string[]
+  type: string[]
+  id: string
+  issuer: {
+    id: string
+    ethereumAddress: string
+  }
+  credentialSubject: {
+    id: string
+    app: string
+  }
+  credentialSchema: {
+    id: string
+    type: string
+  }
+  issuanceDate: string
+  expirationDate: string
+}
+
 /**
- * Create and initialize a new RenownCredential document
+ * Create and initialize a new RenownCredential document with EIP-712 credential
  */
 export async function storeCredential(params: {
   driveId?: string
-  jwt: string
+  credential: EIP712Credential
+  signature: string
+  domain: EIP712Domain
   ethAddress: string
 }): Promise<{ success: boolean; credentialId?: string }> {
   try {
-    // Decode JWT to extract information
-    const decoded = decodeJWT(params.jwt)
+    const { credential, signature, domain, ethAddress } = params
 
     // Create a new RenownCredential document
     const createResult = (await request(SWITCHBOARD_URL, CREATE_CREDENTIAL_MUTATION, {
-      name: `Credential for ${params.ethAddress.slice(0, 8)}...`,
+      name: `Credential for ${ethAddress.slice(0, 8)}...`,
       driveId: params.driveId,
     })) as { RenownCredential_createDocument: string }
 
@@ -56,31 +72,51 @@ export async function storeCredential(params: {
       throw new Error('Failed to create credential document')
     }
 
-    // Initialize the credential with JWT
+    // Construct the InitInput for EIP-712 credential
+    const initInput = {
+      id: credential.id,
+      context: credential['@context'],
+      type: credential.type,
+      issuer: {
+        id: credential.issuer.id,
+        ethereumAddress: credential.issuer.ethereumAddress,
+      },
+      credentialSubject: {
+        id: credential.credentialSubject.id,
+        app: credential.credentialSubject.app,
+      },
+      credentialSchema: {
+        id: credential.credentialSchema.id,
+        type: credential.credentialSchema.type,
+      },
+      issuanceDate: credential.issuanceDate,
+      expirationDate: credential.expirationDate || undefined,
+      proof: {
+        type: 'EthereumEip712Signature2021',
+        created: credential.issuanceDate,
+        verificationMethod: credential.issuer.id,
+        proofPurpose: 'assertionMethod',
+        proofValue: signature,
+        ethereumAddress: credential.issuer.ethereumAddress,
+        eip712: {
+          domain: {
+            version: domain.version,
+            chainId: typeof domain.chainId === 'bigint' ? Number(domain.chainId) : domain.chainId,
+          },
+          primaryType: 'VerifiableCredential',
+        },
+      },
+    }
+
+    // Initialize the credential with EIP-712 data
     const initResult = (await request(SWITCHBOARD_URL, INIT_CREDENTIAL_MUTATION, {
       docId: credentialId,
-      input: {
-        jwt: params.jwt,
-      },
+      input: initInput,
     })) as { RenownCredential_init: number }
 
     if (initResult.RenownCredential_init === 0) {
-      throw new Error('Failed to initialize credential with JWT')
+      throw new Error('Failed to initialize credential')
     }
-
-    // Update credential subject with DID/address information
-    const credentialSubject = {
-      id: decoded.sub || decoded.iss || `did:pkh:eip155:1:${params.ethAddress}`,
-      address: params.ethAddress,
-      ...(decoded.connectId && { connectId: decoded.connectId }),
-    }
-
-    await request(SWITCHBOARD_URL, UPDATE_CREDENTIAL_SUBJECT_MUTATION, {
-      docId: credentialId,
-      input: {
-        credentialSubject: JSON.stringify(credentialSubject),
-      },
-    })
 
     return {
       success: true,

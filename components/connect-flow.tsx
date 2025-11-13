@@ -1,6 +1,6 @@
 "use client";
 
-import { useAccount, useEnsName, useDisconnect } from "wagmi";
+import { useAccount, useEnsName, useDisconnect, useChainId } from "wagmi";
 import Image from "next/image";
 import IconConnect from "../assets/icons/connect.svg";
 import IconConnectWhite from "../assets/icons/connect-white.svg";
@@ -9,7 +9,6 @@ import { useCredential } from "../hooks/credential";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import WalletButton from "./wallet-button";
-import { decodeJWT } from "../services/did-jwt-auth";
 import RenownCard from "./renown-card";
 
 interface IProps {
@@ -36,13 +35,14 @@ const ConnectFlow: React.FC<IProps> = ({
     returnUrl = connectUrl,
 }) => {
     const { address, isConnected, chain } = useAccount();
+    const chainId = useChainId();
     const { data: ensName } = useEnsName({ address });
     const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId, returnUrl);
 
-    // Extract issuer DID from JWT credential
-    const user = credential
-        ? encodeURIComponent(decodeJWT(credential).iss ?? "")
+    // Construct DID from address and chainId
+    const user = (address && hasCredential)
+        ? encodeURIComponent(`did:pkh:eip155:${chainId}:${address.toLowerCase()}`)
         : "";
 
     const url = deeplink

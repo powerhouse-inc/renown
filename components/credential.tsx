@@ -4,7 +4,8 @@ import { useCredential } from "../hooks/credential";
 import { useRef, useState } from "react";
 import IconConnect from "../assets/icons/connect.svg";
 import { useVerifyToken } from "../hooks/useVerifyToken";
-import { decodeJWT } from "../services/did-jwt-auth";
+import { useAccount } from "wagmi";
+
 interface IProps {
     connectId: string;
     returnUrl?: string;
@@ -16,6 +17,7 @@ function ConnectIdText(id: string) {
 const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
     const { hasCredential, credential, revokeCredential } =
         useCredential(connectId, returnUrl);
+    const { address } = useAccount();
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
@@ -45,10 +47,10 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
                             className={`text-link underline underline-offset-4 text-sm ${
                                 isVerifying && "animate-pulse pointer-events-none"
                             }`}
-                            disabled={isVerifying || !credential}
+                            disabled={isVerifying || !credential || !address}
                             onClick={async () => {
-                                if (credential) {
-                                    await verifyToken(credential);
+                                if (credential && address) {
+                                    await verifyToken(credential, address);
                                 }
                             }}
                         >
@@ -94,14 +96,7 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
                         className="text-start"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {credential && (() => {
-                            try {
-                                const decoded = decodeJWT(credential);
-                                return JSON.stringify(decoded, null, 4);
-                            } catch (error) {
-                                return JSON.stringify({ error: "Failed to decode JWT", raw: credential }, null, 4);
-                            }
-                        })()}
+                        {credential && JSON.stringify({ credentialId: credential }, null, 4)}
                     </pre>
                 </dialog>
             </div>

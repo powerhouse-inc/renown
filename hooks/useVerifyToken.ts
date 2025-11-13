@@ -10,6 +10,8 @@ interface VerifyResponse {
     address: string;
     chainId: number;
     connectId?: string;
+    credentialId?: string;
+    documentId?: string;
   };
   error?: string;
 }
@@ -18,7 +20,7 @@ export function useVerifyToken() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<VerifyResponse | null>(null);
 
-  const verifyToken = useCallback(async (token: string): Promise<VerifyResponse> => {
+  const verifyToken = useCallback(async (token: string, address: string): Promise<VerifyResponse> => {
     setIsVerifying(true);
     setVerificationResult(null);
 
@@ -28,7 +30,7 @@ export function useVerifyToken() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, address }),
       });
 
       const result: VerifyResponse = await response.json();
