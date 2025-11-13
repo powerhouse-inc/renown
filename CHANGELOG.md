@@ -1,3 +1,7 @@
+## 1.4.0 (2025-11-13)
+
+* feat: user drives storing eip712 credentials and renown user profile ([f7d3955](https://github.com/powerhouse-inc/renown/commit/f7d3955))
+
 ## <small>1.3.5 (2025-10-21)</small>
 
 * fix: use proper vc as renown credential payload ([b1ff6b6](https://github.com/powerhouse-inc/renown/commit/b1ff6b6))
