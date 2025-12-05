@@ -4,6 +4,7 @@ import LandingGradient from "../assets/images/landing-gradient.jpg";
 import Noise from "../assets/images/noise.png";
 import PhIcons from "../assets/images/ph-icons.svg";
 import ThemeToggle from "./theme-toggle";
+import RenownLoginButton from "./renown-login-button";
 
 interface PageBackgroundProps {
   children: React.ReactNode;
@@ -68,7 +69,8 @@ export const PageBackground: React.FC<PageBackgroundProps> = ({ children }) => {
           height={48}
         />
       </div>
-      <div className="absolute right-8 top-3 z-10">
+      <div className="absolute right-8 top-3 z-10 flex items-center gap-3">
+        <RenownLoginButton />
         <ThemeToggle />
       </div>
 

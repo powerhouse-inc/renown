@@ -4,9 +4,9 @@ import { createConfig, WagmiProvider, http } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
 import { Inter } from 'next/font/google'
 import { getChain } from '../utils/viem'
-import { useMemo } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
+import { RenownUserProvider } from '@renown/sdk'
 import '@rainbow-me/rainbowkit/styles.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -96,7 +96,13 @@ function MyApp({ Component, pageProps, router }: AppProps) {
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider>
-            <Component {...pageProps} />
+            <RenownUserProvider
+              renownUrl={process.env.NEXT_PUBLIC_RENOWN_URL || 'https://www.renown.id'}
+              networkId={networkId}
+              chainId={chainId}
+            >
+              <Component {...pageProps} />
+            </RenownUserProvider>
           </RainbowKitProvider>
         </QueryClientProvider>
       </WagmiProvider>

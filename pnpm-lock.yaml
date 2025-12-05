@@ -27,8 +27,8 @@ importers:
         specifier: ^2.2.8
         version: 2.2.8(@tanstack/react-query@5.90.2(react@18.3.1))(@types/react@18.3.25)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)(viem@2.37.9(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11))(wagmi@2.17.5(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.3.1))(@types/react@18.3.25)(bufferutil@4.0.9)(encoding@0.1.13)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(viem@2.37.9(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11))(zod@4.1.11))
       '@renown/sdk':
-        specifier: ^4.0.6
-        version: 4.0.6(bufferutil@4.0.9)(document-model@4.0.6)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11)
+        specifier: 5.1.0-dev.9
+        version: 5.1.0-dev.9(bufferutil@4.0.9)(document-model@4.0.6)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11)
       '@supabase/supabase-js':
         specifier: ^2.58.0
         version: 2.58.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
@@ -1582,10 +1582,14 @@ packages:
       viem: 2.x
       wagmi: ^2.9.0
 
-  '@renown/sdk@4.0.6':
-    resolution: {integrity: sha512-eH2b62fa078+srhfxHpv+jrROmdzSjtjtcsJoKNjMSM7j2UR3dAY6gaN4ZsIiYLiavtBQsvEaFlJoBRwqdoQVA==}
+  '@renown/sdk@5.1.0-dev.9':
+    resolution: {integrity: sha512-zk3KX4yHkWa5l68sze8rjUUbALxhBXUkQPUF1LnHeP629hKGT6FW3AVCtggMidSL4lEOEkVmobQsybs/E53qoQ==}
     peerDependencies:
-      document-model: 4.0.6
+      document-model: 5.1.0-dev.9
+      react: ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   '@reown/appkit-common@1.7.8':
     resolution: {integrity: sha512-ridIhc/x6JOp7KbDdwGKY4zwf8/iK8EYBl+HtWrruutSLwZyVi5P8WaZa+8iajL6LcDcDF7LoyLwMTym7SRuwQ==}
@@ -3341,6 +3345,10 @@ packages:
 
   did-jwt@8.0.18:
     resolution: {integrity: sha512-yS3Y+aUKjYqRFrgR/RY77NuOOqS7SFfvfFH4THhWD6+hkxeUZcKQSsdNZ12QR1Vd48yP9exwae2wzbuOZn0NqQ==}
+
+  did-key-creator@1.2.0:
+    resolution: {integrity: sha512-mo5hPvQeAskHQT5s3QCFLttv6fQxr5S/Lo5IXM9lkDml7Y0pWJp7xNsOyf7tGwYBLpTyFDecOU+TSfZPWEAk5g==}
+    engines: {node: '>=14.06'}
 
   did-resolver@4.1.0:
     resolution: {integrity: sha512-S6fWHvCXkZg2IhS4RcVHxwuyVejPR7c+a4Go0xbQ9ps5kILa8viiYQgrM4gfTyeTjJ0ekgJH9gk/BawTpmkbZA==}
@@ -5162,6 +5170,10 @@ packages:
     engines: {node: '>=12.0.0', npm: '>=6.0.0'}
     deprecated: This module has been superseded by the multiformats module
 
+  multicodec@3.2.1:
+    resolution: {integrity: sha512-+expTPftro8VAW8kfvcuNNNBgb9gPeNYV9dn+z1kJRWF2vih+/S79f2RVeIwmrJBUJ6NT9IUPWnZDQvegEh5pw==}
+    deprecated: This module has been superseded by the multiformats module
+
   multiformats@11.0.2:
     resolution: {integrity: sha512-b5mYMkOkARIuVZCpvijFj9a6m5wMVLC7cf/jIPd5D/ARDOfLC5+IFkbgDXQgcU2goIsTD/O9NY4DI/Mt4OGvlg==}
     engines: {node: '>=16.0.0', npm: '>=7.0.0'}
@@ -6912,6 +6924,9 @@ packages:
 
   uint8arraylist@2.4.8:
     resolution: {integrity: sha512-vc1PlGOzglLF0eae1M8mLRTBivsvrGsdmJ5RbK3e+QRvRLOZfZhQROTwH/OfyF3+ZVUg9/8hE8bmKP2CvP9quQ==}
+
+  uint8arrays@2.1.10:
+    resolution: {integrity: sha512-Q9/hhJa2836nQfEJSZTmr+pg9+cDJS9XEAp7N2Vg5MzL3bK/mkMVfjscRGYruP9jNda6MAdf4QD/y78gSzkp6A==}
 
   uint8arrays@3.1.0:
     resolution: {integrity: sha512-ei5rfKtoRO8OyOIor2Rz5fhzjThwIHJZ3uyDPnDHTXbP0aMQ1RN/6AI5B5d9dBxJOU+BvOAk7ZQ1xphsX8Lrog==}
@@ -10076,14 +10091,18 @@ snapshots:
       - babel-plugin-macros
       - typescript
 
-  '@renown/sdk@4.0.6(bufferutil@4.0.9)(document-model@4.0.6)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11)':
+  '@renown/sdk@5.1.0-dev.9(bufferutil@4.0.9)(document-model@4.0.6)(react@18.3.1)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11)':
     dependencies:
       '@didtools/key-did': 1.0.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11)
       did-jwt: 8.0.18
       did-jwt-vc: 4.0.16
+      did-key-creator: 1.2.0
       did-resolver: 4.1.0
       document-model: 4.0.6
       key-did-resolver: 4.0.0
+      uint8arrays: 5.1.0
+    optionalDependencies:
+      react: 18.3.1
     transitivePeerDependencies:
       - bufferutil
       - typescript
@@ -12972,6 +12991,12 @@ snapshots:
       multiformats: 9.9.0
       uint8arrays: 3.1.1
 
+  did-key-creator@1.2.0:
+    dependencies:
+      multicodec: 3.2.1
+      multiformats: 9.9.0
+      uint8arrays: 2.1.10
+
   did-resolver@4.1.0: {}
 
   did-session@3.1.0(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.1.11):
@@ -15211,6 +15236,11 @@ snapshots:
     dependencies:
       '@multiformats/base-x': 4.0.1
 
+  multicodec@3.2.1:
+    dependencies:
+      uint8arrays: 3.1.1
+      varint: 6.0.0
+
   multiformats@11.0.2: {}
 
   multiformats@12.1.3: {}
@@ -17034,6 +17064,10 @@ snapshots:
   uint8arraylist@2.4.8:
     dependencies:
       uint8arrays: 5.1.0
+
+  uint8arrays@2.1.10:
+    dependencies:
+      multiformats: 9.9.0
 
   uint8arrays@3.1.0:
     dependencies:
