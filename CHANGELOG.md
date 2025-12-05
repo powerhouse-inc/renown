@@ -1,3 +1,7 @@
+## 1.5.0 (2025-12-05)
+
+* feat: added user login ([d4d0c46](https://github.com/powerhouse-inc/renown/commit/d4d0c46))
+
 ## <small>1.4.2 (2025-12-05)</small>
 
 * fix: improved flow and profile page ([082deee](https://github.com/powerhouse-inc/renown/commit/082deee))
