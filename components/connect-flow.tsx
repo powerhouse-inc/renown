@@ -1,11 +1,12 @@
 "use client";
 
-import { useAccount, useEnsName, useDisconnect, useChainId } from "wagmi";
+import { useAccount, useEnsName, useEnsAvatar, useDisconnect, useChainId } from "wagmi";
 import Image from "next/image";
 import IconConnect from "../assets/icons/connect.svg";
 import IconConnectWhite from "../assets/icons/connect-white.svg";
 import Button from "./button";
 import { useCredential } from "../hooks/credential";
+import { useAuth } from "../hooks/auth";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import WalletButton from "./wallet-button";
@@ -37,8 +38,10 @@ const ConnectFlow: React.FC<IProps> = ({
     const { address, isConnected, chain } = useAccount();
     const chainId = useChainId();
     const { data: ensName } = useEnsName({ address });
+    const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId, returnUrl);
+    const { docId } = useAuth();
 
     // Construct DID from address and chainId
     const user = (address && hasCredential)
@@ -54,7 +57,7 @@ const ConnectFlow: React.FC<IProps> = ({
             <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
                 <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10">
                     <h2 className="mb-3 text-3xl font-semibold">
-                        {isConnected && chain
+                        {address
                             ? "Confirm Authorization"
                             : "Connect Wallet"}
                     </h2>
@@ -65,9 +68,17 @@ const ConnectFlow: React.FC<IProps> = ({
                     {/* Ethereum Profile Card */}
                     {address && (
                         <div className="rounded-xl p-4 mb-6 bg-neutral-2-light flex gap-3 w-full">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
-                                {address.slice(2, 4).toUpperCase()}
-                            </div>
+                            {ensAvatar ? (
+                                <img
+                                    src={ensAvatar}
+                                    alt="Profile"
+                                    className="w-12 h-12 rounded-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
+                                    {address.slice(2, 4).toUpperCase()}
+                                </div>
+                            )}
                             <div className="flex-1">
                                 <h3 className="text-neutral-5-light font-medium">
                                     {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
@@ -77,7 +88,7 @@ const ConnectFlow: React.FC<IProps> = ({
                                 </p>
                                 <div className="flex gap-3 mt-1">
                                     <button className="text-link text-sm underline underline-offset-4" onClick={() => {
-                                        window.open(`/profile/${address}`, '_blank');
+                                        window.open(`/profile/${docId || address}`, '_blank');
                                     }}>
                                         View profile
                                     </button>

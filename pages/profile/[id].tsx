@@ -54,15 +54,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
   }
 
   const displayName = profile.username || 'Anonymous'
-  const truncatedAddress = profile.ethAddress
-    ? `${profile.ethAddress.slice(0, 6)}...${profile.ethAddress.slice(-4)}`
-    : null
 
   return (
     <PageBackground>
       <Head>
-        <title>{String(displayName)} - Renown Profile</title>
-        <meta content={`${String(displayName)}'s Renown profile`} name="description" />
+        <title>{`${displayName} - Renown Profile`}</title>
+        <meta content={`${displayName}'s Renown profile`} name="description" />
         <link href="/favicon.ico" rel="icon" />
       </Head>
 
@@ -89,14 +86,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
               </div>
 
               {/* Username */}
-              <h1 className="mb-2 text-center text-3xl font-bold text-white">{displayName}</h1>
-
-              {/* ETH Address */}
-              {truncatedAddress && (
-                <p className="mb-6 text-center font-mono text-sm text-gray-300">
-                  {truncatedAddress}
-                </p>
-              )}
+              <h1 className="mb-6 text-center text-3xl font-bold text-white">{displayName}</h1>
 
               {/* Profile Details */}
               <div className="mt-8 space-y-4">

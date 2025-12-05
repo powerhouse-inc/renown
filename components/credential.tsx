@@ -1,10 +1,29 @@
 import IconCheck from "../assets/icons/check.svg";
 import Image from "next/image";
 import { useCredential } from "../hooks/credential";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import IconConnect from "../assets/icons/connect.svg";
 import { useVerifyToken } from "../hooks/useVerifyToken";
 import { useAccount } from "wagmi";
+
+interface CredentialDetails {
+    documentId: string;
+    credentialId: string;
+    status: string;
+    revoked: boolean;
+    revokedAt: string | null;
+    revocationReason: string | null;
+    issuerId: string;
+    issuerEthereumAddress: string;
+    issuanceDate: string;
+    expirationDate: string | null;
+    credentialSubject: {
+        id: string | null;
+        app: string;
+    };
+    createdAt: string | null;
+    updatedAt: string | null;
+}
 
 interface IProps {
     connectId: string;
@@ -20,7 +39,24 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
     const { address } = useAccount();
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
+    const [credentialDetails, setCredentialDetails] = useState<CredentialDetails | null>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
+
+    useEffect(() => {
+        if (address && hasCredential) {
+            setLoadingDetails(true);
+            fetch(`/api/status/${address}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.error) {
+                        setCredentialDetails(data);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch credential details:', err))
+                .finally(() => setLoadingDetails(false));
+        }
+    }, [address, hasCredential]);
 
     if (!hasCredential) {
         return null;
@@ -28,8 +64,10 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
 
     return (
         <div className="flex flex-col w-full">
-            <div className="rounded-xl p-4 px-6 flex gap-3 w-full">
-                <Image src={IconCheck} alt="Confirmed" width={36} height={36} />
+            <div className="rounded-xl p-4 flex gap-3 w-full">
+                <div className="w-12 flex items-center justify-center">
+                    <Image src={IconCheck} alt="Confirmed" width={36} height={36} />
+                </div>
                 <div className="flex flex-col flex-1">
                     <h3 className="font-medium">
                         Authorization confirmed
@@ -89,21 +127,25 @@ const Credential: React.FC<IProps> = ({ connectId, returnUrl }) => {
                 </div>
                 <dialog
                     ref={dialogRef}
-                    className="shadow-lg backdrop:bg-transparent backdrop:cursor-pointer p-6 h-4/6"
+                    className="shadow-lg backdrop:bg-transparent backdrop:cursor-pointer p-6 h-4/6 max-w-2xl rounded-xl"
                     onClick={() => dialogRef.current?.close()}
                 >
                     <pre
-                        className="text-start"
+                        className="text-start text-sm overflow-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {credential && JSON.stringify({ credentialId: credential }, null, 4)}
+                        {loadingDetails
+                            ? 'Loading credential details...'
+                            : JSON.stringify(credentialDetails || { credentialId: credential }, null, 4)}
                     </pre>
                 </dialog>
             </div>
             <div>
                                 {/* Connected Application Card */}
                                 <div className="rounded-xl p-4 mt-6 bg-neutral-2-light flex gap-3 w-full">
-                                <Image src={IconConnect} alt="Application" width={36} height={36} />
+                                <div className="w-12 flex items-center justify-center">
+                                    <Image src={IconConnect} alt="Application" width={36} height={36} />
+                                </div>
                                 <div className="flex-1">
                                     <h3 className="text-neutral-5-light font-medium">
                                         {returnUrl ? new URL(returnUrl).hostname : 'Connected Application'}

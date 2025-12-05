@@ -23,6 +23,7 @@ export interface LoginOptions {
 export interface UseAuthReturn {
   jwt: string | null // Legacy field name, now stores credentialId
   did: string | null
+  docId: string | null // The Renown document ID
   isAuthenticated: boolean
   isLoading: boolean
   error: Error | null
@@ -203,10 +204,10 @@ export function useAuth(): UseAuthReturn {
             throw new Error(errorData.error || 'Failed to store credential')
           }
 
-          // Capture the document ID from the response
+          // Capture the user document ID from the response (this is the profile ID)
           const result = await response.json()
-          if (result.documentId) {
-            setStoredDocId(result.documentId)
+          if (result.userDocumentId) {
+            setStoredDocId(result.userDocumentId)
           }
 
           // Store the credential ID locally for session tracking
@@ -304,8 +305,8 @@ export function useAuth(): UseAuthReturn {
       }
 
       const result = await response.json()
-      if (result.documentId) {
-        setStoredDocId(result.documentId)
+      if (result.userDocumentId) {
+        setStoredDocId(result.userDocumentId)
       }
 
       setJwt(credential.id)
@@ -324,6 +325,7 @@ export function useAuth(): UseAuthReturn {
     () => ({
       jwt,
       did,
+      docId: storedDocId,
       isAuthenticated,
       isLoading,
       error,
@@ -331,6 +333,6 @@ export function useAuth(): UseAuthReturn {
       logout,
       refreshToken,
     }),
-    [jwt, did, isAuthenticated, isLoading, error, login, logout, refreshToken],
+    [jwt, did, storedDocId, isAuthenticated, isLoading, error, login, logout, refreshToken],
   )
 }
