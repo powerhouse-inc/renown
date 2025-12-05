@@ -1,3 +1,7 @@
+## <small>1.4.2 (2025-12-05)</small>
+
+* fix: improved flow and profile page ([082deee](https://github.com/powerhouse-inc/renown/commit/082deee))
+
 ## <small>1.4.1 (2025-12-05)</small>
 
 * fix: store username and image ([7472bf6](https://github.com/powerhouse-inc/renown/commit/7472bf6))
