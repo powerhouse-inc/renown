@@ -1,14 +1,19 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { atom, useAtom } from "jotai";
-import { useAuth } from "./auth";
+import { useAuth, LoginOptions } from "./auth";
+
+interface CreateCredentialOptions {
+    ensName?: string | null;
+    ensAvatar?: string | null;
+}
 
 interface ICredential {
     credential: string | undefined; // Now stores JWT instead of VC
     isAuth: boolean;
     hasCredential: boolean;
     loading: boolean;
-    createCredential: () => Promise<string | undefined>;
+    createCredential: (options?: CreateCredentialOptions) => Promise<string | undefined>;
     revokeCredential: () => Promise<void>;
 }
 
@@ -35,11 +40,16 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
     }, [jwt, setCredential]);
 
     const createCredential = useCallback(
-        async (address: `0x${string}`, chainId: number, connectId: string, returnUrl?: string) => {
+        async (address: `0x${string}`, chainId: number, connectId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
             setState("FETCHING_CREDENTIAL");
             try {
                 // Use the JWT authentication system
-                const jwtToken = await login(connectId, undefined, undefined, returnUrl);
+                const jwtToken = await login({
+                    connectId,
+                    returnUrl,
+                    ensName: options?.ensName,
+                    ensAvatar: options?.ensAvatar,
+                });
                 setCredential(jwtToken);
                 setState("SUCCESS");
                 return jwtToken;
@@ -74,11 +84,11 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
             isAuth: isAuthenticated,
             hasCredential: !!credential,
             loading: state === "FETCHING_CREDENTIAL" || authLoading,
-            createCredential: () => {
+            createCredential: (options?: CreateCredentialOptions) => {
                 if (!address) {
                     throw new Error("Address is not set");
                 }
-                return createCredential(address, chainId, connectId, returnUrl);
+                return createCredential(address, chainId, connectId, returnUrl, options);
             },
             revokeCredential,
         }),

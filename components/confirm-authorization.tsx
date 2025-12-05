@@ -1,9 +1,10 @@
-import { useAccount } from "wagmi";
+import { useAccount, useEnsName, useEnsAvatar } from "wagmi";
 import Button from "./button";
 import WalletButton from "./wallet-button";
 import { useCredential } from "../hooks/credential";
 import Image from "next/image";
 import IconConnect from "../assets/icons/connect.svg";
+import { useCallback } from "react";
 
 interface IProps {
     connectId: string;
@@ -16,8 +17,17 @@ function ConnectIdText(id: string) {
 }
 
 export const ConfirmAuthorization: React.FC<IProps> = ({ connectId, returnUrl  }) => {
-    const { isConnected, chain } = useAccount();
+    const { address, isConnected, chain } = useAccount();
+    const { data: ensName } = useEnsName({ address });
+    const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { createCredential, loading } = useCredential(connectId, returnUrl);
+
+    const handleCreateCredential = useCallback(() => {
+        return createCredential({
+            ensName: ensName ?? null,
+            ensAvatar: ensAvatar ?? null,
+        });
+    }, [createCredential, ensName, ensAvatar]);
 
     return (
         <div className="flex flex-col w-full ">
@@ -39,7 +49,7 @@ export const ConfirmAuthorization: React.FC<IProps> = ({ connectId, returnUrl  }
                             </div>
                 <Button
                     primary
-                    onClick={createCredential}
+                    onClick={handleCreateCredential}
                     className={`w-full mb-3 ${loading ? "animate-pulse" : ""}`}
                     disabled={
                         !isConnected || !chain || loading

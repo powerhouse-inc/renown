@@ -11,13 +11,22 @@ const credentialIdAtom = atom<string | null>(null)
 // Atom to store the document ID
 const docIdAtom = atom<string | null>(null)
 
+export interface LoginOptions {
+  connectId?: string
+  driveId?: string
+  docId?: string
+  returnUrl?: string
+  ensName?: string | null
+  ensAvatar?: string | null
+}
+
 export interface UseAuthReturn {
   jwt: string | null // Legacy field name, now stores credentialId
   did: string | null
   isAuthenticated: boolean
   isLoading: boolean
   error: Error | null
-  login: (connectId?: string, driveId?: string, docId?: string, returnUrl?: string) => Promise<string>
+  login: (options?: LoginOptions) => Promise<string>
   logout: (driveId?: string, docId?: string) => Promise<void>
   refreshToken: () => Promise<string | null>
 }
@@ -133,7 +142,9 @@ export function useAuth(): UseAuthReturn {
    * Login and create a new JWT
    */
   const login = useCallback(
-    async (connectId?: string, driveId?: string, docId?: string, returnUrl?: string): Promise<string> => {
+    async (options?: LoginOptions): Promise<string> => {
+      const { connectId, driveId, docId, returnUrl, ensName, ensAvatar } = options || {}
+
       if (!walletClient || !address) {
         throw new Error('Wallet not connected')
       }
@@ -162,6 +173,9 @@ export function useAuth(): UseAuthReturn {
           expiresInDays: 7,
         })
 
+        // Determine username: use ENS name if available, otherwise use shortened address
+        const username = ensName || `${address.slice(0, 6)}...${address.slice(-4)}`
+
         // Store the credential on Renown Switchboard
         try {
           const response = await fetch('/api/credential/renown', {
@@ -178,6 +192,8 @@ export function useAuth(): UseAuthReturn {
                 ...domain,
                 chainId: Number(domain.chainId), // Convert BigInt to number for JSON serialization
               },
+              username,
+              userImage: ensAvatar,
             }),
           })
 

@@ -38,12 +38,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'POST') {
     // Create/Add an EIP-712 credential
-    const { driveId, docId, credential, signature, domain } = req.body as {
+    const { driveId, docId, credential, signature, domain, username, userImage } = req.body as {
       driveId?: string
       docId?: string
       credential: EIP712Credential
       signature: string
       domain: EIP712Domain
+      username?: string
+      userImage?: string | null
     }
 
     if (!credential || !signature || !domain) {
@@ -176,6 +178,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           })
 
           console.log('Set ethAddress on new document')
+        }
+
+        // Set username and userImage if provided
+        if (finalDocId && username) {
+          const SET_USERNAME_MUTATION = `
+            mutation SetUsername($docId: PHID!, $input: RenownUser_SetUsernameInput!) {
+              RenownUser_setUsername(docId: $docId, input: $input)
+            }
+          `
+
+          await client.request(SET_USERNAME_MUTATION, {
+            docId: finalDocId,
+            input: { username },
+          })
+          console.log('Set username on document:', username)
+        }
+
+        if (finalDocId && userImage) {
+          const SET_USER_IMAGE_MUTATION = `
+            mutation SetUserImage($docId: PHID!, $input: RenownUser_SetUserImageInput!) {
+              RenownUser_setUserImage(docId: $docId, input: $input)
+            }
+          `
+
+          await client.request(SET_USER_IMAGE_MUTATION, {
+            docId: finalDocId,
+            input: { userImage },
+          })
+          console.log('Set userImage on document:', userImage)
         }
 
         // Note: Folders are not supported in the GraphQL API
