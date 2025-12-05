@@ -1,3 +1,7 @@
+## <small>1.4.1 (2025-12-05)</small>
+
+* fix: store username and image ([7472bf6](https://github.com/powerhouse-inc/renown/commit/7472bf6))
+
 ## 1.4.0 (2025-11-13)
 
 * feat: user drives storing eip712 credentials and renown user profile ([f7d3955](https://github.com/powerhouse-inc/renown/commit/f7d3955))
