@@ -26,7 +26,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
-    const { hasCredential, credential, createCredential, loading } = useCredential(sessionId);
+    const { hasCredential, credential, createCredential, loading } = useCredential(connectDid || sessionId);
     const { docId, did } = useAuth();
     const [sessionCompleted, setSessionCompleted] = useState(false);
     const [error, setError] = useState<string | null>(null);
