@@ -1,3 +1,7 @@
+## 1.6.0 (2025-12-10)
+
+* feat: added console flow login ([b09d6d7](https://github.com/powerhouse-inc/renown/commit/b09d6d7))
+
 ## 1.5.0 (2025-12-05)
 
 * feat: added user login ([d4d0c46](https://github.com/powerhouse-inc/renown/commit/d4d0c46))
