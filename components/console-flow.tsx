@@ -26,15 +26,62 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
-    const { hasCredential, credential, createCredential, loading } = useCredential(connectDid || sessionId);
+    const { credential, createCredential, loading } = useCredential(connectDid || sessionId);
     const { docId, did } = useAuth();
     const [sessionCompleted, setSessionCompleted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Track if we have a valid credential for the requested connectDid
+    // This can be true if: 1) we created a new credential, or 2) existing credential matches connectDid
+    const [hasValidCredentialForSession, setHasValidCredentialForSession] = useState(false);
+    const [checkingExistingCredential, setCheckingExistingCredential] = useState(false);
 
-    // Complete the console session when credential is created
+    // Check if existing credential matches the requested connectDid
+    useEffect(() => {
+        const checkExistingCredential = async () => {
+            if (!address || !connectDid || hasValidCredentialForSession) {
+                return;
+            }
+
+            setCheckingExistingCredential(true);
+            try {
+                const response = await fetch(`/api/status/${encodeURIComponent(address)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // Check if credential is active and matches the requested connectDid
+                    if (
+                        data.status === 'active' &&
+                        !data.revoked &&
+                        data.credentialSubject?.id === connectDid
+                    ) {
+                        // Check if not expired
+                        if (data.expirationDate) {
+                            const expiration = new Date(data.expirationDate);
+                            if (expiration > new Date()) {
+                                console.log('Found existing valid credential for connectDid:', connectDid);
+                                setHasValidCredentialForSession(true);
+                            }
+                        } else {
+                            // No expiration date means it's valid
+                            console.log('Found existing valid credential (no expiration) for connectDid:', connectDid);
+                            setHasValidCredentialForSession(true);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error checking existing credential:', e);
+            } finally {
+                setCheckingExistingCredential(false);
+            }
+        };
+
+        checkExistingCredential();
+    }, [address, connectDid, hasValidCredentialForSession]);
+
+    // Complete the console session when we have a valid credential for this connectDid
+    // This triggers when: 1) existing credential matches, or 2) new credential was created
     useEffect(() => {
         const completeSession = async () => {
-            if (hasCredential && credential && address && did && !sessionCompleted) {
+            if (hasValidCredentialForSession && credential && address && did && !sessionCompleted) {
                 try {
                     const response = await fetch(`/api/console/session/${sessionId}`, {
                         method: 'PUT',
@@ -65,13 +112,17 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
         };
 
         completeSession();
-    }, [hasCredential, credential, address, chainId, did, docId, sessionId, sessionCompleted, connectDid]);
+    }, [hasValidCredentialForSession, credential, address, chainId, did, docId, sessionId, sessionCompleted, connectDid]);
 
-    const handleCreateCredential = useCallback(() => {
-        return createCredential({
+    const handleCreateCredential = useCallback(async () => {
+        const result = await createCredential({
             ensName: ensName ?? null,
             ensAvatar: ensAvatar ?? null,
         });
+        if (result) {
+            setHasValidCredentialForSession(true);
+        }
+        return result;
     }, [createCredential, ensName, ensAvatar]);
 
     return (
@@ -216,7 +267,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                     </div>
                                     <WalletButton />
                                 </div>
-                            ) : !hasCredential ? (
+                            ) : !hasValidCredentialForSession ? (
                                 <div className="flex flex-col w-full gap-3">
                                     {/* CLI Application Card */}
                                     <div className="rounded-xl p-4 bg-neutral-2-light flex gap-3 w-full">
@@ -246,10 +297,10 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                     <Button
                                         primary
                                         onClick={handleCreateCredential}
-                                        className={`w-full ${loading ? "animate-pulse" : ""}`}
-                                        disabled={!isConnected || !chain || loading}
+                                        className={`w-full ${loading || checkingExistingCredential ? "animate-pulse" : ""}`}
+                                        disabled={!isConnected || !chain || loading || checkingExistingCredential}
                                     >
-                                        {loading ? "Signing..." : "Authorize CLI"}
+                                        {checkingExistingCredential ? "Checking credentials..." : loading ? "Signing..." : "Authorize CLI"}
                                     </Button>
                                     <p className="text-xs text-neutral-4 text-center mt-2">
                                         By authorizing, you allow this CLI to sign documents on your behalf.
