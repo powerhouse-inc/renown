@@ -9,7 +9,10 @@
         "lint": "next lint",
         "next:dev": "next dev",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "test": "playwright test",
+        "test:ui": "playwright test --ui",
+        "test:headed": "playwright test --headed"
     },
     "dependencies": {
         "@composedb/client": "^0.7.1",
@@ -52,6 +55,7 @@
         "@composedb/devtools": "^0.7.1",
         "@composedb/devtools-node": "^0.7.1",
         "@composedb/types": "^0.7.1",
+        "@playwright/test": "^1.57.0",
         "@semantic-release/changelog": "^6.0.3",
         "@semantic-release/commit-analyzer": "^11.1.0",
         "@semantic-release/git": "^10.0.1",
