@@ -2,7 +2,7 @@ import { GraphQLClient, gql } from 'graphql-request'
 
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown-staging.vetra.io/graphql'
+  'https://switchboard.renown.vetra.io/graphql'
 
 const CREATE_DRIVE_MUTATION = gql`
   mutation CreateDrive($id: String!, $name: String!, $slug: String!) {
