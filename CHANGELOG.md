@@ -1,3 +1,9 @@
+## <small>1.6.1 (2026-01-19)</small>
+
+* fix: use renown prod endpoint by default ([8e22fde](https://github.com/powerhouse-inc/renown/commit/8e22fde))
+* chore: small console flow improvements ([14cd5f1](https://github.com/powerhouse-inc/renown/commit/14cd5f1))
+* chore: updated console flow ([31596b4](https://github.com/powerhouse-inc/renown/commit/31596b4))
+
 ## 1.6.0 (2025-12-10)
 
 * feat: added console flow login ([b09d6d7](https://github.com/powerhouse-inc/renown/commit/b09d6d7))
