@@ -4,16 +4,15 @@ import { GraphQLClient } from 'graphql-request'
 import { revokeCredential } from '../../../services/renown-credential'
 
 const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
+  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || 'https://switchboard.renown.vetra.io/graphql'
 const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || 'renown-profiles'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 
   if (req.method === 'GET') {
-    // Get credentials by address/chainId/connectId
-    const { address, chainId, connectId, driveId, includeRevoked } = req.query
+    // Get credentials by address/chainId/appId
+    const { address, chainId, appId, connectId, driveId, includeRevoked } = req.query
 
     if (!address) {
       res.status(400).json({ error: 'Address is required' })
@@ -102,43 +101,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       console.log(`Found ${credentials.length} credentials for address ${address}`)
 
-      // If no credentials at all, return 404 immediately
-      if (credentials.length === 0) {
-        res.status(404).json({ error: 'Credential not found' })
-        return
-      }
-
       // Filter by chainId if provided
       // The issuerId format is: did:pkh:eip155:chainId:address
       if (chainId) {
         const normalizedAddress = (address as string).toLowerCase()
         const expectedIssuerId = `did:pkh:eip155:${chainId}:${normalizedAddress}`
 
-        const filtered = credentials.filter((cred) => {
+        credentials = credentials.filter((cred) => {
           return cred.issuerId.toLowerCase() === expectedIssuerId.toLowerCase()
         })
-
-        console.log(`After chainId filter (${chainId}): ${filtered.length} credentials`)
-        if (filtered.length > 0) {
-          credentials = filtered
-        }
       }
 
-      // Filter by connectId if provided
-      // connectId is stored in credentialSubjectId
-      if (connectId) {
-        const filtered = credentials.filter((cred) => {
-          return cred.credentialSubjectId === connectId
+      // Filter by app did if provided
+      const appDid = appId || connectId
+      if (appDid) {
+        credentials = credentials.filter((cred) => {
+          return cred.credentialSubjectId === appDid
         })
-
-        console.log(`After connectId filter (${connectId}): ${filtered.length} credentials`)
-        if (filtered.length > 0) {
-          credentials = filtered
-        }
       }
 
-      // Return the first valid credential (SDK expects a single credential, not an array)
-      const credential = credentials[0]
+      // If no credentials are found after applying filters, return 404
+      if (credentials.length === 0) {
+        res.status(404).json({ error: 'Credential not found' })
+        return
+      }
+
+      // Return the most recent credential
+      const credential = credentials.reduce((prev, curr) => {
+        return prev.issuanceDate > curr.issuanceDate ? prev : curr
+      })
 
       // Parse EIP-712 domain from JSON string
       let eip712Domain
