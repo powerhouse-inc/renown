@@ -1,3 +1,8 @@
+## <small>1.6.2 (2026-03-06)</small>
+
+* fix: filter credentials correctly ([09f583e](https://github.com/powerhouse-inc/renown/commit/09f583e))
+* ci: add Vetra container registry publishing ([1c3266f](https://github.com/powerhouse-inc/renown/commit/1c3266f))
+
 ## <small>1.6.1 (2026-01-19)</small>
 
 * fix: use renown prod endpoint by default ([8e22fde](https://github.com/powerhouse-inc/renown/commit/8e22fde))
