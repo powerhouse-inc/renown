@@ -95,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }>(GET_CREDENTIALS_QUERY, {
         input: {
           driveId: finalDriveId,
-          ethAddress: address,
+          ethAddress: (address as string).toLowerCase(),
           did: appDid as string | undefined,
           includeRevoked: includeRevoked === 'true',
         },
@@ -103,7 +103,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       let credentials = credentialsData.renownCredentials
 
-      console.log(`Found ${credentials.length} credentials for address ${address}`)
+      console.log(
+        `Found ${credentials.length} credentials for address ${address} ${appDid ? `and app ${appDid}` : ''}`,
+      )
 
       // Filter by chainId if provided
       // The issuerId format is: did:pkh:eip155:chainId:address

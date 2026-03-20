@@ -41,7 +41,7 @@ const ConnectFlow: React.FC<IProps> = ({
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId, returnUrl);
-    const { docId } = useAuth();
+    const { docId } = useAuth(connectId);
 
     // Construct DID from address and chainId
     const user = (address && hasCredential)

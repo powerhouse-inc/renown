@@ -22,7 +22,7 @@ const credentialAtom = atom<string | undefined>(undefined);
 export function useCredential(connectId: string, returnUrl?: string): ICredential {
     const { address } = useAccount();
     const chainId = useChainId();
-    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth();
+    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(connectId);
     const [credential, setCredential] = useAtom<string | undefined>(credentialAtom);
     const [state, setState] = useState<
         "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"

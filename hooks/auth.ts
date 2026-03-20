@@ -3,9 +3,6 @@ import { useWalletClient, useAccount, useChainId } from 'wagmi'
 import { atom, useAtom } from 'jotai'
 import { createEIP712Credential } from '../services/eip712-credential'
 
-const CREDENTIAL_ID_STORAGE_KEY = 'renown_credential_id'
-const DOC_ID_STORAGE_KEY = 'renown_doc_id'
-
 // Atom to store the credential ID
 const credentialIdAtom = atom<string | null>(null)
 // Atom to store the document ID
@@ -32,7 +29,7 @@ export interface UseAuthReturn {
   refreshToken: () => Promise<string | null>
 }
 
-export function useAuth(): UseAuthReturn {
+export function useAuth(appDid?: string): UseAuthReturn {
   const { data: walletClient } = useWalletClient()
   const { address } = useAccount()
   const chainId = useChainId()
@@ -53,91 +50,42 @@ export function useAuth(): UseAuthReturn {
     return !!jwt
   }, [jwt])
 
-  // Load credential ID and docId from localStorage on mount and validate with server
+  // Fetch credential from API on mount and when appDid changes
   useEffect(() => {
-    const validateStoredCredential = async () => {
-      try {
-        const storedCredentialId = localStorage.getItem(CREDENTIAL_ID_STORAGE_KEY)
-        const storedDocIdValue = localStorage.getItem(DOC_ID_STORAGE_KEY)
+    const fetchCredential = async () => {
+      if (!address) {
+        return
+      }
 
-        if (!storedCredentialId || !address) {
-          return
+      try {
+        const params = new URLSearchParams({
+          address,
+          includeRevoked: 'false',
+        })
+        if (appDid) {
+          params.set('appId', appDid)
         }
 
-        // Validate with server to check if credential is still valid and not revoked
-        try {
-          const response = await fetch(`/api/status/${encodeURIComponent(address)}`)
+        const response = await fetch(`/api/auth/credential?${params}`)
 
-          if (response.ok) {
-            const data = await response.json()
-
-            // Check if credential is revoked
-            if (data.revoked) {
-              console.log('Stored credential has been revoked, removing from storage')
-              localStorage.removeItem(CREDENTIAL_ID_STORAGE_KEY)
-              localStorage.removeItem(DOC_ID_STORAGE_KEY)
-              return
-            }
-
-            // Check if status is active
-            if (data.status !== 'active') {
-              console.log('Stored credential is not active, removing from storage')
-              localStorage.removeItem(CREDENTIAL_ID_STORAGE_KEY)
-              localStorage.removeItem(DOC_ID_STORAGE_KEY)
-              return
-            }
-
-            // Credential is valid, set it
-            setJwt(storedCredentialId)
-            if (storedDocIdValue) {
-              setStoredDocId(storedDocIdValue)
-            }
-            console.log('Stored credential is valid')
-          } else if (response.status === 404) {
-            // Credential not found on server
-            console.log('Stored credential not found on server, removing from storage')
-            localStorage.removeItem(CREDENTIAL_ID_STORAGE_KEY)
-            localStorage.removeItem(DOC_ID_STORAGE_KEY)
-          } else {
-            // Server error - be lenient and use the credential anyway
-            console.warn('Failed to validate credential with server, using stored credential anyway')
-            setJwt(storedCredentialId)
-            if (storedDocIdValue) {
-              setStoredDocId(storedDocIdValue)
-            }
+        if (response.ok) {
+          const data = await response.json()
+          const credential = data.credential
+          if (credential) {
+            setJwt(credential.id)
           }
-        } catch (e) {
-          // Network error - be lenient and use the credential anyway
-          console.warn('Failed to validate credential with server (network error), using stored credential anyway:', e)
-          setJwt(storedCredentialId)
-          if (storedDocIdValue) {
-            setStoredDocId(storedDocIdValue)
-          }
+        } else {
+          // No valid credential found for this app DID
+          setJwt(null)
+          setStoredDocId(null)
         }
       } catch (e) {
-        console.error('Failed to load credential from storage:', e)
+        console.error('Failed to fetch credential:', e)
       }
     }
 
-    validateStoredCredential()
-  }, [address, setJwt, setStoredDocId])
-
-  // Save credential ID and docId to localStorage when they change
-  useEffect(() => {
-    if (jwt) {
-      localStorage.setItem(CREDENTIAL_ID_STORAGE_KEY, jwt)
-    } else {
-      localStorage.removeItem(CREDENTIAL_ID_STORAGE_KEY)
-    }
-  }, [jwt])
-
-  useEffect(() => {
-    if (storedDocId) {
-      localStorage.setItem(DOC_ID_STORAGE_KEY, storedDocId)
-    } else {
-      localStorage.removeItem(DOC_ID_STORAGE_KEY)
-    }
-  }, [storedDocId])
+    fetchCredential()
+  }, [address, appDid, setJwt, setStoredDocId])
 
   /**
    * Login and create a new JWT
