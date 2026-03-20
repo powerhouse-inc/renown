@@ -59,6 +59,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       `
 
+      // Pass app DID to the subgraph query for server-side filtering
+      const appDid = appId || connectId
+
       const credentialsData = await client.request<{
         renownCredentials: Array<{
           documentId: string
@@ -93,6 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         input: {
           driveId: finalDriveId,
           ethAddress: address,
+          did: appDid as string | undefined,
           includeRevoked: includeRevoked === 'true',
         },
       })
@@ -109,14 +113,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         credentials = credentials.filter((cred) => {
           return cred.issuerId.toLowerCase() === expectedIssuerId.toLowerCase()
-        })
-      }
-
-      // Filter by app did if provided
-      const appDid = appId || connectId
-      if (appDid) {
-        credentials = credentials.filter((cred) => {
-          return cred.credentialSubjectId === appDid
         })
       }
 
