@@ -1,3 +1,7 @@
+## <small>1.6.6 (2026-03-25)</small>
+
+* fix: force rebuild for v6 API changes ([b626664](https://github.com/powerhouse-inc/renown/commit/b626664))
+
 ## <small>1.6.5 (2026-03-25)</small>
 
 * fix: create documents without parentIdentifier for now ([28335af](https://github.com/powerhouse-inc/renown/commit/28335af))
