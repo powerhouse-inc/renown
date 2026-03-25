@@ -1,3 +1,7 @@
+## <small>1.6.4 (2026-03-25)</small>
+
+* fix: update GraphQL mutations to v6 reactor API ([9371c07](https://github.com/powerhouse-inc/renown/commit/9371c07))
+
 ## <small>1.6.3 (2026-03-25)</small>
 
 * fix: pass app DID to subgraph query instead of filtering client-side ([fd60645](https://github.com/powerhouse-inc/renown/commit/fd60645))
