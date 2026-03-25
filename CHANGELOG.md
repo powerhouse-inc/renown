@@ -1,3 +1,7 @@
+## <small>1.6.5 (2026-03-25)</small>
+
+* fix: create documents without parentIdentifier for now ([28335af](https://github.com/powerhouse-inc/renown/commit/28335af))
+
 ## <small>1.6.4 (2026-03-25)</small>
 
 * fix: update GraphQL mutations to v6 reactor API ([9371c07](https://github.com/powerhouse-inc/renown/commit/9371c07))
