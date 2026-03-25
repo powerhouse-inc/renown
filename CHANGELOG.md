@@ -1,3 +1,8 @@
+## <small>1.6.3 (2026-03-25)</small>
+
+* fix: pass app DID to subgraph query instead of filtering client-side ([fd60645](https://github.com/powerhouse-inc/renown/commit/fd60645))
+* fix: UI credential check ([a2d5377](https://github.com/powerhouse-inc/renown/commit/a2d5377))
+
 ## <small>1.6.2 (2026-03-06)</small>
 
 * fix: filter credentials correctly ([09f583e](https://github.com/powerhouse-inc/renown/commit/09f583e))
