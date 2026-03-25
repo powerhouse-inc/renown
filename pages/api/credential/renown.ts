@@ -1,3 +1,4 @@
+// v6 reactor API - uses createEmptyDocument + mutateDocument
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
 import { GraphQLClient } from 'graphql-request'
