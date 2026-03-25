@@ -106,14 +106,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           const createResult = await client.request<{
             createEmptyDocument: { id: string }
           }>(`
-            mutation CreateEmptyDocument($documentType: String!, $parentIdentifier: String) {
-              createEmptyDocument(documentType: $documentType, parentIdentifier: $parentIdentifier) {
+            mutation CreateEmptyDocument($documentType: String!) {
+              createEmptyDocument(documentType: $documentType) {
                 id
               }
             }
           `, {
             documentType: 'powerhouse/renown-user',
-            parentIdentifier: userDriveId,
           })
 
           finalDocId = createResult.createEmptyDocument.id

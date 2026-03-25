@@ -61,7 +61,6 @@ export async function storeCredential(params: {
     // Create a new RenownCredential document
     const createResult = (await request(SWITCHBOARD_URL, CREATE_EMPTY_DOCUMENT, {
       documentType: 'powerhouse/renown-credential',
-      parentIdentifier: params.driveId,
     })) as { createEmptyDocument: { id: string } }
 
     const credentialId = createResult.createEmptyDocument.id
