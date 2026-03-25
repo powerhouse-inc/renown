@@ -59,14 +59,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       let finalDocId = docId
 
       // Extract Ethereum address from the issuer DID
-      // Issuer format: "did:pkh:eip155:chainId:address"
       const issuerParts = credential.issuer.id.split(':')
       let ethAddress: string | undefined
 
       if (issuerParts.length >= 5 && issuerParts[0] === 'did' && issuerParts[1] === 'pkh') {
         ethAddress = issuerParts[4]
       } else {
-        // Fallback to ethereumAddress field
         ethAddress = credential.issuer.ethereumAddress
       }
 
@@ -75,56 +73,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return
       }
 
-      // Create a user-specific drive ID based on their address
       const userDriveId = `renown-${ethAddress.toLowerCase()}`
 
-      // If no docId provided, we need to find or create the user's drive and documents
       if (!finalDocId) {
         console.log('Setting up user drive for ethAddress:', ethAddress)
 
-        // Try to find existing drive
-        const GET_DRIVES_QUERY = `
-          query GetDrives {
-            drives
-          }
-        `
-
-        let driveExists = false
-        try {
-          const drivesData = await client.request<{
-            drives: string[]
-          }>(GET_DRIVES_QUERY)
-          driveExists = drivesData.drives.includes(userDriveId)
-          console.log('Drive exists:', driveExists, 'userDriveId:', userDriveId)
-          console.log('Available drives:', drivesData.drives)
-        } catch (e) {
-          console.error('Error checking for existing drive:', e)
-          // If we can't check, assume it might exist and skip creation
-          driveExists = true
-        }
-
-        // Create drive if it doesn't exist
-        if (!driveExists) {
-          console.log('Creating new drive:', userDriveId)
-          const CREATE_DRIVE_MUTATION = `
-            mutation AddDrive($id: String!, $name: String!, $slug: String!) {
-              addDrive(id: $id, name: $name, slug: $slug) {
-                id
-                name
-                slug
-              }
-            }
-          `
-
-          await client.request(CREATE_DRIVE_MUTATION, {
-            id: userDriveId,
-            name: `Renown - ${ethAddress.slice(0, 8)}`,
-            slug: userDriveId,
-          })
-          console.log('Created drive:', userDriveId)
-        }
-
-        // Try to find existing RenownUser document in the user's drive
+        // Try to find existing RenownUser document
         const GET_PROFILE_QUERY = `
           query RenownUsers($input: RenownUsersInput!) {
             renownUsers(input: $input) {
@@ -147,73 +101,83 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           finalDocId = profileData.renownUsers[0].documentId
           console.log('Found existing RenownUser document:', finalDocId)
         } else {
-          // Create RenownUser document in the user's drive
-          console.log('Creating RenownUser document in drive:', userDriveId)
-          const CREATE_USER_MUTATION = `
-            mutation CreateRenownUser($name: String!, $driveId: String) {
-              RenownUser_createDocument(name: $name, driveId: $driveId)
-            }
-          `
-
+          // Create RenownUser document using generic v6 mutations
+          console.log('Creating RenownUser document')
           const createResult = await client.request<{
-            RenownUser_createDocument: string
-          }>(CREATE_USER_MUTATION, {
-            name: `User ${ethAddress.slice(0, 8)}`,
-            driveId: userDriveId,
+            createEmptyDocument: { id: string }
+          }>(`
+            mutation CreateEmptyDocument($documentType: String!, $parentIdentifier: String) {
+              createEmptyDocument(documentType: $documentType, parentIdentifier: $parentIdentifier) {
+                id
+              }
+            }
+          `, {
+            documentType: 'powerhouse/renown-user',
+            parentIdentifier: userDriveId,
           })
 
-          finalDocId = createResult.RenownUser_createDocument
+          finalDocId = createResult.createEmptyDocument.id
           console.log('Created new RenownUser document:', finalDocId)
 
-          // Set the eth address on the new document
-          const SET_ETH_ADDRESS_MUTATION = `
-            mutation SetEthAddress($docId: PHID!, $input: RenownUser_SetEthAddressInput!) {
-              RenownUser_setEthAddress(docId: $docId, input: $input)
-            }
-          `
+          // Set eth address, username, and userImage in a single mutateDocument call
+          const actions: { type: string; input: Record<string, unknown> }[] = [
+            { type: 'SET_ETH_ADDRESS', input: { ethAddress } },
+          ]
 
-          await client.request(SET_ETH_ADDRESS_MUTATION, {
-            docId: finalDocId,
-            input: { ethAddress },
+          if (username) {
+            actions.push({ type: 'SET_USERNAME', input: { username } })
+          }
+
+          if (userImage) {
+            actions.push({ type: 'SET_USER_IMAGE', input: { userImage } })
+          }
+
+          await client.request(`
+            mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+              mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+                id
+              }
+            }
+          `, {
+            documentIdentifier: finalDocId,
+            actions,
           })
 
-          console.log('Set ethAddress on new document')
+          console.log('Set user fields on document')
         }
 
-        // Set username and userImage if provided
-        if (finalDocId && username) {
-          const SET_USERNAME_MUTATION = `
-            mutation SetUsername($docId: PHID!, $input: RenownUser_SetUsernameInput!) {
-              RenownUser_setUsername(docId: $docId, input: $input)
+        // Update username and userImage on existing documents too
+        if (finalDocId && (username || userImage)) {
+          const updateActions: { type: string; input: Record<string, unknown> }[] = []
+
+          if (username) {
+            updateActions.push({ type: 'SET_USERNAME', input: { username } })
+          }
+
+          if (userImage) {
+            updateActions.push({ type: 'SET_USER_IMAGE', input: { userImage } })
+          }
+
+          if (updateActions.length > 0) {
+            try {
+              await client.request(`
+                mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+                  mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+                    id
+                  }
+                }
+              `, {
+                documentIdentifier: finalDocId,
+                actions: updateActions,
+              })
+            } catch (e) {
+              console.error('Failed to update user fields:', e)
             }
-          `
-
-          await client.request(SET_USERNAME_MUTATION, {
-            docId: finalDocId,
-            input: { username },
-          })
-          console.log('Set username on document:', username)
+          }
         }
-
-        if (finalDocId && userImage) {
-          const SET_USER_IMAGE_MUTATION = `
-            mutation SetUserImage($docId: PHID!, $input: RenownUser_SetUserImageInput!) {
-              RenownUser_setUserImage(docId: $docId, input: $input)
-            }
-          `
-
-          await client.request(SET_USER_IMAGE_MUTATION, {
-            docId: finalDocId,
-            input: { userImage },
-          })
-          console.log('Set userImage on document:', userImage)
-        }
-
-        // Note: Folders are not supported in the GraphQL API
-        // Credentials will be stored directly in the user's drive
       }
 
-      // Store credential using RenownCredential mutations in the user's drive
+      // Store credential
       const result = await storeCredential({
         driveId: userDriveId,
         credential,
@@ -237,14 +201,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.status(500).json({ error: 'Failed to store credential', details: String(e) })
     }
   } else if (req.method === 'DELETE') {
-    // Revoke a credential
     const { credentialId, reason } = req.body as {
       credentialId?: string
       reason?: string
     }
-
-    console.log('DELETE /api/credential/renown called')
-    console.log('Request body:', { credentialId, reason })
 
     if (!credentialId) {
       res.status(400).json({ error: 'credentialId is required' })
@@ -252,14 +212,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-      // Revoke the credential
       const success = await revokeCredential({
         credentialId,
         reason,
       })
 
       if (success) {
-        console.log('Revoke successful')
         res.status(200).json({ result: true })
       } else {
         res.status(500).json({ error: 'Failed to revoke credential' })

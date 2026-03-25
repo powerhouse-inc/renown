@@ -24,18 +24,11 @@ export interface Authorization {
   }
 }
 
-const ADD_AUTHORIZATION_MUTATION = gql`
-  mutation RenownUser_addAuthorization($docId: PHID!, $input: RenownUser_AddAuthorizationInput!) {
-    RenownUser_addAuthorization(docId: $docId, input: $input)
-  }
-`
-
-const REVOKE_AUTHORIZATION_MUTATION = gql`
-  mutation RenownUser_revokeAuthorization(
-    $docId: PHID!
-    $input: RenownUser_RevokeAuthorizationInput!
-  ) {
-    RenownUser_revokeAuthorization(docId: $docId, input: $input)
+const MUTATE_DOCUMENT = gql`
+  mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+    mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+      id
+    }
   }
 `
 
@@ -89,20 +82,23 @@ export async function storeAuthorization(params: {
   createdAt?: string
 }): Promise<boolean> {
   try {
-    const result = (await request(SWITCHBOARD_URL, ADD_AUTHORIZATION_MUTATION, {
-      docId: params.docId,
-      input: {
-        id: params.id,
-        jwt: params.jwt,
-        issuer: params.issuer || null,
-        subject: params.subject || null,
-        audience: params.audience || null,
-        payload: params.payload || null,
-        createdAt: params.createdAt || new Date().toISOString(),
-      },
-    })) as { RenownUser_addAuthorization: boolean }
+    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
+      documentIdentifier: params.docId,
+      actions: [{
+        type: 'ADD_AUTHORIZATION',
+        input: {
+          id: params.id,
+          jwt: params.jwt,
+          issuer: params.issuer || null,
+          subject: params.subject || null,
+          audience: params.audience || null,
+          payload: params.payload || null,
+          createdAt: params.createdAt || new Date().toISOString(),
+        },
+      }],
+    })
 
-    return result.RenownUser_addAuthorization === true
+    return true
   } catch (error) {
     console.error('Failed to store authorization:', error)
     throw error
@@ -118,15 +114,18 @@ export async function revokeAuthorization(params: {
   revokedAt?: string
 }): Promise<boolean> {
   try {
-    const result = (await request(SWITCHBOARD_URL, REVOKE_AUTHORIZATION_MUTATION, {
-      docId: params.docId,
-      input: {
-        id: params.authorizationId,
-        revokedAt: params.revokedAt || new Date().toISOString(),
-      },
-    })) as { RenownUser_revokeAuthorization: boolean }
+    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
+      documentIdentifier: params.docId,
+      actions: [{
+        type: 'REVOKE_AUTHORIZATION',
+        input: {
+          id: params.authorizationId,
+          revokedAt: params.revokedAt || new Date().toISOString(),
+        },
+      }],
+    })
 
-    return result.RenownUser_revokeAuthorization === true
+    return true
   } catch (error) {
     console.error('Failed to revoke authorization:', error)
     throw error
@@ -190,10 +189,9 @@ export async function verifyToken(params: {
     const authorizations = await fetchAuthorizationsByEthAddress({
       driveId: params.driveId,
       ethAddress: params.ethAddress,
-      includeRevoked: false, // Only get non-revoked authorizations
+      includeRevoked: false,
     })
 
-    // Check if the specific JWT exists in the non-revoked authorizations
     return authorizations.some((auth) => auth.jwt === params.jwt)
   } catch (error) {
     console.error('Failed to verify token:', error)

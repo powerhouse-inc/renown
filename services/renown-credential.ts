@@ -4,21 +4,19 @@ const SWITCHBOARD_URL =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
   'https://switchboard.renown.vetra.io/graphql'
 
-const CREATE_CREDENTIAL_MUTATION = gql`
-  mutation RenownCredential_createDocument($name: String!, $driveId: String) {
-    RenownCredential_createDocument(name: $name, driveId: $driveId)
+const CREATE_EMPTY_DOCUMENT = gql`
+  mutation CreateEmptyDocument($documentType: String!, $parentIdentifier: String) {
+    createEmptyDocument(documentType: $documentType, parentIdentifier: $parentIdentifier) {
+      id
+    }
   }
 `
 
-const INIT_CREDENTIAL_MUTATION = gql`
-  mutation RenownCredential_init($docId: PHID!, $input: RenownCredential_InitInput!) {
-    RenownCredential_init(docId: $docId, input: $input)
-  }
-`
-
-const REVOKE_CREDENTIAL_MUTATION = gql`
-  mutation RenownCredential_revoke($docId: PHID!, $input: RenownCredential_RevokeInput!) {
-    RenownCredential_revoke(docId: $docId, input: $input)
+const MUTATE_DOCUMENT = gql`
+  mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+    mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+      id
+    }
   }
 `
 
@@ -61,18 +59,18 @@ export async function storeCredential(params: {
     const { credential, signature, domain, ethAddress } = params
 
     // Create a new RenownCredential document
-    const createResult = (await request(SWITCHBOARD_URL, CREATE_CREDENTIAL_MUTATION, {
-      name: `Credential for ${ethAddress.slice(0, 8)}...`,
-      driveId: params.driveId,
-    })) as { RenownCredential_createDocument: string }
+    const createResult = (await request(SWITCHBOARD_URL, CREATE_EMPTY_DOCUMENT, {
+      documentType: 'powerhouse/renown-credential',
+      parentIdentifier: params.driveId,
+    })) as { createEmptyDocument: { id: string } }
 
-    const credentialId = createResult.RenownCredential_createDocument
+    const credentialId = createResult.createEmptyDocument.id
 
     if (!credentialId) {
       throw new Error('Failed to create credential document')
     }
 
-    // Construct the InitInput for EIP-712 credential
+    // Construct the INIT action input
     const initInput = {
       id: credential.id,
       context: credential['@context'],
@@ -109,14 +107,10 @@ export async function storeCredential(params: {
     }
 
     // Initialize the credential with EIP-712 data
-    const initResult = (await request(SWITCHBOARD_URL, INIT_CREDENTIAL_MUTATION, {
-      docId: credentialId,
-      input: initInput,
-    })) as { RenownCredential_init: number }
-
-    if (initResult.RenownCredential_init === 0) {
-      throw new Error('Failed to initialize credential')
-    }
+    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
+      documentIdentifier: credentialId,
+      actions: [{ type: 'INIT', input: initInput }],
+    })
 
     return {
       success: true,
@@ -137,15 +131,18 @@ export async function revokeCredential(params: {
   revokedAt?: string
 }): Promise<boolean> {
   try {
-    const result = (await request(SWITCHBOARD_URL, REVOKE_CREDENTIAL_MUTATION, {
-      docId: params.credentialId,
-      input: {
-        revokedAt: params.revokedAt || new Date().toISOString(),
-        reason: params.reason || null,
-      },
-    })) as { RenownCredential_revoke: number }
+    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
+      documentIdentifier: params.credentialId,
+      actions: [{
+        type: 'REVOKE',
+        input: {
+          revokedAt: params.revokedAt || new Date().toISOString(),
+          reason: params.reason || null,
+        },
+      }],
+    })
 
-    return result.RenownCredential_revoke > 0
+    return true
   } catch (error) {
     console.error('Failed to revoke credential:', error)
     throw error
