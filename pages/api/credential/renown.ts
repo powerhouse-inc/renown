@@ -11,7 +11,7 @@ function makeAction(type: string, input: Record<string, unknown>) {
     type,
     input,
     scope: 'global',
-    timestampUtcMs: Date.now().toString(),
+    timestampUtcMs: Date.now(),
   }
 }
 
