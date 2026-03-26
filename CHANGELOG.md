@@ -1,3 +1,7 @@
+## <small>1.6.8 (2026-03-26)</small>
+
+* fix: use JSONObject type for mutateDocument actions parameter ([b49a6f6](https://github.com/powerhouse-inc/renown/commit/b49a6f6))
+
 ## <small>1.6.7 (2026-03-26)</small>
 
 * fix: use v6 ActionInput format for mutateDocument calls ([361f6a9](https://github.com/powerhouse-inc/renown/commit/361f6a9))
