@@ -1,4 +1,15 @@
 import { request, gql } from 'graphql-request'
+import { v4 as uuidv4 } from 'uuid'
+
+function makeAction(type: string, input: Record<string, unknown>) {
+  return {
+    id: uuidv4(),
+    type,
+    input,
+    scope: 'global',
+    timestampUtcMs: Date.now().toString(),
+  }
+}
 
 const SWITCHBOARD_URL =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -108,7 +119,7 @@ export async function storeCredential(params: {
     // Initialize the credential with EIP-712 data
     await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
       documentIdentifier: credentialId,
-      actions: [{ type: 'INIT', input: initInput }],
+      actions: [makeAction('INIT', initInput)],
     })
 
     return {
@@ -132,13 +143,10 @@ export async function revokeCredential(params: {
   try {
     await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
       documentIdentifier: params.credentialId,
-      actions: [{
-        type: 'REVOKE',
-        input: {
-          revokedAt: params.revokedAt || new Date().toISOString(),
-          reason: params.reason || null,
-        },
-      }],
+      actions: [makeAction('REVOKE', {
+        revokedAt: params.revokedAt || new Date().toISOString(),
+        reason: params.reason || null,
+      })],
     })
 
     return true

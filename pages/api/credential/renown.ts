@@ -2,7 +2,18 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
 import { GraphQLClient } from 'graphql-request'
+import { v4 as uuidv4 } from 'uuid'
 import { storeCredential, revokeCredential } from '../../../services/renown-credential'
+
+function makeAction(type: string, input: Record<string, unknown>) {
+  return {
+    id: uuidv4(),
+    type,
+    input,
+    scope: 'global',
+    timestampUtcMs: Date.now().toString(),
+  }
+}
 
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -120,16 +131,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           console.log('Created new RenownUser document:', finalDocId)
 
           // Set eth address, username, and userImage in a single mutateDocument call
-          const actions: { type: string; input: Record<string, unknown> }[] = [
-            { type: 'SET_ETH_ADDRESS', input: { ethAddress } },
+          const actions = [
+            makeAction('SET_ETH_ADDRESS', { ethAddress }),
           ]
 
           if (username) {
-            actions.push({ type: 'SET_USERNAME', input: { username } })
+            actions.push(makeAction('SET_USERNAME', { username }))
           }
 
           if (userImage) {
-            actions.push({ type: 'SET_USER_IMAGE', input: { userImage } })
+            actions.push(makeAction('SET_USER_IMAGE', { userImage }))
           }
 
           await client.request(`
@@ -148,14 +159,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Update username and userImage on existing documents too
         if (finalDocId && (username || userImage)) {
-          const updateActions: { type: string; input: Record<string, unknown> }[] = []
+          const updateActions = []
 
           if (username) {
-            updateActions.push({ type: 'SET_USERNAME', input: { username } })
+            updateActions.push(makeAction('SET_USERNAME', { username }))
           }
 
           if (userImage) {
-            updateActions.push({ type: 'SET_USER_IMAGE', input: { userImage } })
+            updateActions.push(makeAction('SET_USER_IMAGE', { userImage }))
           }
 
           if (updateActions.length > 0) {

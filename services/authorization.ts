@@ -1,4 +1,15 @@
 import { request, gql } from 'graphql-request'
+import { v4 as uuidv4 } from 'uuid'
+
+function makeAction(type: string, input: Record<string, unknown>) {
+  return {
+    id: uuidv4(),
+    type,
+    input,
+    scope: 'global',
+    timestampUtcMs: Date.now().toString(),
+  }
+}
 
 const SWITCHBOARD_URL =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
@@ -84,18 +95,15 @@ export async function storeAuthorization(params: {
   try {
     await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
       documentIdentifier: params.docId,
-      actions: [{
-        type: 'ADD_AUTHORIZATION',
-        input: {
-          id: params.id,
-          jwt: params.jwt,
-          issuer: params.issuer || null,
-          subject: params.subject || null,
-          audience: params.audience || null,
-          payload: params.payload || null,
-          createdAt: params.createdAt || new Date().toISOString(),
-        },
-      }],
+      actions: [makeAction('ADD_AUTHORIZATION', {
+        id: params.id,
+        jwt: params.jwt,
+        issuer: params.issuer || null,
+        subject: params.subject || null,
+        audience: params.audience || null,
+        payload: params.payload || null,
+        createdAt: params.createdAt || new Date().toISOString(),
+      })],
     })
 
     return true
@@ -116,13 +124,10 @@ export async function revokeAuthorization(params: {
   try {
     await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
       documentIdentifier: params.docId,
-      actions: [{
-        type: 'REVOKE_AUTHORIZATION',
-        input: {
-          id: params.authorizationId,
-          revokedAt: params.revokedAt || new Date().toISOString(),
-        },
-      }],
+      actions: [makeAction('REVOKE_AUTHORIZATION', {
+        id: params.authorizationId,
+        revokedAt: params.revokedAt || new Date().toISOString(),
+      })],
     })
 
     return true
