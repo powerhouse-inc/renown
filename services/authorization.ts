@@ -36,7 +36,7 @@ export interface Authorization {
 }
 
 const MUTATE_DOCUMENT = gql`
-  mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+  mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
     mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
       id
     }

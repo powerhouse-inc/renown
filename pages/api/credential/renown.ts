@@ -144,7 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           }
 
           await client.request(`
-            mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+            mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
               mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
                 id
               }
@@ -172,7 +172,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           if (updateActions.length > 0) {
             try {
               await client.request(`
-                mutation MutateDocument($documentIdentifier: String!, $actions: [ActionInput!]!) {
+                mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
                   mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
                     id
                   }
