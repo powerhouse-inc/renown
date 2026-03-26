@@ -1,3 +1,7 @@
+## <small>1.6.7 (2026-03-26)</small>
+
+* fix: use v6 ActionInput format for mutateDocument calls ([361f6a9](https://github.com/powerhouse-inc/renown/commit/361f6a9))
+
 ## <small>1.6.6 (2026-03-25)</small>
 
 * fix: force rebuild for v6 API changes ([b626664](https://github.com/powerhouse-inc/renown/commit/b626664))
