@@ -113,18 +113,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           finalDocId = profileData.renownUsers[0].documentId
           console.log('Found existing RenownUser document:', finalDocId)
         } else {
-          // Create RenownUser document using generic v6 mutations
-          console.log('Creating RenownUser document')
+          // Create RenownUser document in the user's drive
+          console.log('Creating RenownUser document in drive:', userDriveId)
           const createResult = await client.request<{
             createEmptyDocument: { id: string }
           }>(`
-            mutation CreateEmptyDocument($documentType: String!) {
-              createEmptyDocument(documentType: $documentType) {
+            mutation CreateEmptyDocument($documentType: String!, $parentIdentifier: String) {
+              createEmptyDocument(documentType: $documentType, parentIdentifier: $parentIdentifier) {
                 id
               }
             }
           `, {
             documentType: 'powerhouse/renown-user',
+            parentIdentifier: userDriveId,
           })
 
           finalDocId = createResult.createEmptyDocument.id
