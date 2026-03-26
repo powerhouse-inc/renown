@@ -1,3 +1,7 @@
+## <small>1.6.9 (2026-03-26)</small>
+
+* fix: use numeric timestampUtcMs in actions (not string) ([4d669f9](https://github.com/powerhouse-inc/renown/commit/4d669f9))
+
 ## <small>1.6.8 (2026-03-26)</small>
 
 * fix: use JSONObject type for mutateDocument actions parameter ([b49a6f6](https://github.com/powerhouse-inc/renown/commit/b49a6f6))
