@@ -1,3 +1,7 @@
+## <small>1.6.11 (2026-03-26)</small>
+
+* fix: revert parentIdentifier — user drives don't exist yet ([9b9653a](https://github.com/powerhouse-inc/renown/commit/9b9653a))
+
 ## <small>1.6.10 (2026-03-26)</small>
 
 * fix: pass parentIdentifier (driveId) when creating documents ([5850777](https://github.com/powerhouse-inc/renown/commit/5850777))
