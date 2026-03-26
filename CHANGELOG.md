@@ -1,3 +1,7 @@
+## <small>1.6.10 (2026-03-26)</small>
+
+* fix: pass parentIdentifier (driveId) when creating documents ([5850777](https://github.com/powerhouse-inc/renown/commit/5850777))
+
 ## <small>1.6.9 (2026-03-26)</small>
 
 * fix: use numeric timestampUtcMs in actions (not string) ([4d669f9](https://github.com/powerhouse-inc/renown/commit/4d669f9))
