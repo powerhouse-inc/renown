@@ -11,6 +11,7 @@ import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import WalletButton from "./wallet-button";
 import RenownCard from "./renown-card";
+import { useState, useEffect, useRef } from "react";
 
 interface IProps {
     connectId: string;
@@ -30,6 +31,66 @@ function buildUrl(returnUrl: string, user: string) {
     return url.toString();
 }
 
+/**
+ * Polls the credential API to confirm the credential is indexed and
+ * retrievable by the calling app before allowing the redirect back.
+ */
+function useCredentialReady(address: string | undefined, chainId: number, connectId: string, hasCredential: boolean) {
+    const [ready, setReady] = useState(false);
+    const abortRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        if (!hasCredential || !address) {
+            setReady(false);
+            return;
+        }
+
+        let cancelled = false;
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        const poll = async () => {
+            const maxAttempts = 20;
+            const delayMs = 500;
+
+            for (let i = 0; i < maxAttempts; i++) {
+                if (cancelled) return;
+
+                try {
+                    const params = new URLSearchParams({
+                        address,
+                        chainId: String(chainId),
+                        connectId,
+                    });
+                    const res = await fetch(`/api/auth/credential?${params}`, {
+                        signal: controller.signal,
+                    });
+                    if (res.ok) {
+                        if (!cancelled) setReady(true);
+                        return;
+                    }
+                } catch {
+                    if (cancelled) return;
+                }
+
+                await new Promise((r) => setTimeout(r, delayMs));
+            }
+
+            // After all retries, allow redirect anyway to avoid blocking forever
+            if (!cancelled) setReady(true);
+        };
+
+        poll();
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+        };
+    }, [hasCredential, address, chainId, connectId]);
+
+    return ready;
+}
+
 const ConnectFlow: React.FC<IProps> = ({
     connectId,
     deeplink,
@@ -42,6 +103,7 @@ const ConnectFlow: React.FC<IProps> = ({
     const { disconnect } = useDisconnect();
     const { hasCredential, credential } = useCredential(connectId, returnUrl);
     const { docId } = useAuth(connectId);
+    const credentialReady = useCredentialReady(address, chainId, connectId, hasCredential);
 
     // Construct DID from address and chainId
     const user = (address && hasCredential)
@@ -134,20 +196,30 @@ const ConnectFlow: React.FC<IProps> = ({
 
                     
                     {address && hasCredential ? (
-                        <a
-                            href={url}
-                            className="text-center block w-full mt-12"
-                        >
-                            <Button primary className="w-full">
-                                <div className="flex items-center justify-center gap-2">
-                                    <Image
-                                        src={IconConnectWhite}
-                                        alt="Connect"
-                                    />
-                                    Return to Connect
-                                </div>
-                            </Button>
-                        </a>
+                        credentialReady ? (
+                            <a
+                                href={url}
+                                className="text-center block w-full mt-12"
+                            >
+                                <Button primary className="w-full">
+                                    <div className="flex items-center justify-center gap-2">
+                                        <Image
+                                            src={IconConnectWhite}
+                                            alt="Connect"
+                                        />
+                                        Return to Connect
+                                    </div>
+                                </Button>
+                            </a>
+                        ) : (
+                            <div className="text-center block w-full mt-12">
+                                <Button primary className="w-full animate-pulse" disabled>
+                                    <div className="flex items-center justify-center gap-2">
+                                        Preparing session...
+                                    </div>
+                                </Button>
+                            </div>
+                        )
                     ) : null}
                 </div>
             </RenownCard>
