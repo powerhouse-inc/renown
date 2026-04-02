@@ -1,3 +1,7 @@
+## <small>1.6.12 (2026-04-02)</small>
+
+* fix: wait for credential indexing before redirecting back to app ([20406a5](https://github.com/powerhouse-inc/renown/commit/20406a5))
+
 ## <small>1.6.11 (2026-03-26)</small>
 
 * fix: revert parentIdentifier — user drives don't exist yet ([9b9653a](https://github.com/powerhouse-inc/renown/commit/9b9653a))
