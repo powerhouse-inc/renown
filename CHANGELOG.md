@@ -1,3 +1,7 @@
+## 1.7.0 (2026-04-21)
+
+* feat: support multiple apps in auth flow ([535e56b](https://github.com/powerhouse-inc/renown/commit/535e56b))
+
 ## <small>1.6.12 (2026-04-02)</small>
 
 * fix: wait for credential indexing before redirecting back to app ([20406a5](https://github.com/powerhouse-inc/renown/commit/20406a5))
