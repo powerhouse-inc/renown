@@ -45,7 +45,7 @@ export interface CreateEIP712CredentialParams {
   walletClient: WalletClient
   chainId: number
   app: string
-  connectId?: string
+  appId?: string
   expiresInDays?: number
 }
 
@@ -57,7 +57,7 @@ export async function createEIP712Credential(params: CreateEIP712CredentialParam
     walletClient,
     chainId,
     app,
-    connectId,
+    appId,
     expiresInDays = 7,
   } = params
 
@@ -81,7 +81,7 @@ export async function createEIP712Credential(params: CreateEIP712CredentialParam
       ethereumAddress: address,
     },
     credentialSubject: {
-      id: connectId || issuerId,
+      id: appId || issuerId,
       app,
     },
     credentialSchema: {

@@ -9,7 +9,7 @@ const credentialIdAtom = atom<string | null>(null)
 const docIdAtom = atom<string | null>(null)
 
 export interface LoginOptions {
-  connectId?: string
+  appId?: string
   driveId?: string
   docId?: string
   returnUrl?: string
@@ -92,7 +92,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
    */
   const login = useCallback(
     async (options?: LoginOptions): Promise<string> => {
-      const { connectId, driveId, docId, returnUrl, ensName, ensAvatar } = options || {}
+      const { appId, driveId, docId, returnUrl, ensName, ensAvatar } = options || {}
 
       if (!walletClient || !address) {
         throw new Error('Wallet not connected')
@@ -118,7 +118,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
           walletClient,
           chainId,
           app,
-          connectId,
+          appId,
           expiresInDays: 7,
         })
 
@@ -228,7 +228,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
         walletClient,
         chainId,
         app: 'renown-app',
-        connectId: undefined,
+        appId: undefined,
         expiresInDays: 7,
       })
 
