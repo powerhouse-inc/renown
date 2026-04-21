@@ -19,7 +19,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
         <Head>
           <title>Profile Not Found - Renown</title>
           <meta content="Profile not found" name="description" />
-          <link href="/favicon.ico" rel="icon" />
         </Head>
 
         <main className={styles.main}>
@@ -38,7 +37,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
         <Head>
           <title>Profile Not Found - Renown</title>
           <meta content="Profile not found" name="description" />
-          <link href="/favicon.ico" rel="icon" />
         </Head>
 
         <main className={styles.main}>

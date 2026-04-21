@@ -22,7 +22,6 @@ const ConsolePage: NextPage = () => {
                 <Head>
                     <title>Renown - Console Login</title>
                     <meta content="Authorize Powerhouse CLI" name="description" />
-                    <link href="/favicon.ico" rel="icon" />
                 </Head>
 
                 <main className={styles.main}>

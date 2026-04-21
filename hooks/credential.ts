@@ -19,10 +19,10 @@ interface ICredential {
 
 const credentialAtom = atom<string | undefined>(undefined);
 
-export function useCredential(connectId: string, returnUrl?: string): ICredential {
+export function useCredential(appId: string, returnUrl?: string): ICredential {
     const { address } = useAccount();
     const chainId = useChainId();
-    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(connectId);
+    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(appId);
     const [credential, setCredential] = useAtom<string | undefined>(credentialAtom);
     const [state, setState] = useState<
         "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"
@@ -40,12 +40,12 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
     }, [jwt, setCredential]);
 
     const createCredential = useCallback(
-        async (address: `0x${string}`, chainId: number, connectId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
+        async (address: `0x${string}`, chainId: number, appId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
             setState("FETCHING_CREDENTIAL");
             try {
                 // Use the JWT authentication system
                 const jwtToken = await login({
-                    connectId,
+                    appId,
                     returnUrl,
                     ensName: options?.ensName,
                     ensAvatar: options?.ensAvatar,
@@ -88,7 +88,7 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
                 if (!address) {
                     throw new Error("Address is not set");
                 }
-                return createCredential(address, chainId, connectId, returnUrl, options);
+                return createCredential(address, chainId, appId, returnUrl, options);
             },
             revokeCredential,
         }),
@@ -101,7 +101,7 @@ export function useCredential(connectId: string, returnUrl?: string): ICredentia
             address,
             createCredential,
             chainId,
-            connectId,
+            appId,
             returnUrl,
         ]
     );

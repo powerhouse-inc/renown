@@ -2,13 +2,14 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
-import Connect from "../components/connect-flow";
+import {WebFlow} from "../components/web-flow";
 import { useEffect, useState } from "react";
 import PageBackground from "../components/page-background";
 
 const Home: NextPage = () => {
     const router = useRouter();
     const connectId = router.query["connect"]?.toString();
+    const appId = router.query["app"]?.toString() || connectId;
     const deeplink = router.query["deeplink"]?.toString();
     const returnUrl = router.query["returnUrl"]?.toString();
     const [isClient, setIsClient] = useState(false);
@@ -23,13 +24,12 @@ const Home: NextPage = () => {
                 <Head>
                     <title>Renown</title>
                     <meta content="Created by Powerhouse" name="description" />
-                    <link href="/favicon.ico" rel="icon" />
                 </Head>
 
                 <main className={styles.main}>
-                    {connectId && isClient && (
-                        <Connect
-                            connectId={connectId}
+                    {appId && isClient && (
+                        <WebFlow
+                            appId={appId}
                             deeplink={deeplink}
                             returnUrl={returnUrl}
                         />
