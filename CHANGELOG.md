@@ -1,3 +1,7 @@
+## <small>1.7.1 (2026-04-21)</small>
+
+* fix: updating remanining usage of connectId to appId ([b03b555](https://github.com/powerhouse-inc/renown/commit/b03b555))
+
 ## 1.7.0 (2026-04-21)
 
 * feat: support multiple apps in auth flow ([535e56b](https://github.com/powerhouse-inc/renown/commit/535e56b))
