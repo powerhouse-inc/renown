@@ -1,3 +1,7 @@
+## 1.8.0 (2026-04-29)
+
+* feat: simplify wallet integration ([5d14305](https://github.com/powerhouse-inc/renown/commit/5d14305))
+
 ## <small>1.7.2 (2026-04-29)</small>
 
 * fix: resolve document id when revoking credential ([2a1a7d2](https://github.com/powerhouse-inc/renown/commit/2a1a7d2))
