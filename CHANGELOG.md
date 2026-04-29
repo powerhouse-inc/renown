@@ -1,3 +1,7 @@
+## <small>1.7.2 (2026-04-29)</small>
+
+* fix: resolve document id when revoking credential ([2a1a7d2](https://github.com/powerhouse-inc/renown/commit/2a1a7d2))
+
 ## <small>1.7.1 (2026-04-21)</small>
 
 * fix: updating remanining usage of connectId to appId ([b03b555](https://github.com/powerhouse-inc/renown/commit/b03b555))
