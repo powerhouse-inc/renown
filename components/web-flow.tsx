@@ -75,7 +75,7 @@ export const WebFlow: React.FC<IProps> = ({
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
     const { hasCredential } = useCredential(appId, returnUrl);
-    const { docId } = useAuth(appId);
+    const { userDocId } = useAuth(appId);
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
 
     const user = (address && hasCredential)
@@ -115,7 +115,7 @@ export const WebFlow: React.FC<IProps> = ({
                                     {address.slice(0, 6)}...{address.slice(-4)}
                                 </p>
                                 <div className="flex gap-3 mt-1">
-                                    <button className="text-link text-sm underline underline-offset-4" onClick={() => window.open(`/profile/${docId || address}`, '_blank')}>
+                                    <button className="text-link text-sm underline underline-offset-4" onClick={() => window.open(`/profile/${userDocId || address}`, '_blank')}>
                                         View profile
                                     </button>
                                     <button className="text-red text-sm underline underline-offset-4" onClick={() => disconnect()}>

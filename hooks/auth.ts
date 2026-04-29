@@ -5,13 +5,13 @@ import { createEIP712Credential } from '../services/eip712-credential'
 
 // Atom to store the credential ID
 const credentialIdAtom = atom<string | null>(null)
-// Atom to store the document ID
-const docIdAtom = atom<string | null>(null)
+// Atom to store the user profile document ID
+const userDocIdAtom = atom<string | null>(null)
 
 export interface LoginOptions {
   appId?: string
   driveId?: string
-  docId?: string
+  userDocId?: string
   returnUrl?: string
   ensName?: string | null
   ensAvatar?: string | null
@@ -20,12 +20,12 @@ export interface LoginOptions {
 export interface UseAuthReturn {
   jwt: string | null // Legacy field name, now stores credentialId
   did: string | null
-  docId: string | null // The Renown document ID
+  userDocId: string | null // The Renown document ID
   isAuthenticated: boolean
   isLoading: boolean
   error: Error | null
   login: (options?: LoginOptions) => Promise<string>
-  logout: (driveId?: string, docId?: string) => Promise<void>
+  logout: () => Promise<void>
   refreshToken: () => Promise<string | null>
 }
 
@@ -35,7 +35,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
   const chainId = useChainId()
 
   const [jwt, setJwt] = useAtom(credentialIdAtom) // jwt now stores credentialId
-  const [storedDocId, setStoredDocId] = useAtom(docIdAtom)
+  const [userDocId, setUserDocId] = useAtom(userDocIdAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -77,7 +77,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
         } else {
           // No valid credential found for this app DID
           setJwt(null)
-          setStoredDocId(null)
+          setUserDocId(null)
         }
       } catch (e) {
         console.error('Failed to fetch credential:', e)
@@ -85,14 +85,14 @@ export function useAuth(appDid?: string): UseAuthReturn {
     }
 
     fetchCredential()
-  }, [address, appDid, setJwt, setStoredDocId])
+  }, [address, appDid, setJwt, setUserDocId])
 
   /**
    * Login and create a new JWT
    */
   const login = useCallback(
     async (options?: LoginOptions): Promise<string> => {
-      const { appId, driveId, docId, returnUrl, ensName, ensAvatar } = options || {}
+      const { appId, driveId, userDocId, returnUrl, ensName, ensAvatar } = options || {}
 
       if (!walletClient || !address) {
         throw new Error('Wallet not connected')
@@ -134,7 +134,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
             },
             body: JSON.stringify({
               driveId,
-              docId,
+              docId: userDocId,
               credential,
               signature,
               domain: {
@@ -155,7 +155,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
           // Capture the user document ID from the response (this is the profile ID)
           const result = await response.json()
           if (result.userDocumentId) {
-            setStoredDocId(result.userDocumentId)
+            setUserDocId(result.userDocumentId)
           }
 
           // Store the credential ID locally for session tracking
@@ -174,16 +174,16 @@ export function useAuth(appDid?: string): UseAuthReturn {
         setIsLoading(false)
       }
     },
-    [walletClient, address, chainId, setJwt, setStoredDocId],
+    [walletClient, address, chainId, setJwt, setUserDocId],
   )
 
   /**
    * Logout and clear JWT
    */
   const logout = useCallback(
-    async (driveId?: string, docId?: string) => {
-      // Revoke on Renown Switchboard if we have a credential ID
-      if (jwt && storedDocId) {
+    async () => {
+      // Revoke on Renown Switchboard if we have a credential and an address
+      if (jwt && address) {
         try {
           const response = await fetch('/api/credential/renown', {
             method: 'DELETE',
@@ -191,7 +191,8 @@ export function useAuth(appDid?: string): UseAuthReturn {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              credentialId: storedDocId,
+              credentialId: jwt,
+              address,
               reason: 'User logged out',
             }),
           })
@@ -206,10 +207,10 @@ export function useAuth(appDid?: string): UseAuthReturn {
       }
 
       setJwt(null)
-      setStoredDocId(null)
+      setUserDocId(null)
       setError(null)
     },
-    [jwt, storedDocId, setJwt, setStoredDocId],
+    [jwt, address, setJwt, setUserDocId],
   )
 
   /**
@@ -254,7 +255,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
 
       const result = await response.json()
       if (result.userDocumentId) {
-        setStoredDocId(result.userDocumentId)
+        setUserDocId(result.userDocumentId)
       }
 
       setJwt(credential.id)
@@ -267,13 +268,13 @@ export function useAuth(appDid?: string): UseAuthReturn {
     } finally {
       setIsLoading(false)
     }
-  }, [walletClient, address, chainId, setJwt, setStoredDocId])
+  }, [walletClient, address, chainId, setJwt, setUserDocId])
 
   return useMemo(
     () => ({
       jwt,
       did,
-      docId: storedDocId,
+      userDocId,
       isAuthenticated,
       isLoading,
       error,
@@ -281,6 +282,6 @@ export function useAuth(appDid?: string): UseAuthReturn {
       logout,
       refreshToken,
     }),
-    [jwt, did, storedDocId, isAuthenticated, isLoading, error, login, logout, refreshToken],
+    [jwt, did, userDocId, isAuthenticated, isLoading, error, login, logout, refreshToken],
   )
 }

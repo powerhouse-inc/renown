@@ -27,7 +27,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
     const { credential, createCredential, loading } = useCredential(connectDid || sessionId);
-    const { docId, did } = useAuth(connectDid);
+    const { userDocId, did } = useAuth(connectDid);
     const [sessionCompleted, setSessionCompleted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Track if we have a valid credential for the requested connectDid
@@ -93,7 +93,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                             chainId,
                             did,
                             credentialId: credential,
-                            userDocumentId: docId,
+                            userDocumentId: userDocId,
                             connectDid, // Include the CLI's DID in the session
                         }),
                     });
@@ -112,7 +112,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
         };
 
         completeSession();
-    }, [hasValidCredentialForSession, credential, address, chainId, did, docId, sessionId, sessionCompleted, connectDid]);
+    }, [hasValidCredentialForSession, credential, address, chainId, did, userDocId, sessionId, sessionCompleted, connectDid]);
 
     const handleCreateCredential = useCallback(async () => {
         const result = await createCredential({

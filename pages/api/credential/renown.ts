@@ -212,8 +212,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.status(500).json({ error: 'Failed to store credential', details: String(e) })
     }
   } else if (req.method === 'DELETE') {
-    const { credentialId, reason } = req.body as {
+    const { credentialId, address, reason } = req.body as {
       credentialId?: string
+      address?: string
       reason?: string
     }
 
@@ -221,10 +222,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.status(400).json({ error: 'credentialId is required' })
       return
     }
+    if (!address) {
+      res.status(400).json({ error: 'address is required' })
+      return
+    }
 
     try {
+      // Resolve the credential URI to its document ID by querying the user's drive
+      const userDriveId = `renown-${address.toLowerCase()}`
+      const LOOKUP_QUERY = `
+        query LookupCredential($input: RenownCredentialsInput!) {
+          renownCredentials(input: $input) {
+            documentId
+            credentialId
+          }
+        }
+      `
+      const lookup = await client.request<{
+        renownCredentials: { documentId: string; credentialId: string }[]
+      }>(LOOKUP_QUERY, {
+        input: {
+          driveId: userDriveId,
+          ethAddress: address.toLowerCase(),
+          includeRevoked: false,
+        },
+      })
+
+      const match = lookup.renownCredentials.find(c => c.credentialId === credentialId)
+      if (!match) {
+        res.status(404).json({ error: 'Credential not found' })
+        return
+      }
+
       const success = await revokeCredential({
-        credentialId,
+        credentialId: match.documentId,
         reason,
       })
 
