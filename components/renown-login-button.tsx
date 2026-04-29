@@ -8,7 +8,7 @@ interface RenownLoginButtonProps {
   className?: string;
 }
 
-export const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
+const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
   className = "",
 }) => {
   const { user, isLoading, openRenown, logout } = useUser();

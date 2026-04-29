@@ -10,7 +10,7 @@ interface PageBackgroundProps {
   children: React.ReactNode;
 }
 
-export const PageBackground: React.FC<PageBackgroundProps> = ({ children }) => {
+const PageBackground: React.FC<PageBackgroundProps> = ({ children }) => {
   return (
     <div className="relative overflow-hidden min-h-screen">
       {/* Dark mode background */}

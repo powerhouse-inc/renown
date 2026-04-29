@@ -7,7 +7,7 @@ interface RenownCardProps {
   className?: string;
 }
 
-export const RenownCard: React.FC<RenownCardProps> = ({ children, className = "" }) => {
+const RenownCard: React.FC<RenownCardProps> = ({ children, className = "" }) => {
   return (
     <div className={`overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-lg ${className}`}>
       {/* Card Header */}

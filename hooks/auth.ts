@@ -8,7 +8,7 @@ const credentialIdAtom = atom<string | null>(null)
 // Atom to store the user profile document ID
 const userDocIdAtom = atom<string | null>(null)
 
-export interface LoginOptions {
+interface LoginOptions {
   appId?: string
   driveId?: string
   userDocId?: string
@@ -17,7 +17,7 @@ export interface LoginOptions {
   ensAvatar?: string | null
 }
 
-export interface UseAuthReturn {
+interface UseAuthReturn {
   jwt: string | null // Legacy field name, now stores credentialId
   did: string | null
   userDocId: string | null // The Renown document ID

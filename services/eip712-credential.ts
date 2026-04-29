@@ -41,7 +41,7 @@ const CREDENTIAL_TYPES = {
   Issuer: ISSUER_TYPE,
 } as const
 
-export interface CreateEIP712CredentialParams {
+interface CreateEIP712CredentialParams {
   walletClient: WalletClient
   chainId: number
   app: string

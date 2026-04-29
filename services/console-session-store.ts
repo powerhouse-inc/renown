@@ -3,7 +3,7 @@
  * Sessions expire after 5 minutes to prevent memory leaks.
  */
 
-export interface ConsoleSession {
+interface ConsoleSession {
   sessionId: string
   status: 'pending' | 'ready'
   createdAt: number

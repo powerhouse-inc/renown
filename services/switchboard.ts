@@ -6,7 +6,7 @@ const SWITCHBOARD_ENDPOINT =
 
 const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 
-export interface GetProfileInput {
+interface GetProfileInput {
   driveId: string
   id?: string
   username?: string
