@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { atom, useAtom } from "jotai";
-import { useAuth, LoginOptions } from "./auth";
+import { useAuth } from "./auth";
 
 interface CreateCredentialOptions {
     ensName?: string | null;
@@ -21,7 +21,6 @@ const credentialAtom = atom<string | undefined>(undefined);
 
 export function useCredential(appId: string, returnUrl?: string): ICredential {
     const { address } = useAccount();
-    const chainId = useChainId();
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(appId);
     const [credential, setCredential] = useAtom<string | undefined>(credentialAtom);
     const [state, setState] = useState<
@@ -40,7 +39,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
     }, [jwt, setCredential]);
 
     const createCredential = useCallback(
-        async (address: `0x${string}`, chainId: number, appId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
+        async (appId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
             setState("FETCHING_CREDENTIAL");
             try {
                 // Use the JWT authentication system
@@ -88,7 +87,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
                 if (!address) {
                     throw new Error("Address is not set");
                 }
-                return createCredential(address, chainId, appId, returnUrl, options);
+                return createCredential(appId, returnUrl, options);
             },
             revokeCredential,
         }),
@@ -100,7 +99,6 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             revokeCredential,
             address,
             createCredential,
-            chainId,
             appId,
             returnUrl,
         ]

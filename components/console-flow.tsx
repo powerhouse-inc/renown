@@ -26,7 +26,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
     const { disconnect } = useDisconnect();
-    const { credential, createCredential, loading } = useCredential(connectDid || sessionId);
+    const { credential, createCredential, loading } = useCredential(connectDid ?? "");
     const { userDocId, did } = useAuth(connectDid);
     const [sessionCompleted, setSessionCompleted] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,7 +44,8 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
 
             setCheckingExistingCredential(true);
             try {
-                const response = await fetch(`/api/status/${encodeURIComponent(address)}`);
+                const params = new URLSearchParams({ appId: connectDid });
+                const response = await fetch(`/api/status/${encodeURIComponent(address)}?${params}`);
                 if (response.ok) {
                     const data = await response.json();
                     // Check if credential is active and matches the requested connectDid
@@ -124,6 +125,23 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
         }
         return result;
     }, [createCredential, ensName, ensAvatar]);
+
+    if (!connectDid) {
+        return (
+            <div className="flex flex-col items-center">
+                <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
+                    <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10 text-center">
+                        <h2 className="mb-3 text-3xl font-semibold">Invalid Login Link</h2>
+                        <p className="text-lg leading-6 text-neutral-4-light">
+                            This console session is missing the CLI identity. Please run{' '}
+                            <code className="bg-neutral-2 px-2 py-1 rounded">ph login</code>{' '}
+                            again to start a new session.
+                        </p>
+                    </div>
+                </RenownCard>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col items-center">

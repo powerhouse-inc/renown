@@ -56,6 +56,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // The route parameter is an Ethereum address or DID
   const { address: paramValue } = req.query
   const explicitDriveId = req.query.driveId as string
+  const appDid = (req.query.appId || req.query.connectId) as string | undefined
+  const includeRevoked = req.query.includeRevoked === 'true'
 
   if (!paramValue || typeof paramValue !== 'string') {
     res.status(400).json({ error: 'Address is required' })
@@ -67,7 +69,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build the query input
     const queryInput: any = {
-      includeRevoked: true, // Include revoked credentials in search
+      includeRevoked,
+      did: appDid,
     }
 
     // Check if it's an Ethereum address or a DID
@@ -111,8 +114,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return
     }
 
-    // Return the first credential (most recent)
-    const matchedCredential = data.renownCredentials[0]
+    // Return the most recent credential by issuanceDate
+    const matchedCredential = data.renownCredentials.reduce((prev, curr) =>
+      prev.issuanceDate > curr.issuanceDate ? prev : curr
+    )
 
     // Return the credential details with clear status
     res.status(200).json({

@@ -74,6 +74,9 @@ export function useAuth(appDid?: string): UseAuthReturn {
           if (credential) {
             setJwt(credential.id)
           }
+          if (data.userDocumentId) {
+            setUserDocId(data.userDocumentId)
+          }
         } else {
           // No valid credential found for this app DID
           setJwt(null)

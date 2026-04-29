@@ -137,8 +137,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         eip712Domain = null
       }
 
+      // Look up the user's profile document ID so the client can rehydrate
+      // it after a page reload without going through login again
+      let userDocumentId: string | undefined
+      try {
+        const profileData = await client.request<{
+          renownUsers: { documentId: string }[]
+        }>(
+          `
+            query RenownUsers($input: RenownUsersInput!) {
+              renownUsers(input: $input) {
+                documentId
+              }
+            }
+          `,
+          {
+            input: {
+              driveId: finalDriveId,
+              ethAddresses: [(address as string).toLowerCase()],
+            },
+          },
+        )
+        userDocumentId = profileData.renownUsers[0]?.documentId
+      } catch (e) {
+        console.error('Failed to fetch user profile documentId:', e)
+      }
+
       // Transform to SDK format (PowerhouseVerifiableCredential)
       res.status(200).json({
+        userDocumentId,
         credential: {
           '@context': credential.context,
           id: credential.credentialId,

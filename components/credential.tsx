@@ -42,13 +42,14 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     useEffect(() => {
         if (address && hasCredential) {
             setLoadingDetails(true);
-            fetch(`/api/status/${address}`)
+            const params = new URLSearchParams({ appId });
+            fetch(`/api/status/${address}?${params}`)
                 .then(res => res.json())
                 .then(data => { if (!data.error) setCredentialDetails(data); })
                 .catch(err => console.error('Failed to fetch credential details:', err))
                 .finally(() => setLoadingDetails(false));
         }
-    }, [address, hasCredential]);
+    }, [address, hasCredential, appId]);
 
     if (!hasCredential) return null;
 

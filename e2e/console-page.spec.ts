@@ -11,7 +11,7 @@ test.describe('Console Login Page', () => {
 
   test('shows console login flow with valid session ID', async ({ page }) => {
     const sessionId = 'ui-test-' + Date.now()
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
 
     // Should show authorize CLI title
     await expect(page.getByText('Authorize CLI')).toBeVisible()
@@ -26,14 +26,14 @@ test.describe('Console Login Page', () => {
 
   test('page has correct meta title', async ({ page }) => {
     const sessionId = 'meta-test-' + Date.now()
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
 
     await expect(page).toHaveTitle('Renown - Console Login')
   })
 
   test('shows connect wallet button when not connected', async ({ page }) => {
     const sessionId = 'wallet-test-' + Date.now()
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
 
     // The wallet button should be visible (RainbowKit connect button)
     // Note: The exact text may vary based on RainbowKit configuration
@@ -43,7 +43,7 @@ test.describe('Console Login Page', () => {
 
   test('displays Renown branding', async ({ page }) => {
     const sessionId = 'branding-test-' + Date.now()
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
 
     // Should have Renown logo/branding in the card header
     const renownCard = page.locator('.rounded-2xl')
@@ -52,15 +52,15 @@ test.describe('Console Login Page', () => {
 
   test('handles different session ID formats', async ({ page }) => {
     // UUID format
-    await page.goto('/console?session=550e8400-e29b-41d4-a716-446655440000')
+    await page.goto('/console?session=550e8400-e29b-41d4-a716-446655440000&connect=did:key:test')
     await expect(page.getByText('Authorize CLI')).toBeVisible()
 
     // Short session ID
-    await page.goto('/console?session=abc123')
+    await page.goto('/console?session=abc123&connect=did:key:test')
     await expect(page.getByText('Authorize CLI')).toBeVisible()
 
     // Long session ID
-    await page.goto('/console?session=very-long-session-id-with-many-characters-1234567890')
+    await page.goto('/console?session=very-long-session-id-with-many-characters-1234567890&connect=did:key:test')
     await expect(page.getByText('Authorize CLI')).toBeVisible()
   })
 })
@@ -70,7 +70,7 @@ test.describe('Console Login Page - API Integration', () => {
     const sessionId = 'init-test-' + Date.now()
 
     // Load the page
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
     await expect(page.getByText('Authorize CLI')).toBeVisible()
 
     // The session should exist now (created lazily or by the page)
@@ -87,7 +87,7 @@ test.describe('Console Login Page - API Integration', () => {
     const testDid = `did:pkh:eip155:${testChainId}:${testAddress.toLowerCase()}`
 
     // Load the page
-    await page.goto(`/console?session=${sessionId}`)
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
     await expect(page.getByText('Authorize CLI')).toBeVisible()
 
     // Simulate completing the session via API (as if user authenticated)

@@ -112,6 +112,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (profileData.renownUsers.length > 0) {
           finalDocId = profileData.renownUsers[0].documentId
           console.log('Found existing RenownUser document:', finalDocId)
+
+          // Refresh username/userImage on the existing document
+          const updateActions: ReturnType<typeof makeAction>[] = []
+          if (username) {
+            updateActions.push(makeAction('SET_USERNAME', { username }))
+          }
+          if (userImage) {
+            updateActions.push(makeAction('SET_USER_IMAGE', { userImage }))
+          }
+
+          if (updateActions.length > 0) {
+            try {
+              await client.request(`
+                mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
+                  mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+                    id
+                  }
+                }
+              `, {
+                documentIdentifier: finalDocId,
+                actions: updateActions,
+              })
+            } catch (e) {
+              console.error('Failed to update user fields:', e)
+            }
+          }
         } else {
           // Create RenownUser document
           console.log('Creating RenownUser document')
@@ -155,36 +181,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           })
 
           console.log('Set user fields on document')
-        }
-
-        // Update username and userImage on existing documents too
-        if (finalDocId && (username || userImage)) {
-          const updateActions = []
-
-          if (username) {
-            updateActions.push(makeAction('SET_USERNAME', { username }))
-          }
-
-          if (userImage) {
-            updateActions.push(makeAction('SET_USER_IMAGE', { userImage }))
-          }
-
-          if (updateActions.length > 0) {
-            try {
-              await client.request(`
-                mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-                  mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-                    id
-                  }
-                }
-              `, {
-                documentIdentifier: finalDocId,
-                actions: updateActions,
-              })
-            } catch (e) {
-              console.error('Failed to update user fields:', e)
-            }
-          }
         }
       }
 
