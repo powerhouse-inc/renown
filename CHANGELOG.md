@@ -1,3 +1,8 @@
+## <small>1.8.1 (2026-04-29)</small>
+
+* chore: remove unused files, deps, and exports flagged by knip ([5f16ad1](https://github.com/powerhouse-inc/renown/commit/5f16ad1))
+* fix: improve credential lookup and session rehydration ([38e2220](https://github.com/powerhouse-inc/renown/commit/38e2220))
+
 ## 1.8.0 (2026-04-29)
 
 * feat: simplify wallet integration ([5d14305](https://github.com/powerhouse-inc/renown/commit/5d14305))
