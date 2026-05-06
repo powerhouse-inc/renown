@@ -1,3 +1,7 @@
+## <small>1.8.2 (2026-05-06)</small>
+
+* fix: improve light-mode contrast on profile view ([ab4b05c](https://github.com/powerhouse-inc/renown/commit/ab4b05c)), closes [#2502](https://github.com/powerhouse-inc/renown/issues/2502)
+
 ## <small>1.8.1 (2026-04-29)</small>
 
 * chore: remove unused files, deps, and exports flagged by knip ([5f16ad1](https://github.com/powerhouse-inc/renown/commit/5f16ad1))
