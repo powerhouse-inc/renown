@@ -25,7 +25,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
         <main className={styles.main}>
           <div className="flex min-h-screen flex-col items-center justify-center">
             <h1 className="text-red-500 mb-4 text-2xl font-bold">Error</h1>
-            <p className="text-gray-400">{error}</p>
+            <p className="text-gray-600 dark:text-gray-400">{error}</p>
           </div>
         </main>
       </div>
@@ -43,8 +43,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
 
         <main className={styles.main}>
           <div className="flex min-h-screen flex-col items-center justify-center">
-            <h1 className="mb-4 text-2xl font-bold text-gray-400">Profile Not Found</h1>
-            <p className="text-gray-500">
+            <h1 className="mb-4 text-2xl font-bold text-gray-700 dark:text-gray-400">
+              Profile Not Found
+            </h1>
+            <p className="text-gray-600 dark:text-gray-500">
               The profile you&apos;re looking for doesn&apos;t exist or has been removed.
             </p>
           </div>
@@ -86,24 +88,26 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
               </div>
 
               {/* Username */}
-              <h1 className="mb-6 text-center text-3xl font-bold text-white">{displayName}</h1>
+              <h1 className="mb-6 text-center text-3xl font-bold text-gray-900 dark:text-white">
+                {displayName}
+              </h1>
 
               {/* Profile Details */}
               <div className="mt-8 space-y-4">
-                <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-400">RenownID</span>
-                    <span className="break-all font-mono text-sm text-white">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">RenownID</span>
+                    <span className="break-all font-mono text-sm text-gray-900 dark:text-white">
                       {profile.documentId}
                     </span>
                   </div>
                 </div>
 
                 {profile.ethAddress && (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">ETH Address</span>
-                      <span className="break-all font-mono text-xs text-white">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">ETH Address</span>
+                      <span className="break-all font-mono text-xs text-gray-900 dark:text-white">
                         {profile.ethAddress}
                       </span>
                     </div>
@@ -111,10 +115,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
                 )}
 
                 {profile.createdAt && (
-                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-400">Member Since</span>
-                      <span className="text-sm text-white">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Member Since</span>
+                      <span className="text-sm text-gray-900 dark:text-white">
                         {new Date(profile.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',

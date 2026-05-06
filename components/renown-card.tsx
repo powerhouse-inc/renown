@@ -9,7 +9,7 @@ interface RenownCardProps {
 
 export const RenownCard: React.FC<RenownCardProps> = ({ children, className = "" }) => {
   return (
-    <div className={`overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-lg ${className}`}>
+    <div className={`overflow-hidden rounded-2xl border border-gray-200 bg-white/80 shadow-2xl backdrop-blur-lg dark:border-white/20 dark:bg-white/10 ${className}`}>
       {/* Card Header */}
       <div className="relative h-[106px]">
         <Image
