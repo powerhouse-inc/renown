@@ -63,20 +63,20 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                     <h3 className="font-medium">Authorization confirmed</h3>
                     <div className="flex items-center gap-3 mt-1">
                         <button
-                            className="text-link underline underline-offset-4 text-sm"
+                            className="text-accent underline underline-offset-4 text-sm"
                             onClick={() => dialogRef.current?.showModal()}
                         >
                             View details
                         </button>
                         <button
-                            className={`text-link underline underline-offset-4 text-sm ${isVerifying && "animate-pulse pointer-events-none"}`}
+                            className={`text-accent underline underline-offset-4 text-sm ${isVerifying && "animate-pulse pointer-events-none"}`}
                             disabled={isVerifying || !credential || !address}
                             onClick={async () => { if (credential && address) await verifyToken(credential, address); }}
                         >
                             {isVerifying ? 'Verifying...' : 'Verify'}
                         </button>
                         <button
-                            className={`text-red underline underline-offset-4 text-sm ${revoking && "animate-pulse pointer-events-none"}`}
+                            className={`text-destructive underline underline-offset-4 text-sm ${revoking && "animate-pulse pointer-events-none"}`}
                             disabled={revoking || !credential}
                             onClick={async () => {
                                 setRevoking(true);
@@ -89,7 +89,7 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                         </button>
                     </div>
                     {verificationResult && (
-                        <div className={`mt-2 p-2 rounded text-xs ${verificationResult.valid ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+                        <div className={`mt-2 p-2 rounded-sm text-xs ${verificationResult.valid ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                             {verificationResult.valid ? '✓ Token is valid' : `✗ ${verificationResult.error || 'Token is invalid'}`}
                         </div>
                     )}

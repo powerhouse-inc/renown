@@ -1,6 +1,90 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    --background: #F8FAFC;
+    --foreground: #393E44;
+    --primary: #0084FF;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #393E44;
+    --muted: #F3F5F7;
+    --muted-foreground: #6F767E;
+    --muted-foreground-light: #7C878E;
+    --accent: #3E90F0;
+    --accent-foreground: #FFFFFF;
+    --destructive: #EA4335;
+    --destructive-foreground: #FFFFFF;
+    --success: #16a34a;
+    --success-foreground: #FFFFFF;
+    --border: #E5E7EB;
+    --input: #E5E7EB;
+    --ring: #0084FF;
+    --neutral-1: #FAFBFC;
+
+    --shadow-button: 0px 4px 12px 0px rgba(0, 0, 0, 0.10);
+    --shadow-modal: 0px 0px 24px 4px rgba(0, 0, 0, 0.05),
+        0px 44px 48px -12px rgba(0, 0, 0, 0.15),
+        0px 2px 8px 0px rgba(0, 0, 0, 0.05);
+}
+
+.dark {
+    --background: #050a1a;
+    --foreground: #FFFFFF;
+    --primary: #0084FF;
+    --primary-foreground: #FFFFFF;
+    --secondary: rgba(255, 255, 255, 0.10);
+    --secondary-foreground: #FFFFFF;
+    --muted: rgba(255, 255, 255, 0.05);
+    --muted-foreground: #94A3B8;
+    --muted-foreground-light: #94A3B8;
+    --accent: #3E90F0;
+    --accent-foreground: #FFFFFF;
+    --destructive: #EA4335;
+    --destructive-foreground: #FFFFFF;
+    --success: #16a34a;
+    --success-foreground: #FFFFFF;
+    --border: rgba(255, 255, 255, 0.10);
+    --input: rgba(255, 255, 255, 0.10);
+    --ring: #0084FF;
+    --neutral-1: rgba(255, 255, 255, 0.05);
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted-foreground-light: var(--muted-foreground-light);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-neutral-1: var(--neutral-1);
+
+    --shadow-button: var(--shadow-button);
+    --shadow-modal: var(--shadow-modal);
+}
+
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
 
 html,
 body {
@@ -8,7 +92,8 @@ body {
     margin: 0;
     font-family: Inter, -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
         Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #050a1a;
+    background-color: var(--background);
+    color: var(--foreground);
 }
 
 a {

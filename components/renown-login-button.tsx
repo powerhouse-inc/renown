@@ -48,9 +48,9 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
   if (isLoading) {
     return (
       <div
-        className={`flex h-10 items-center justify-center rounded-lg bg-white/10 px-4 ${className}`}
+        className={`flex h-10 items-center justify-center rounded-lg bg-foreground/10 px-4 ${className}`}
       >
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
       </div>
     );
   }
@@ -59,7 +59,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
     return (
       <button
         onClick={openRenown}
-        className={`flex h-10 items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 font-semibold text-white transition-colors hover:bg-white/10 ${className}`}
+        className={`flex h-10 items-center gap-2 rounded-lg border border-foreground/20 bg-transparent px-4 font-semibold text-foreground transition-colors hover:bg-foreground/10 ${className}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -85,7 +85,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="flex h-10 items-center gap-2 rounded-lg bg-white/10 px-3 transition-colors hover:bg-white/20"
+        className="flex h-10 items-center gap-2 rounded-lg bg-foreground/10 px-3 transition-colors hover:bg-foreground/20"
       >
         {user.avatar ? (
           <Image
@@ -102,7 +102,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
             </span>
           </div>
         )}
-        <span className="font-medium text-white dark:text-white text-gray-900">
+        <span className="font-medium text-foreground">
           {user.name || truncateAddress(user.address)}
         </span>
         <svg
@@ -115,26 +115,26 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`text-white dark:text-white text-gray-900 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+          className={`text-foreground transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
       {isDropdownOpen && (
-        <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-lg border border-white/10 bg-gray-900 shadow-xl">
-          <div className="border-b border-white/10 px-4 py-3">
-            <p className="text-sm font-medium text-white">
+        <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+          <div className="border-b border-border px-4 py-3">
+            <p className="text-sm font-medium text-foreground">
               {user.name || "Anonymous"}
             </p>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {truncateAddress(user.address)}
             </p>
           </div>
           <div className="py-1">
             <button
               onClick={handleViewProfile}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-white/10"
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/10"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -154,7 +154,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
             </button>
             <button
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red transition-colors hover:bg-red/10"
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

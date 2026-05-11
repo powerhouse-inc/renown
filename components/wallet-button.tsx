@@ -56,7 +56,7 @@ const WalletButton: React.FC<IProps> = ({ className }) => {
                                 <div className="flex gap-3 justify-center">
                                     {chain.hasIcon && (
                                         <Button
-                                            className="p-2 bg-neutral-2-light overflow-hidden shadow-button"
+                                            className="p-2 bg-secondary overflow-hidden shadow-button"
                                             onClick={openChainModal}
                                             style={{
                                                 borderRadius: 14,
@@ -90,7 +90,7 @@ const WalletButton: React.FC<IProps> = ({ className }) => {
                                     <button
                                         onClick={openAccountModal}
                                         type="button"
-                                        className="p-2 bg-neutral-2-light overflow-hidden rounded-[14px] shadow-button h-10 flex gap-2"
+                                        className="p-2 bg-secondary overflow-hidden rounded-[14px] shadow-button h-10 flex gap-2"
                                     >
                                         {account.ensAvatar && (
                                             <Image
@@ -104,7 +104,7 @@ const WalletButton: React.FC<IProps> = ({ className }) => {
                                                 className="rounded-full"
                                             />
                                         )}
-                                        <span className="font-bold lining-nums proportional-nums text-neutral-5-light">
+                                        <span className="font-bold lining-nums proportional-nums text-foreground">
                                             {`${account.address.slice(
                                                 0,
                                                 5
