@@ -18,9 +18,9 @@ const Button: React.FC<ButtonProps> = ({
         <button
             className={`${
                 primary
-                    ? "bg-action text-white hover:bg-action/75"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/75"
                     : secondary
-                    ? "bg-neutral-2 text-neutral-4 hover:bg-neutral-4/10"
+                    ? "bg-muted text-muted-foreground hover:bg-muted-foreground/10"
                     : ""
             } 
             font-semibold disabled:opacity-60 disabled:pointer-events-none

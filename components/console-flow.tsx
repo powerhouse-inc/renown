@@ -130,11 +130,11 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
         return (
             <div className="flex flex-col items-center">
                 <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
-                    <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10 text-center">
+                    <div className="flex flex-col items-center bg-background px-8 pb-8 pt-10 text-center">
                         <h2 className="mb-3 text-3xl font-semibold">Invalid Login Link</h2>
-                        <p className="text-lg leading-6 text-neutral-4-light">
+                        <p className="text-lg leading-6 text-muted-foreground-light">
                             This console session is missing the CLI identity. Please run{' '}
-                            <code className="bg-neutral-2 px-2 py-1 rounded">ph login</code>{' '}
+                            <code className="bg-muted px-2 py-1 rounded-sm">ph login</code>{' '}
                             again to start a new session.
                         </p>
                     </div>
@@ -146,7 +146,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
     return (
         <div className="flex flex-col items-center">
             <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
-                <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10">
+                <div className="flex flex-col items-center bg-background px-8 pb-8 pt-10">
                     <h2 className="mb-3 text-3xl font-semibold">
                         {sessionCompleted
                             ? "Authorization Complete"
@@ -154,7 +154,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                             ? "Confirm Authorization"
                             : "Authorize CLI"}
                     </h2>
-                    <p className="mb-6 text-center text-lg leading-6 text-neutral-4-light">
+                    <p className="mb-6 text-center text-lg leading-6 text-muted-foreground-light">
                         {sessionCompleted
                             ? "You can now close this window and return to your terminal."
                             : "Authorize the Powerhouse CLI to act on behalf of your Ethereum identity"}
@@ -172,7 +172,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
 
                     {/* Ethereum Profile Card */}
                     {address && !sessionCompleted && (
-                        <div className="rounded-xl p-4 mb-6 bg-neutral-2-light flex gap-3 w-full">
+                        <div className="rounded-xl p-4 mb-6 bg-secondary flex gap-3 w-full">
                             {ensAvatar ? (
                                 <img
                                     src={ensAvatar}
@@ -185,15 +185,15 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                 </div>
                             )}
                             <div className="flex-1">
-                                <h3 className="text-neutral-5-light font-medium">
+                                <h3 className="text-foreground font-medium">
                                     {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
                                 </h3>
-                                <p className="text-neutral-4 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                     {address.slice(0, 6)}...{address.slice(-4)}
                                 </p>
                                 <div className="flex gap-3 mt-1">
                                     <button
-                                        className="text-red text-sm underline underline-offset-4"
+                                        className="text-destructive text-sm underline underline-offset-4"
                                         onClick={() => disconnect()}
                                     >
                                         Disconnect
@@ -206,10 +206,10 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                     {/* Success State */}
                     {sessionCompleted && (
                         <div className="flex flex-col items-center w-full">
-                            <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mb-6">
+                            <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-6">
                                 <Image src={IconCheck} alt="Success" width={48} height={48} />
                             </div>
-                            <div className="rounded-xl p-4 bg-neutral-2-light flex gap-3 w-full mb-4">
+                            <div className="rounded-xl p-4 bg-secondary flex gap-3 w-full mb-4">
                                 {ensAvatar ? (
                                     <img
                                         src={ensAvatar}
@@ -222,23 +222,23 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                     </div>
                                 ) : null}
                                 <div className="flex-1">
-                                    <h3 className="text-neutral-5-light font-medium">
+                                    <h3 className="text-foreground font-medium">
                                         {ensName || (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '')}
                                     </h3>
-                                    <p className="text-green-600 text-sm">
+                                    <p className="text-success text-sm">
                                         CLI authorized successfully
                                     </p>
                                 </div>
                             </div>
                             {connectDid && (
-                                <div className="rounded-xl p-3 mb-4 bg-green-500/10 border border-green-500/20 w-full">
-                                    <p className="text-xs text-green-600 mb-1">Authorized CLI DID</p>
-                                    <p className="text-sm font-mono text-green-700 break-all">
+                                <div className="rounded-xl p-3 mb-4 bg-success/10 border border-success/20 w-full">
+                                    <p className="text-xs text-success mb-1">Authorized CLI DID</p>
+                                    <p className="text-sm font-mono text-success break-all">
                                         {formatDid(connectDid)}
                                     </p>
                                 </div>
                             )}
-                            <p className="text-neutral-4 text-sm text-center">
+                            <p className="text-muted-foreground text-sm text-center">
                                 The CLI will automatically detect your authorization.
                                 <br />
                                 You can safely close this browser tab.
@@ -248,7 +248,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
 
                     {/* Error State */}
                     {error && (
-                        <div className="rounded-xl p-4 bg-red-500/10 text-red-600 w-full mb-6">
+                        <div className="rounded-xl p-4 bg-destructive/10 text-destructive w-full mb-6">
                             {error}
                         </div>
                     )}
@@ -259,8 +259,8 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                             {!address ? (
                                 <div className="flex flex-col w-full gap-3">
                                     {/* CLI Application Card */}
-                                    <div className="rounded-xl p-4 bg-neutral-2-light flex gap-3 w-full mb-3">
-                                        <div className="w-9 h-9 rounded-lg bg-neutral-3 flex items-center justify-center">
+                                    <div className="rounded-xl p-4 bg-secondary flex gap-3 w-full mb-3">
+                                        <div className="w-9 h-9 rounded-lg bg-border flex items-center justify-center">
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 width="20"
@@ -278,7 +278,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                         </div>
                                         <div className="flex-1">
                                             <h3 className="font-medium">Powerhouse CLI</h3>
-                                            <p className="text-sm text-neutral-4">
+                                            <p className="text-sm text-muted-foreground">
                                                 Session: {sessionId.slice(0, 8)}...
                                             </p>
                                         </div>
@@ -288,8 +288,8 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                             ) : !hasValidCredentialForSession ? (
                                 <div className="flex flex-col w-full gap-3">
                                     {/* CLI Application Card */}
-                                    <div className="rounded-xl p-4 bg-neutral-2-light flex gap-3 w-full">
-                                        <div className="w-9 h-9 rounded-lg bg-neutral-3 flex items-center justify-center">
+                                    <div className="rounded-xl p-4 bg-secondary flex gap-3 w-full">
+                                        <div className="w-9 h-9 rounded-lg bg-border flex items-center justify-center">
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 width="20"
@@ -307,7 +307,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                         </div>
                                         <div className="flex-1">
                                             <h3 className="font-medium">Powerhouse CLI</h3>
-                                            <p className="text-sm text-neutral-4">
+                                            <p className="text-sm text-muted-foreground">
                                                 Session: {sessionId.slice(0, 8)}...
                                             </p>
                                         </div>
@@ -320,13 +320,13 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                     >
                                         {checkingExistingCredential ? "Checking credentials..." : loading ? "Signing..." : "Authorize CLI"}
                                     </Button>
-                                    <p className="text-xs text-neutral-4 text-center mt-2">
+                                    <p className="text-xs text-muted-foregroundtext-center mt-2">
                                         By authorizing, you allow this CLI to sign documents on your behalf.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center w-full">
-                                    <div className="animate-pulse text-neutral-4">
+                                    <div className="animate-pulse text-muted-foreground">
                                         Completing authorization...
                                     </div>
                                 </div>

@@ -23,7 +23,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
 
         <main className={styles.main}>
           <div className="flex min-h-screen flex-col items-center justify-center">
-            <h1 className="text-red-500 mb-4 text-2xl font-bold">Error</h1>
+            <h1 className="text-destructive mb-4 text-2xl font-bold">Error</h1>
             <p className="text-gray-600 dark:text-gray-400">{error}</p>
           </div>
         </main>

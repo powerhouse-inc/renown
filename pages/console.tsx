@@ -28,9 +28,9 @@ const ConsolePage: NextPage = () => {
                     {sessionId && isClient ? (
                         <ConsoleFlow sessionId={sessionId} connectDid={connectDid} />
                     ) : !sessionId && isClient ? (
-                        <div className="text-center text-neutral-4">
+                        <div className="text-center text-muted-foreground">
                             <h2 className="text-2xl font-semibold mb-4">Invalid Session</h2>
-                            <p>No session ID provided. Please run <code className="bg-neutral-2 px-2 py-1 rounded">ph login</code> from your terminal.</p>
+                            <p>No session ID provided. Please run <code className="bg-muted px-2 py-1 rounded-sm">ph login</code> from your terminal.</p>
                         </div>
                     ) : null}
                 </main>

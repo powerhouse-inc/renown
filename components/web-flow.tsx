@@ -89,17 +89,17 @@ export const WebFlow: React.FC<IProps> = ({
     return (
         <div className="flex flex-col items-center">
             <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
-                <div className="flex flex-col items-center bg-bg px-8 pb-8 pt-10">
+                <div className="flex flex-col items-center bg-background px-8 pb-8 pt-10">
                     <h2 className="mb-3 text-3xl font-semibold">
                         {address ? "Confirm Authorization" : "Connect Wallet"}
                     </h2>
-                    <p className="mb-10 text-center text-lg leading-6 text-neutral-4-light">
+                    <p className="mb-10 text-center text-lg leading-6 text-muted-foreground-light">
                         Click on the button below to start signing messages in
                         Connect on behalf of your Ethereum identity
                     </p>
 
                     {address && (
-                        <div className="rounded-xl p-4 mb-6 bg-neutral-2-light flex gap-3 w-full">
+                        <div className="rounded-xl p-4 mb-6 bg-secondary flex gap-3 w-full">
                             {ensAvatar ? (
                                 <img src={ensAvatar} alt="Profile" className="w-12 h-12 rounded-full object-cover" />
                             ) : (
@@ -108,17 +108,17 @@ export const WebFlow: React.FC<IProps> = ({
                                 </div>
                             )}
                             <div className="flex-1">
-                                <h3 className="text-neutral-5-light font-medium">
+                                <h3 className="text-foreground font-medium">
                                     {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
                                 </h3>
-                                <p className="text-neutral-4 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                     {address.slice(0, 6)}...{address.slice(-4)}
                                 </p>
                                 <div className="flex gap-3 mt-1">
-                                    <button className="text-link text-sm underline underline-offset-4" onClick={() => window.open(`/profile/${userDocId || address}`, '_blank')}>
+                                    <button className="text-accent text-sm underline underline-offset-4" onClick={() => window.open(`/profile/${userDocId || address}`, '_blank')}>
                                         View profile
                                     </button>
-                                    <button className="text-red text-sm underline underline-offset-4" onClick={() => disconnect()}>
+                                    <button className="text-destructive text-sm underline underline-offset-4" onClick={() => disconnect()}>
                                         Disconnect
                                     </button>
                                 </div>
@@ -130,7 +130,7 @@ export const WebFlow: React.FC<IProps> = ({
                         <div className="flex flex-col w-full gap-3">
                             <AppCard appId={appId} returnUrl={returnUrl} className="mb-3" />
                             <WalletButton />
-                            <Button secondary className="w-full hover:bg-neutral-1" onClick={() => history.back()}>
+                            <Button secondary className="w-full hover:bg-muted" onClick={() => history.back()}>
                                 Cancel
                             </Button>
                         </div>
