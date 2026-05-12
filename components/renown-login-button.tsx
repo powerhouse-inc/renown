@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@renown/sdk";
+import { useRenownAuth } from "@powerhousedao/reactor-browser/renown";
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 
@@ -11,7 +11,8 @@ interface RenownLoginButtonProps {
 const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
   className = "",
 }) => {
-  const { user, isLoading, openRenown, logout } = useUser();
+  const { user, status, displayName, avatarUrl, profileId, login, logout } =
+    useRenownAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -36,14 +37,16 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
 
   const handleViewProfile = () => {
     setIsDropdownOpen(false);
-    if (user?.documentId) {
-      window.location.href = `/profile/${user.documentId}`;
+    if (profileId) {
+      window.location.href = `/profile/${profileId}`;
     }
   };
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  const isLoading = status === undefined || status === "loading" || status === "checking";
 
   if (isLoading) {
     return (
@@ -58,7 +61,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
   if (!user) {
     return (
       <button
-        onClick={openRenown}
+        onClick={login}
         className={`flex h-10 items-center gap-2 rounded-lg border border-foreground/20 bg-transparent px-4 font-semibold text-foreground transition-colors hover:bg-foreground/10 ${className}`}
       >
         <svg
@@ -87,10 +90,10 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex h-10 items-center gap-2 rounded-lg bg-foreground/10 px-3 transition-colors hover:bg-foreground/20"
       >
-        {user.avatar ? (
+        {avatarUrl ? (
           <Image
-            src={user.avatar}
-            alt={user.name || user.address}
+            src={avatarUrl}
+            alt={displayName || user.address}
             width={24}
             height={24}
             className="rounded-full"
@@ -98,12 +101,12 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
         ) : (
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
             <span className="text-xs font-bold text-white">
-              {(user.name || user.address)[0].toUpperCase()}
+              {(displayName || user.address)[0].toUpperCase()}
             </span>
           </div>
         )}
         <span className="font-medium text-foreground">
-          {user.name || truncateAddress(user.address)}
+          {displayName || truncateAddress(user.address)}
         </span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -125,7 +128,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
         <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-lg border border-border bg-background shadow-xl">
           <div className="border-b border-border px-4 py-3">
             <p className="text-sm font-medium text-foreground">
-              {user.name || "Anonymous"}
+              {displayName || "Anonymous"}
             </p>
             <p className="text-xs text-muted-foreground">
               {truncateAddress(user.address)}

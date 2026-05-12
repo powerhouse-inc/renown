@@ -6,7 +6,7 @@ import { getChain } from '../utils/viem'
 import { wagmiConfig } from '../utils/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit'
-import { RenownUserProvider } from '@renown/sdk'
+import { Renown } from '@powerhousedao/reactor-browser/renown'
 import '@rainbow-me/rainbowkit/styles.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -14,7 +14,6 @@ const inter = Inter({ subsets: ['latin'] })
 const queryClient = new QueryClient()
 
 function MyApp({ Component, pageProps, router }: AppProps) {
-  const networkId = router.query['network']?.toString() ?? 'eip155'
   const chainId = router.query['chain']?.toString() ?? '1'
 
   const initialChain = getChain(parseInt(chainId))
@@ -27,13 +26,16 @@ function MyApp({ Component, pageProps, router }: AppProps) {
             appInfo={{ appName: 'Renown' }}
             initialChain={initialChain}
           >
-            <RenownUserProvider
-              renownUrl={process.env.NEXT_PUBLIC_RENOWN_URL || 'https://www.renown.id'}
-              networkId={networkId}
-              chainId={chainId}
-            >
-              <Component {...pageProps} />
-            </RenownUserProvider>
+            <Renown
+              appName="renown-app"
+              url={process.env.NEXT_PUBLIC_RENOWN_URL || 'https://www.renown.id'}
+              onError={(error) => {
+                // useRenownInit rejects synchronously during SSR — suppress that noise.
+                if (error instanceof Error && error.message === 'window is undefined') return
+                console.error(error)
+              }}
+            />
+            <Component {...pageProps} />
           </RainbowKitProvider>
         </QueryClientProvider>
       </WagmiProvider>
