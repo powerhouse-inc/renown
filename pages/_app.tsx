@@ -11,18 +11,6 @@ import '@rainbow-me/rainbowkit/styles.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// Suppress known Next.js 13.5.11 + React 18.3 fetchPriority warning
-const originalError = console.error
-console.error = (...args) => {
-  if (
-    typeof args[0] === 'string' &&
-    args[0].includes('React does not recognize the `fetchPriority` prop')
-  ) {
-    return
-  }
-  originalError.apply(console, args)
-}
-
 const queryClient = new QueryClient()
 
 function MyApp({ Component, pageProps, router }: AppProps) {
