@@ -3,8 +3,8 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
 import {WebFlow} from "../components/web-flow";
-import { useEffect, useState } from "react";
 import PageBackground from "../components/page-background";
+import { useIsClient } from "../hooks/useIsClient";
 
 const Home: NextPage = () => {
     const router = useRouter();
@@ -12,11 +12,7 @@ const Home: NextPage = () => {
     const appId = router.query["app"]?.toString() || connectId;
     const deeplink = router.query["deeplink"]?.toString();
     const returnUrl = router.query["returnUrl"]?.toString();
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(typeof indexedDB !== "undefined");
-    }, []);
+    const isClient = useIsClient();
 
     return (
         <PageBackground>

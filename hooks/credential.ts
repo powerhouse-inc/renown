@@ -1,6 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useAccount } from "wagmi";
-import { atom, useAtom } from "jotai";
 import { useAuth } from "./auth";
 
 interface CreateCredentialOptions {
@@ -17,47 +16,30 @@ interface ICredential {
     revokeCredential: () => Promise<void>;
 }
 
-const credentialAtom = atom<string | undefined>(undefined);
-
 export function useCredential(appId: string, returnUrl?: string): ICredential {
     const { address } = useAccount();
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(appId);
-    const [credential, setCredential] = useAtom<string | undefined>(credentialAtom);
-    const [state, setState] = useState<
-        "INITIAL" | "FETCHING_CREDENTIAL" | "ERROR" | "SUCCESS"
-    >(credential ? "SUCCESS" : "INITIAL");
-
-    // Sync JWT from useAuth to local credential state
-    useEffect(() => {
-        if (jwt) {
-            setCredential(jwt);
-            setState("SUCCESS");
-        } else {
-            setCredential(undefined);
-            setState("INITIAL");
-        }
-    }, [jwt, setCredential]);
+    const credential = jwt ?? undefined;
+    const [isFetching, setIsFetching] = useState(false);
 
     const createCredential = useCallback(
         async (appId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
-            setState("FETCHING_CREDENTIAL");
+            setIsFetching(true);
             try {
-                // Use the JWT authentication system
                 const jwtToken = await login({
                     appId,
                     returnUrl,
                     ensName: options?.ensName,
                     ensAvatar: options?.ensAvatar,
                 });
-                setCredential(jwtToken);
-                setState("SUCCESS");
                 return jwtToken;
             } catch (e) {
                 console.error("Failed to create credential:", e);
-                setState("ERROR");
+            } finally {
+                setIsFetching(false);
             }
         },
-        [login, setCredential]
+        [login]
     );
 
     const revokeCredential = useCallback(async () => {
@@ -66,11 +48,8 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
                 return;
             }
             await logout();
-            // Don't manually clear credential here - let the useEffect handle it
-            // when jwt becomes null, to avoid race conditions
         } catch (e) {
             console.error('Failed to revoke credential:', e);
-            setState("ERROR");
         }
     }, [
         logout,
@@ -82,7 +61,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             credential,
             isAuth: isAuthenticated,
             hasCredential: !!credential,
-            loading: state === "FETCHING_CREDENTIAL" || authLoading,
+            loading: isFetching || authLoading,
             createCredential: (options?: CreateCredentialOptions) => {
                 if (!address) {
                     throw new Error("Address is not set");
@@ -94,7 +73,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
         [
             credential,
             isAuthenticated,
-            state,
+            isFetching,
             authLoading,
             revokeCredential,
             address,

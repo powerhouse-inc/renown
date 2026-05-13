@@ -3,18 +3,14 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
 import ConsoleFlow from "../components/console-flow";
-import { useEffect, useState } from "react";
 import PageBackground from "../components/page-background";
+import { useIsClient } from "../hooks/useIsClient";
 
 const ConsolePage: NextPage = () => {
     const router = useRouter();
     const sessionId = router.query["session"]?.toString();
     const connectDid = router.query["connect"]?.toString(); // CLI's DID to authorize
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(typeof indexedDB !== "undefined");
-    }, []);
+    const isClient = useIsClient();
 
     return (
         <PageBackground>

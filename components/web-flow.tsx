@@ -11,7 +11,7 @@ import Credential from "./credential";
 import WalletButton from "./wallet-button";
 import RenownCard from "./renown-card";
 import AppCard from "./app-card";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 interface IProps {
     appId: string;
@@ -28,18 +28,14 @@ function buildUrl(returnUrl: string, user: string) {
 }
 
 function useCredentialReady(address: string | undefined, chainId: number, connectId: string, hasCredential: boolean) {
-    const [ready, setReady] = useState(false);
-    const abortRef = useRef<AbortController | null>(null);
+    const sessionKey = hasCredential && address ? `${address}:${chainId}:${connectId}` : null;
+    const [readyKey, setReadyKey] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!hasCredential || !address) {
-            setReady(false);
-            return;
-        }
+        if (!sessionKey || !address) return;
 
         let cancelled = false;
         const controller = new AbortController();
-        abortRef.current = controller;
 
         const poll = async () => {
             const maxAttempts = 20;
@@ -50,18 +46,18 @@ function useCredentialReady(address: string | undefined, chainId: number, connec
                 try {
                     const params = new URLSearchParams({ address, chainId: String(chainId), connectId });
                     const res = await fetch(`/api/auth/credential?${params}`, { signal: controller.signal });
-                    if (res.ok) { if (!cancelled) setReady(true); return; }
+                    if (res.ok) { if (!cancelled) setReadyKey(sessionKey); return; }
                 } catch { if (cancelled) return; }
                 await new Promise((r) => setTimeout(r, delayMs));
             }
-            if (!cancelled) setReady(true);
+            if (!cancelled) setReadyKey(sessionKey);
         };
 
         poll();
         return () => { cancelled = true; controller.abort(); };
-    }, [hasCredential, address, chainId, connectId]);
+    }, [sessionKey, address, chainId, connectId]);
 
-    return ready;
+    return sessionKey !== null && readyKey === sessionKey;
 }
 
 export const WebFlow: React.FC<IProps> = ({
@@ -101,9 +97,9 @@ export const WebFlow: React.FC<IProps> = ({
                     {address && (
                         <div className="rounded-xl p-4 mb-6 bg-secondary flex gap-3 w-full">
                             {ensAvatar ? (
-                                <img src={ensAvatar} alt="Profile" className="w-12 h-12 rounded-full object-cover" />
+                                <Image src={ensAvatar} alt="Profile" width={48} height={48} unoptimized className="w-12 h-12 rounded-full object-cover" />
                             ) : (
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
+                                <div className="w-12 h-12 rounded-full bg-linear-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
                                     {address.slice(2, 4).toUpperCase()}
                                 </div>
                             )}

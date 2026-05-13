@@ -1,5 +1,6 @@
 import { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
+import Image from 'next/image'
 import { getProfile, RenownProfile } from '../../services/switchboard'
 import styles from '../../styles/Home.module.css'
 import RenownCard from '../../components/renown-card'
@@ -71,9 +72,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
               {/* Avatar */}
               <div className="mb-4 flex justify-center">
                 {profile.userImage ? (
-                  <img
+                  <Image
                     src={profile.userImage}
                     alt={displayName}
+                    width={128}
+                    height={128}
+                    unoptimized
                     className="h-32 w-32 rounded-full border-4 border-white object-cover shadow-lg"
                   />
                 ) : (

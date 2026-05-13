@@ -174,13 +174,16 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                     {address && !sessionCompleted && (
                         <div className="rounded-xl p-4 mb-6 bg-secondary flex gap-3 w-full">
                             {ensAvatar ? (
-                                <img
+                                <Image
                                     src={ensAvatar}
                                     alt="Profile"
+                                    width={48}
+                                    height={48}
+                                    unoptimized
                                     className="w-12 h-12 rounded-full object-cover"
                                 />
                             ) : (
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
+                                <div className="w-12 h-12 rounded-full bg-linear-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
                                     {address.slice(2, 4).toUpperCase()}
                                 </div>
                             )}
@@ -211,13 +214,16 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                             </div>
                             <div className="rounded-xl p-4 bg-secondary flex gap-3 w-full mb-4">
                                 {ensAvatar ? (
-                                    <img
+                                    <Image
                                         src={ensAvatar}
                                         alt="Profile"
+                                        width={48}
+                                        height={48}
+                                        unoptimized
                                         className="w-12 h-12 rounded-full object-cover"
                                     />
                                 ) : address ? (
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
+                                    <div className="w-12 h-12 rounded-full bg-linear-to-br from-orange-400 via-red-500 to-yellow-500 flex items-center justify-center text-white font-bold text-lg">
                                         {address.slice(2, 4).toUpperCase()}
                                     </div>
                                 ) : null}

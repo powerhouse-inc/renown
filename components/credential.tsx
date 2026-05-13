@@ -1,7 +1,8 @@
 import IconCheck from "../assets/icons/check.svg";
 import Image from "next/image";
 import { useCredential } from "../hooks/credential";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useVerifyToken } from "../hooks/useVerifyToken";
 import { useAccount } from "wagmi";
 import AppCard from "./app-card";
@@ -35,21 +36,24 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     const { address } = useAccount();
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
-    const [credentialDetails, setCredentialDetails] = useState<CredentialDetails | null>(null);
-    const [loadingDetails, setLoadingDetails] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
 
-    useEffect(() => {
-        if (address && hasCredential) {
-            setLoadingDetails(true);
+    const { data: credentialDetails, isFetching: loadingDetails } = useQuery<CredentialDetails | null>({
+        queryKey: ['credentialDetails', address, appId],
+        enabled: !!address && hasCredential,
+        queryFn: async () => {
             const params = new URLSearchParams({ appId });
-            fetch(`/api/status/${address}?${params}`)
-                .then(res => res.json())
-                .then(data => { if (!data.error) setCredentialDetails(data); })
-                .catch(err => console.error('Failed to fetch credential details:', err))
-                .finally(() => setLoadingDetails(false));
-        }
-    }, [address, hasCredential, appId]);
+            try {
+                const res = await fetch(`/api/status/${address}?${params}`);
+                const data = await res.json();
+                if (data.error) return null;
+                return data as CredentialDetails;
+            } catch (err) {
+                console.error('Failed to fetch credential details:', err);
+                return null;
+            }
+        },
+    });
 
     if (!hasCredential) return null;
 
