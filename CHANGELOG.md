@@ -1,3 +1,14 @@
+## 1.9.0 (2026-05-13)
+
+* Merge branch 'main' into chore/upgrade-deps ([93532bb](https://github.com/powerhouse-inc/renown/commit/93532bb))
+* feat: integrate next-themes for theme management to avoid theme flickering ([aa3cc62](https://github.com/powerhouse-inc/renown/commit/aa3cc62))
+* fix: lint issues after migration to react 19 ([ddbb3cc](https://github.com/powerhouse-inc/renown/commit/ddbb3cc))
+* fix: normalize Ethereum address format in profile API ([ee03581](https://github.com/powerhouse-inc/renown/commit/ee03581))
+* chore: add ESLint and Next.js configuration files, update TypeScript settings, and modify package de ([1e13bf3](https://github.com/powerhouse-inc/renown/commit/1e13bf3))
+* chore: upgrade tailwind and fix light mode theme ([e90da3e](https://github.com/powerhouse-inc/renown/commit/e90da3e))
+* chore: upgrade tailwind and fix light mode theme ([176d9f4](https://github.com/powerhouse-inc/renown/commit/176d9f4))
+* refactor: update Renown integration and dependencies ([3808ab3](https://github.com/powerhouse-inc/renown/commit/3808ab3))
+
 ## <small>1.8.2 (2026-05-06)</small>
 
 * fix: improve light-mode contrast on profile view ([ab4b05c](https://github.com/powerhouse-inc/renown/commit/ab4b05c)), closes [#2502](https://github.com/powerhouse-inc/renown/issues/2502)
