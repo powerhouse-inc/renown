@@ -1,3 +1,9 @@
+## <small>1.9.1 (2026-05-13)</small>
+
+* fix(profile): transpile @rainbow-me/rainbowkit for Vercel SSR ([d592472](https://github.com/powerhouse-inc/renown/commit/d592472))
+* Merge branch 'main' of https://github.com/powerhouse-inc/renown ([69bc857](https://github.com/powerhouse-inc/renown/commit/69bc857))
+* chore: update TypeScript routes import and specify Node.js engine version in package.json ([2aa1b1d](https://github.com/powerhouse-inc/renown/commit/2aa1b1d))
+
 ## 1.9.0 (2026-05-13)
 
 * Merge branch 'main' into chore/upgrade-deps ([93532bb](https://github.com/powerhouse-inc/renown/commit/93532bb))
