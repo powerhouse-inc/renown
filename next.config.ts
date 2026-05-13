@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     reactStrictMode: false,
     output: "standalone",
-    transpilePackages: ["@rainbow-me/rainbowkit"],
     images: {
         remotePatterns: [
             { protocol: "https", hostname: "euc.li" },
