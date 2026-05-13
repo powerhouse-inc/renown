@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const input: RenownUsersInput = {
       driveId,
       ...(body.id && { phids: [body.id] }),
-      ...(body.ethAddress && { ethAddresses: [body.ethAddress] }),
+      ...(body.ethAddress && { ethAddresses: [body.ethAddress.toLowerCase()] }),
       ...(body.username && { usernames: [body.username] }),
     }
 
