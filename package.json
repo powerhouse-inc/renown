@@ -2,6 +2,9 @@
   "name": "renown-placeholder",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
