@@ -1,3 +1,7 @@
+## <small>1.9.2 (2026-05-13)</small>
+
+* fix: profile page on Vercel environment ([1cccc67](https://github.com/powerhouse-inc/renown/commit/1cccc67))
+
 ## <small>1.9.1 (2026-05-13)</small>
 
 * fix(profile): transpile @rainbow-me/rainbowkit for Vercel SSR ([d592472](https://github.com/powerhouse-inc/renown/commit/d592472))
