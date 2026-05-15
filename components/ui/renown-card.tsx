@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Header from "../assets/images/header.jpg";
-import IconRenown from "../assets/icons/renown.svg";
+import Header from "../../assets/images/header.jpg";
+import IconRenown from "../../assets/icons/renown.svg";
 
 interface RenownCardProps {
   children: React.ReactNode;

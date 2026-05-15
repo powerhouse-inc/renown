@@ -3,15 +3,14 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { getProfile, RenownProfile } from '../../services/switchboard'
 import styles from '../../styles/Home.module.css'
-import RenownCard from '../../components/renown-card'
-import PageBackground from '../../components/page-background'
+import RenownCard from '../../components/ui/renown-card'
+import PageBackground from '../../components/ui/page-background'
+import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 
 interface ProfilePageProps {
   profile: RenownProfile | null
   error?: string
 }
-
-const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || 'renown-profiles'
 
 const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
   if (error) {

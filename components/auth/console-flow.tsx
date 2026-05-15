@@ -1,14 +1,15 @@
 "use client";
 
-import { useAccount, useEnsName, useEnsAvatar, useDisconnect, useChainId } from "wagmi";
+import { useEnsName, useEnsAvatar } from "wagmi";
 import Image from "next/image";
-import Button from "./button";
-import { useCredential } from "../hooks/credential";
-import { useAuth } from "../hooks/auth";
-import WalletButton from "./wallet-button";
-import RenownCard from "./renown-card";
+import Button from "../ui/button";
+import { useCredential } from "../../hooks/credential";
+import { useAuth } from "../../hooks/auth";
+import { useOrchestrator, useSession } from "../../hooks/use-wallet-adapter";
+import { LoginButtons } from "./login-buttons";
+import RenownCard from "../ui/renown-card";
 import { useCallback, useState, useEffect } from "react";
-import IconCheck from "../assets/icons/check.svg";
+import IconCheck from "../../assets/icons/check.svg";
 
 interface IProps {
     sessionId: string;
@@ -21,11 +22,16 @@ function formatDid(did: string): string {
 }
 
 const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
-    const { address, isConnected, chain } = useAccount();
-    const chainId = useChainId();
+    const session = useSession();
+    const orchestrator = useOrchestrator();
+    const address = session?.address;
+    const chainId = session?.chainId ?? 1;
+    const isConnected = !!session;
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
-    const { disconnect } = useDisconnect();
+    const disconnect = useCallback(() => {
+        void orchestrator.signOut();
+    }, [orchestrator]);
     const { credential, createCredential, loading } = useCredential(connectDid ?? "");
     const { userDocId, did } = useAuth(connectDid);
     const [sessionCompleted, setSessionCompleted] = useState(false);
@@ -197,7 +203,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                 <div className="flex gap-3 mt-1">
                                     <button
                                         className="text-destructive text-sm underline underline-offset-4"
-                                        onClick={() => disconnect()}
+                                        onClick={disconnect}
                                     >
                                         Disconnect
                                     </button>
@@ -289,7 +295,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                             </p>
                                         </div>
                                     </div>
-                                    <WalletButton />
+                                    <LoginButtons />
                                 </div>
                             ) : !hasValidCredentialForSession ? (
                                 <div className="flex flex-col w-full gap-3">
@@ -322,7 +328,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                                         primary
                                         onClick={handleCreateCredential}
                                         className={`w-full ${loading || checkingExistingCredential ? "animate-pulse" : ""}`}
-                                        disabled={!isConnected || !chain || loading || checkingExistingCredential}
+                                        disabled={!isConnected || loading || checkingExistingCredential}
                                     >
                                         {checkingExistingCredential ? "Checking credentials..." : loading ? "Signing..." : "Authorize CLI"}
                                     </Button>

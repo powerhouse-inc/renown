@@ -1,11 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { useWalletClient, useAccount, useChainId } from 'wagmi'
 import { atom, useAtom } from 'jotai'
-import { createEIP712Credential } from '../services/eip712-credential'
+import { useOrchestrator, useSession } from './use-wallet-adapter'
 
-// Atom to store the credential ID
 const credentialIdAtom = atom<string | null>(null)
-// Atom to store the user profile document ID
 const userDocIdAtom = atom<string | null>(null)
 
 interface LoginOptions {
@@ -18,86 +15,85 @@ interface LoginOptions {
 }
 
 interface UseAuthReturn {
-  jwt: string | null // Legacy field name, now stores credentialId
+  jwt: string | null
   did: string | null
-  userDocId: string | null // The Renown document ID
+  userDocId: string | null
   isAuthenticated: boolean
   isLoading: boolean
   error: Error | null
   login: (options?: LoginOptions) => Promise<string>
   logout: () => Promise<void>
+  signOut: () => Promise<void>
   refreshToken: () => Promise<string | null>
 }
 
-export function useAuth(appDid?: string): UseAuthReturn {
-  const { data: walletClient } = useWalletClient()
-  const { address } = useAccount()
-  const chainId = useChainId()
+function deriveAppFromReturnUrl(returnUrl?: string): string {
+  if (!returnUrl) return 'renown-app'
+  try {
+    const url = new URL(returnUrl)
+    return `${url.protocol}//${url.host}`
+  } catch (e) {
+    console.warn('Failed to parse returnUrl, using default app:', e)
+    return 'renown-app'
+  }
+}
 
-  const [jwt, setJwt] = useAtom(credentialIdAtom) // jwt now stores credentialId
+function shortAddress(address: string): string {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
+}
+
+export function useAuth(appDid?: string): UseAuthReturn {
+  const session = useSession()
+  const orchestrator = useOrchestrator()
+
+  const [jwt, setJwt] = useAtom(credentialIdAtom)
   const [userDocId, setUserDocId] = useAtom(userDocIdAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
-  // Calculate DID from address
   const did = useMemo(() => {
-    if (!address) return null
-    return `did:pkh:eip155:${chainId}:${address.toLowerCase()}`
-  }, [address, chainId])
+    if (!session) return null
+    return `did:pkh:${session.caip2}:${session.address.toLowerCase()}`
+  }, [session])
 
-  // Check if authenticated (jwt is now the credential ID)
-  const isAuthenticated = useMemo(() => {
-    return !!jwt
-  }, [jwt])
+  const isAuthenticated = useMemo(() => !!jwt, [jwt])
 
-  // Fetch credential from API on mount and when appDid changes
   useEffect(() => {
-    const fetchCredential = async () => {
-      if (!address) {
-        return
-      }
+    const address = session?.address
+    if (!address) return
 
+    let cancelled = false
+    void (async () => {
       try {
-        const params = new URLSearchParams({
+        const data = await orchestrator.fetchCredential({
           address,
-          includeRevoked: 'false',
+          appId: appDid,
+          includeRevoked: false,
         })
-        if (appDid) {
-          params.set('appId', appDid)
-        }
-
-        const response = await fetch(`/api/auth/credential?${params}`)
-
-        if (response.ok) {
-          const data = await response.json()
-          const credential = data.credential
-          if (credential) {
-            setJwt(credential.id)
-          }
-          if (data.userDocumentId) {
-            setUserDocId(data.userDocumentId)
-          }
+        if (cancelled) return
+        const credential = data?.credential
+        if (credential) {
+          setJwt(credential.id)
         } else {
-          // No valid credential found for this app DID
           setJwt(null)
           setUserDocId(null)
         }
+        if (data?.userDocumentId) {
+          setUserDocId(data.userDocumentId)
+        }
       } catch (e) {
-        console.error('Failed to fetch credential:', e)
+        if (!cancelled) console.error('Failed to fetch credential:', e)
       }
+    })()
+
+    return () => {
+      cancelled = true
     }
+  }, [session?.address, appDid, orchestrator, setJwt, setUserDocId])
 
-    fetchCredential()
-  }, [address, appDid, setJwt, setUserDocId])
-
-  /**
-   * Login and create a new JWT
-   */
   const login = useCallback(
     async (options?: LoginOptions): Promise<string> => {
-      const { appId, driveId, userDocId, returnUrl, ensName, ensAvatar } = options || {}
-
-      if (!walletClient || !address) {
+      if (!session) {
         throw new Error('Wallet not connected')
       }
 
@@ -105,173 +101,76 @@ export function useAuth(appDid?: string): UseAuthReturn {
       setError(null)
 
       try {
-        // Extract base URL from returnUrl
-        let app = 'renown-app'
-        if (returnUrl) {
-          try {
-            const url = new URL(returnUrl)
-            app = `${url.protocol}//${url.host}`
-          } catch (e) {
-            console.warn('Failed to parse returnUrl, using default app:', e)
-          }
-        }
+        const { credentialId, userDocumentId } = await orchestrator.issueDelegationVc(
+          deriveAppFromReturnUrl(options?.returnUrl),
+          options?.appId,
+          {
+            username: options?.ensName ?? shortAddress(session.address),
+            userImage: options?.ensAvatar,
+            driveId: options?.driveId,
+            docId: options?.userDocId,
+          },
+        )
 
-        // Create EIP-712 Verifiable Credential
-        const { credential, signature, domain } = await createEIP712Credential({
-          walletClient,
-          chainId,
-          app,
-          appId,
-          expiresInDays: 7,
-        })
-
-        // Determine username: use ENS name if available, otherwise use shortened address
-        const username = ensName || `${address.slice(0, 6)}...${address.slice(-4)}`
-
-        // Store the credential on Renown Switchboard
-        try {
-          const response = await fetch('/api/credential/renown', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              driveId,
-              docId: userDocId,
-              credential,
-              signature,
-              domain: {
-                ...domain,
-                chainId: Number(domain.chainId), // Convert BigInt to number for JSON serialization
-              },
-              username,
-              userImage: ensAvatar,
-            }),
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json()
-            console.error('Failed to store credential on Renown Switchboard:', errorData)
-            throw new Error(errorData.error || 'Failed to store credential')
-          }
-
-          // Capture the user document ID from the response (this is the profile ID)
-          const result = await response.json()
-          if (result.userDocumentId) {
-            setUserDocId(result.userDocumentId)
-          }
-
-          // Store the credential ID locally for session tracking
-          setJwt(credential.id)
-          return credential.id
-        } catch (e) {
-          console.error('Error storing credential on Renown Switchboard:', e)
-          throw e
-        }
+        if (userDocumentId) setUserDocId(userDocumentId)
+        setJwt(credentialId)
+        return credentialId
       } catch (e) {
-        const error = e instanceof Error ? e : new Error(String(e))
-        setError(error)
-        console.error('Login failed:', error)
-        throw error
+        const err = e instanceof Error ? e : new Error(String(e))
+        setError(err)
+        console.error('Login failed:', err)
+        throw err
       } finally {
         setIsLoading(false)
       }
     },
-    [walletClient, address, chainId, setJwt, setUserDocId],
+    [session, orchestrator, setJwt, setUserDocId],
   )
 
-  /**
-   * Logout and clear JWT
-   */
-  const logout = useCallback(
-    async () => {
-      // Revoke on Renown Switchboard if we have a credential and an address
-      if (jwt && address) {
-        try {
-          const response = await fetch('/api/credential/renown', {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              credentialId: jwt,
-              address,
-              reason: 'User logged out',
-            }),
-          })
-
-          if (!response.ok) {
-            const responseData = await response.json();
-            console.error('Failed to revoke credential on Renown Switchboard', responseData)
-          }
-        } catch (e) {
-          console.error('Error revoking credential on Renown Switchboard:', e)
-        }
+  const logout = useCallback(async () => {
+    if (jwt && session) {
+      try {
+        await orchestrator.revokeCredential(jwt, session.address)
+      } catch (e) {
+        console.error('Error revoking credential on Renown Switchboard:', e)
       }
-
-      setJwt(null)
-      setUserDocId(null)
-      setError(null)
-    },
-    [jwt, address, setJwt, setUserDocId],
-  )
-
-  /**
-   * Refresh the credential
-   */
-  const refreshToken = useCallback(async (): Promise<string | null> => {
-    if (!walletClient || !address) {
-      return null
     }
+    setJwt(null)
+    setUserDocId(null)
+    setError(null)
+  }, [jwt, session, orchestrator, setJwt, setUserDocId])
+
+  const signOut = useCallback(async () => {
+    await logout()
+    try {
+      await orchestrator.signOut()
+    } catch (e) {
+      console.error('Error signing out of wallet:', e)
+    }
+  }, [logout, orchestrator])
+
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    if (!session) return null
 
     try {
       setIsLoading(true)
-
-      // Create new EIP-712 Verifiable Credential
-      const { credential, signature, domain } = await createEIP712Credential({
-        walletClient,
-        chainId,
-        app: 'renown-app',
-        appId: undefined,
-        expiresInDays: 7,
-      })
-
-      // Store the credential on Renown Switchboard
-      const response = await fetch('/api/credential/renown', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          credential,
-          signature,
-          domain: {
-            ...domain,
-            chainId: Number(domain.chainId), // Convert BigInt to number for JSON serialization
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh credential')
-      }
-
-      const result = await response.json()
-      if (result.userDocumentId) {
-        setUserDocId(result.userDocumentId)
-      }
-
-      setJwt(credential.id)
-      return credential.id
+      const { credentialId, userDocumentId } = await orchestrator.issueDelegationVc(
+        'renown-app',
+        undefined,
+        { username: shortAddress(session.address) },
+      )
+      if (userDocumentId) setUserDocId(userDocumentId)
+      setJwt(credentialId)
+      return credentialId
     } catch (e) {
-      const error = e instanceof Error ? e : new Error(String(e))
-      setError(error)
-      console.error('Credential refresh failed:', error)
+      const err = e instanceof Error ? e : new Error(String(e))
+      setError(err)
+      console.error('Credential refresh failed:', err)
       return null
     } finally {
       setIsLoading(false)
     }
-  }, [walletClient, address, chainId, setJwt, setUserDocId])
+  }, [session, orchestrator, setJwt, setUserDocId])
 
   return useMemo(
     () => ({
@@ -283,8 +182,9 @@ export function useAuth(appDid?: string): UseAuthReturn {
       error,
       login,
       logout,
+      signOut,
       refreshToken,
     }),
-    [jwt, did, userDocId, isAuthenticated, isLoading, error, login, logout, refreshToken],
+    [jwt, did, userDocId, isAuthenticated, isLoading, error, login, logout, signOut, refreshToken],
   )
 }

@@ -2,8 +2,8 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
-import ConsoleFlow from "../components/console-flow";
-import PageBackground from "../components/page-background";
+import ConsoleFlow from "../components/auth/console-flow";
+import PageBackground from "../components/ui/page-background";
 import { useIsClient } from "../hooks/useIsClient";
 
 const ConsolePage: NextPage = () => {

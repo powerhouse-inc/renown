@@ -1,8 +1,8 @@
-import { useAccount } from "wagmi";
-import Button from "./button";
-import { useCredential } from "../hooks/credential";
+import Button from "../ui/button";
+import { useCredential } from "../../hooks/credential";
+import { useSession } from "../../hooks/use-wallet-adapter";
 import { useCallback } from "react";
-import AppCard from "./app-card";
+import AppCard from "../ui/app-card";
 
 interface IProps {
     appId: string;
@@ -12,7 +12,7 @@ interface IProps {
 }
 
 export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensName, ensAvatar }) => {
-    const { isConnected, chain } = useAccount();
+    const session = useSession();
     const { createCredential, loading } = useCredential(appId, returnUrl);
 
     const handleCreateCredential = useCallback(() => {
@@ -22,7 +22,7 @@ export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensNa
         });
     }, [createCredential, ensName, ensAvatar]);
 
-    if (!isConnected) return null;
+    if (!session) return null;
 
     return (
         <div className="flex flex-col w-full gap-3">
@@ -31,7 +31,7 @@ export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensNa
                 primary
                 onClick={handleCreateCredential}
                 className={`w-full mb-3 ${loading ? "animate-pulse" : ""}`}
-                disabled={!chain || loading}
+                disabled={loading}
             >
                 Confirm Authorization
             </Button>

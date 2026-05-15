@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { useAccount } from "wagmi";
 import { useAuth } from "./auth";
+import { useSession } from "./use-wallet-adapter";
 
 interface CreateCredentialOptions {
     ensName?: string | null;
@@ -8,7 +8,7 @@ interface CreateCredentialOptions {
 }
 
 interface ICredential {
-    credential: string | undefined; // Now stores JWT instead of VC
+    credential: string | undefined;
     isAuth: boolean;
     hasCredential: boolean;
     loading: boolean;
@@ -17,7 +17,7 @@ interface ICredential {
 }
 
 export function useCredential(appId: string, returnUrl?: string): ICredential {
-    const { address } = useAccount();
+    const session = useSession();
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(appId);
     const credential = jwt ?? undefined;
     const [isFetching, setIsFetching] = useState(false);
@@ -63,7 +63,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             hasCredential: !!credential,
             loading: isFetching || authLoading,
             createCredential: (options?: CreateCredentialOptions) => {
-                if (!address) {
+                if (!session?.address) {
                     throw new Error("Address is not set");
                 }
                 return createCredential(appId, returnUrl, options);
@@ -76,7 +76,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             isFetching,
             authLoading,
             revokeCredential,
-            address,
+            session?.address,
             createCredential,
             appId,
             returnUrl,

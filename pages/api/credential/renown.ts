@@ -4,6 +4,7 @@ import { allowCors } from '../[utils]'
 import { GraphQLClient } from 'graphql-request'
 import { v4 as uuidv4 } from 'uuid'
 import { storeCredential, revokeCredential } from '../../../services/renown-credential'
+import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
 
 function makeAction(type: string, input: Record<string, unknown>) {
   return {
@@ -18,7 +19,6 @@ function makeAction(type: string, input: Record<string, unknown>) {
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
   'https://switchboard.renown.vetra.io/graphql'
-const DEFAULT_DRIVE_ID = process.env.NEXT_PUBLIC_RENOWN_DRIVE_ID || 'renown-profiles'
 
 interface EIP712Domain {
   version: string

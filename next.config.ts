@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
             ...config.resolve.alias,
             "@react-native-async-storage/async-storage": false,
         };
+        config.ignoreWarnings = [
+            ...(config.ignoreWarnings ?? []),
+            {
+                module: /@privy-io\/react-auth/,
+                message: /@farcaster\/mini-app-solana/,
+            },
+            { module: /ox\/_esm\/tempo\/internal\/virtualMasterPool/ },
+        ];
         return config;
     },
     async headers() {

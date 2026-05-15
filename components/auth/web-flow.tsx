@@ -1,17 +1,18 @@
 "use client";
 
-import { useAccount, useEnsName, useEnsAvatar, useDisconnect, useChainId } from "wagmi";
+import { useEnsName, useEnsAvatar } from "wagmi";
 import Image from "next/image";
-import IconConnectWhite from "../assets/icons/connect-white.svg";
-import Button from "./button";
-import { useCredential } from "../hooks/credential";
-import { useAuth } from "../hooks/auth";
+import IconConnectWhite from "../../assets/icons/connect-white.svg";
+import Button from "../ui/button";
+import { useCredential } from "../../hooks/credential";
+import { useAuth } from "../../hooks/auth";
+import { useSession } from "../../hooks/use-wallet-adapter";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
-import WalletButton from "./wallet-button";
-import RenownCard from "./renown-card";
-import AppCard from "./app-card";
-import { useState, useEffect } from "react";
+import { LoginButtons } from "./login-buttons";
+import RenownCard from "../ui/renown-card";
+import AppCard from "../ui/app-card";
+import { useState, useEffect, useCallback } from "react";
 
 interface IProps {
     appId: string;
@@ -65,14 +66,18 @@ export const WebFlow: React.FC<IProps> = ({
     deeplink,
     returnUrl = connectUrl,
 }) => {
-    const { address } = useAccount();
-    const chainId = useChainId();
+    const session = useSession();
+    const address = session?.address;
+    const chainId = session?.chainId ?? 1;
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
-    const { disconnect } = useDisconnect();
     const { hasCredential } = useCredential(appId, returnUrl);
-    const { userDocId } = useAuth(appId);
+    const { userDocId, signOut } = useAuth(appId);
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
+
+    const disconnect = useCallback(() => {
+        void signOut();
+    }, [signOut]);
 
     const user = (address && hasCredential)
         ? encodeURIComponent(`did:pkh:eip155:${chainId}:${address.toLowerCase()}`)
@@ -114,7 +119,7 @@ export const WebFlow: React.FC<IProps> = ({
                                     <button className="text-accent text-sm underline underline-offset-4" onClick={() => window.open(`/profile/${userDocId || address}`, '_blank')}>
                                         View profile
                                     </button>
-                                    <button className="text-destructive text-sm underline underline-offset-4" onClick={() => disconnect()}>
+                                    <button className="text-destructive text-sm underline underline-offset-4" onClick={disconnect}>
                                         Disconnect
                                     </button>
                                 </div>
@@ -125,7 +130,7 @@ export const WebFlow: React.FC<IProps> = ({
                     {!address ? (
                         <div className="flex flex-col w-full gap-3">
                             <AppCard appId={appId} returnUrl={returnUrl} className="mb-3" />
-                            <WalletButton />
+                            <LoginButtons />
                             <Button secondary className="w-full hover:bg-muted" onClick={() => history.back()}>
                                 Cancel
                             </Button>

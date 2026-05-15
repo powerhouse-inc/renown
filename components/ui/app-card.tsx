@@ -1,5 +1,5 @@
-import { useAppIcon } from "../hooks/useAppIcon";
-import { didKeyText } from "../utils/did";
+import { useAppIcon } from "../../hooks/useAppIcon";
+import { didKeyText } from "../../utils/did";
 
 interface IProps {
     appId: string;

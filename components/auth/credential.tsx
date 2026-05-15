@@ -1,11 +1,11 @@
-import IconCheck from "../assets/icons/check.svg";
+import IconCheck from "../../assets/icons/check.svg";
 import Image from "next/image";
-import { useCredential } from "../hooks/credential";
+import { useCredential } from "../../hooks/credential";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useVerifyToken } from "../hooks/useVerifyToken";
-import { useAccount } from "wagmi";
-import AppCard from "./app-card";
+import { useVerifyToken } from "../../hooks/useVerifyToken";
+import { useSession } from "../../hooks/use-wallet-adapter";
+import AppCard from "../ui/app-card";
 
 interface CredentialDetails {
     documentId: string;
@@ -33,7 +33,8 @@ interface IProps {
 
 const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     const { hasCredential, credential, revokeCredential } = useCredential(appId, returnUrl);
-    const { address } = useAccount();
+    const session = useSession();
+    const address = session?.address;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
