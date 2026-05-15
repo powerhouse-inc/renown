@@ -7,6 +7,10 @@ import {
     useOrchestrator,
     useSupportedLoginMethods,
 } from "../../hooks/use-wallet-adapter";
+import {
+    setLastLoginMethod,
+    useLastLoginMethod,
+} from "../../hooks/use-last-login-method";
 import { LoginCancelledError, LoginMethod } from "../../services/wallet/types";
 
 // Brand-colored icons (logos collection) + a few from simple-icons where logos
@@ -88,6 +92,7 @@ const NON_WALLET_ORDER: LoginMethod[] = [
 export function LoginButtons({ onError, className, plain = false }: LoginButtonsProps) {
     const orchestrator = useOrchestrator();
     const supported = useSupportedLoginMethods();
+    const lastLoginMethod = useLastLoginMethod();
     const [pending, setPending] = useState<LoginMethod | null>(null);
 
     const walletEnabled = supported.includes(LoginMethod.WALLET);
@@ -99,6 +104,7 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
         setPending(method);
         try {
             await orchestrator.signIn({ method });
+            setLastLoginMethod(method);
         } catch (e) {
             if (e instanceof LoginCancelledError) return;
             const error = e instanceof Error ? e : new Error(String(e));
@@ -116,12 +122,13 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
     ) => {
         const config = LOGIN_METHOD_CONFIG[method];
         const icon = plain ? config.iconPlain : config.icon;
+        const isLastUsed = lastLoginMethod === method;
         return (
             <Button
                 key={method}
                 primary={variant === "primary"}
                 secondary={variant === "secondary"}
-                className={`w-full ${pending === method ? "animate-pulse" : ""}`}
+                className={`relative w-full ${pending === method ? "animate-pulse" : ""}`}
                 onClick={() => handle(method)}
                 disabled={pending !== null}
                 aria-label={iconOnly ? config.label : undefined}
@@ -131,6 +138,14 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
                     <Icon icon={icon} width={iconOnly ? 24 : 20} height={iconOnly ? 24 : 20} aria-hidden="true" />
                     {!iconOnly && <span>{config.label}</span>}
                 </div>
+                {isLastUsed && (
+                    <span
+                        className="absolute -top-2 right-2 rounded-full bg-foreground text-background text-[10px] font-semibold leading-none px-1.5 py-0.5 shadow"
+                        aria-label="Last used"
+                    >
+                        Last used
+                    </span>
+                )}
             </Button>
         );
     };
