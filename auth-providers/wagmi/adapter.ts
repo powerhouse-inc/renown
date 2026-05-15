@@ -144,6 +144,7 @@ export class WagmiAdapter extends BaseWalletAdapter {
       caip2: `eip155:${chainId}`,
       accountType: AccountType.EOA,
       signer,
+      autoSign: false,
     }
   }
 }

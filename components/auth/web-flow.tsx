@@ -2,17 +2,18 @@
 
 import { useEnsName, useEnsAvatar } from "wagmi";
 import Image from "next/image";
+import { useAtomValue } from "jotai";
 import IconConnectWhite from "../../assets/icons/connect-white.svg";
 import Button from "../ui/button";
 import { useCredential } from "../../hooks/credential";
-import { useAuth } from "../../hooks/auth";
+import { revokedAddressAtom, useAuth } from "../../hooks/auth";
 import { useAuthBusy, useSession } from "../../hooks/use-wallet-adapter";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import { LoginButtons } from "./login-buttons";
 import RenownCard from "../ui/renown-card";
 import AppCard from "../ui/app-card";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface IProps {
     appId: string;
@@ -90,12 +91,49 @@ export const WebFlow: React.FC<IProps> = ({
     const session = useSession();
     const address = session?.address;
     const chainId = session?.chainId ?? 1;
+    const autoSign = session?.autoSign ?? false;
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
-    const { hasCredential } = useCredential(appId, returnUrl);
+    const { hasCredential, loading, initializing, createCredential } = useCredential(appId, returnUrl);
     const { userDocId, signOut } = useAuth(appId);
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
     const authBusy = useAuthBusy();
+    const revokedAddress = useAtomValue(revokedAddressAtom);
+    const justRevoked = !!address && revokedAddress === address;
+
+    // Tracks per-address auto-sign state so we never fire twice and can fall
+    // back to the manual Confirm view if Privy's silent sign fails. Both
+    // values are address-scoped, so a different address naturally bypasses
+    // them without an explicit reset.
+    const autoAttemptedRef = useRef<string | null>(null);
+    const [autoFailedFor, setAutoFailedFor] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (
+            !address ||
+            !autoSign ||
+            initializing ||
+            hasCredential ||
+            loading ||
+            autoAttemptedRef.current === address ||
+            autoFailedFor === address ||
+            justRevoked
+        ) return;
+   
+
+        autoAttemptedRef.current = address;
+        let cancelled = false;
+        void createCredential({
+            ensName: ensName ?? null,
+            ensAvatar: ensAvatar ?? null,
+        }).then((jwt) => {
+            if (cancelled) return;
+            if (!jwt) setAutoFailedFor(address);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [address, autoSign, initializing, hasCredential, loading, autoFailedFor, justRevoked, createCredential, ensName, ensAvatar]);
 
     const disconnect = useCallback(() => {
         void signOut();
@@ -109,12 +147,19 @@ export const WebFlow: React.FC<IProps> = ({
         ? `${deeplink}://login/${user}`
         : buildUrl(returnUrl ?? "", user);
 
-    // Show the loading body only while an adapter is provisioning a session
-    // (Privy: authenticated → embedded wallet pending). Wagmi never sets this
-    // flag, so its flow is unchanged. After the session arrives the brief
-    // credential fetch runs alongside the regular Confirm/Credential view —
-    // the same path wagmi already takes smoothly.
-    const isAuthLoading = authBusy;
+    // Show the loading body while:
+    //   - an adapter is provisioning a session (Privy authenticated → wallet pending), or
+    //   - we're auto-signing on behalf of a provider-managed wallet and haven't
+    //     either succeeded (hasCredential) or fallen back to manual (autoFailedFor).
+    // Wagmi (autoSign=false) never enters the auto-sign branch, so its flow is
+    // unchanged.
+    const isAutoSigning =
+        !!address &&
+        autoSign &&
+        !hasCredential &&
+        autoFailedFor !== address &&
+        !justRevoked;
+    const isAuthLoading = authBusy || isAutoSigning;
     const showPreLogin = !address && !authBusy;
     const titleLoading = isAuthLoading;
     const title = titleLoading

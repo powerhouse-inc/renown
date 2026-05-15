@@ -39,6 +39,7 @@ export interface Session {
   caip2: string
   accountType: AccountType
   signer: Signer
+  autoSign: boolean
 }
 
 export interface LoginOptions {

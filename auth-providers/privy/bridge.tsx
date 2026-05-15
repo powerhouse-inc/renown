@@ -50,13 +50,16 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
       initOAuth: provider => fnsRef.current.initOAuth({ provider }),
       logout: () => fnsRef.current.logout(),
       signMessage: async (message, address) => {
-        const result = await fnsRef.current.signMessage({ message }, { address })
+        const result = await fnsRef.current.signMessage(
+          { message },
+          { address, uiOptions: { showWalletUIs: false } },
+        )
         return result.signature as Hex
       },
       signTypedData: async (args, address) => {
         const result = await fnsRef.current.signTypedData(
           args as unknown as SignTypedDataParams,
-          { address },
+          { address, uiOptions: { showWalletUIs: false } },
         )
         return result.signature as Hex
       },

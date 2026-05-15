@@ -130,6 +130,9 @@ export class PrivyAdapter extends BaseWalletAdapter {
       caip2: wallet.chainId,
       accountType: AccountType.EOA,
       signer,
+      // Privy manages the embedded wallet's keys, so it can sign without a
+      // user-facing confirmation popup.
+      autoSign: true,
     }
 
     this.emit(session)

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { useAuth } from "./auth";
+import { useAtom } from "jotai";
+import { revokedAddressAtom, useAuth } from "./auth";
 import { useSession } from "./use-wallet-adapter";
 
 interface CreateCredentialOptions {
@@ -23,6 +24,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading, isFetchingCredential } = useAuth(appId);
     const credential = jwt ?? undefined;
     const [isFetching, setIsFetching] = useState(false);
+    const [, setRevokedAddress] = useAtom(revokedAddressAtom);
 
     const createCredential = useCallback(
         async (appId: string, returnUrl?: string, options?: CreateCredentialOptions) => {
@@ -50,12 +52,18 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
                 return;
             }
             await logout();
+            // Mark this address as just-revoked so the auto-sign effect in the
+            // web flow won't immediately recreate a credential for the same
+            // session. Cleared by signOut (Disconnect) or page refresh.
+            if (session?.address) setRevokedAddress(session.address);
         } catch (e) {
             console.error('Failed to revoke credential:', e);
         }
     }, [
         logout,
         jwt,
+        session,
+        setRevokedAddress,
     ]);
 
     return useMemo(

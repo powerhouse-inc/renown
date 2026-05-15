@@ -35,6 +35,10 @@ export function PrivyAuthProvider({
       },
       embeddedWallets: {
         ethereum: { createOnLogin: 'users-without-wallets' as const },
+        // Privy owns the embedded wallet's keys, so the typed-data signature
+        // that issues the Renown VC doesn't need a user confirmation prompt.
+        // Hiding wallet UIs lets us sign silently as part of the login flow.
+        showWalletUIs: false,
       },
     }),
     [theme],

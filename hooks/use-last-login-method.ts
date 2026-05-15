@@ -44,3 +44,12 @@ export function setLastLoginMethod(method: LoginMethod): void {
     }
     for (const listener of listeners) listener();
 }
+
+export function clearLastLoginMethod(): void {
+    try {
+        window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // ignore storage failures
+    }
+    for (const listener of listeners) listener();
+}
