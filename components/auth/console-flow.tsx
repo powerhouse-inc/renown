@@ -163,7 +163,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                     <p className="mb-6 text-center text-lg leading-6 text-muted-foreground-light">
                         {sessionCompleted
                             ? "You can now close this window and return to your terminal."
-                            : "Authorize the Powerhouse CLI to act on behalf of your Ethereum identity"}
+                            : "Authorize the Powerhouse CLI to sign actions on your behalf using your identity."}
                     </p>
 
                     {/* CLI DID Info */}

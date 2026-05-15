@@ -167,9 +167,10 @@ export const WebFlow: React.FC<IProps> = ({
         : address
             ? "Confirm Authorization"
             : "Connect Wallet";
+    const appName = returnUrl ? new URL(returnUrl).hostname : "this app";
     const subtitle = titleLoading
         ? "Hang tight while we finish setting up your session."
-        : "Click on the button below to start signing messages in Connect on behalf of your Ethereum identity";
+        : `Authorize ${appName} to sign actions on your behalf using your identity.`;
 
     return (
         <div className="flex flex-col items-center">
