@@ -8,6 +8,7 @@ import {
     useSupportedLoginMethods,
 } from "../../hooks/use-wallet-adapter";
 import {
+    clearLastLoginMethod,
     setLastLoginMethod,
     useLastLoginMethod,
 } from "../../hooks/use-last-login-method";
@@ -102,10 +103,16 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
 
     const handle = async (method: LoginMethod) => {
         setPending(method);
+        // Set optimistically: OAuth flows trigger a full-page redirect, so
+        // anything we'd write *after* signIn never runs. Reverted below on
+        // failure so cancelled flows don't get stickered as "last used".
+        const previous = lastLoginMethod;
+        setLastLoginMethod(method);
         try {
             await orchestrator.signIn({ method });
-            setLastLoginMethod(method);
         } catch (e) {
+            if (previous !== null) setLastLoginMethod(previous);
+            else clearLastLoginMethod();
             if (e instanceof LoginCancelledError) return;
             const error = e instanceof Error ? e : new Error(String(e));
             console.error(`Login (${method}) failed:`, error);

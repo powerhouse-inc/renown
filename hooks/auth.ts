@@ -4,6 +4,13 @@ import { useOrchestrator, useSession } from './use-wallet-adapter'
 
 const credentialIdAtom = atom<string | null>(null)
 const userDocIdAtom = atom<string | null>(null)
+/**
+ * Address whose credential was just revoked in the current page session.
+ * Used by the web flow to suppress auto-sign so a revoked user lands on the
+ * manual Confirm Authorization view instead of being re-signed-in immediately.
+ * Cleared when the user fully signs out (Disconnect) or on page refresh.
+ */
+export const revokedAddressAtom = atom<string | null>(null)
 
 interface LoginOptions {
   appId?: string
@@ -50,6 +57,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
 
   const [jwt, setJwt] = useAtom(credentialIdAtom)
   const [userDocId, setUserDocId] = useAtom(userDocIdAtom)
+  const [, setRevokedAddress] = useAtom(revokedAddressAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   // Tracks the address that the initial credential fetch most recently resolved
@@ -159,7 +167,10 @@ export function useAuth(appDid?: string): UseAuthReturn {
     } catch (e) {
       console.error('Error signing out of wallet:', e)
     }
-  }, [logout, orchestrator])
+    // A full sign-out (Disconnect) clears any prior revoke suppression so the
+    // next login can auto-sign normally.
+    setRevokedAddress(null)
+  }, [logout, orchestrator, setRevokedAddress])
 
   const refreshToken = useCallback(async (): Promise<string | null> => {
     if (!session) return null
