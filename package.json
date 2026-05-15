@@ -18,7 +18,12 @@
     "test:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@iconify-icons/logos": "^1.2.36",
+    "@iconify-icons/lucide": "^1.2.135",
+    "@iconify-icons/simple-icons": "^1.2.74",
+    "@iconify/react": "^6.0.2",
     "@powerhousedao/reactor-browser": "6.0.2-staging.8",
+    "@privy-io/react-auth": "^3.25.0",
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@renown/sdk": "6.0.2-staging.8",
     "@tanstack/react-query": "^5.90.2",

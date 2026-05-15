@@ -1,7 +1,7 @@
-import type { WalletClient } from 'viem'
+import type { Hex } from 'viem'
 import { v4 as uuidv4 } from 'uuid'
+import type { Signer } from './types'
 
-// EIP-712 domain and types (from Powerhouse Renown SDK constants)
 const DOMAIN_TYPE = [
   { name: 'version', type: 'string' },
   { name: 'chainId', type: 'uint256' },
@@ -33,7 +33,7 @@ const ISSUER_TYPE = [
   { name: 'ethereumAddress', type: 'string' },
 ] as const
 
-const CREDENTIAL_TYPES = {
+export const CREDENTIAL_TYPES = {
   EIP712Domain: DOMAIN_TYPE,
   VerifiableCredential: VERIFIABLE_CREDENTIAL_EIP712_TYPE,
   CredentialSchema: CREDENTIAL_SCHEMA_EIP712_TYPE,
@@ -41,38 +41,39 @@ const CREDENTIAL_TYPES = {
   Issuer: ISSUER_TYPE,
 } as const
 
-interface CreateEIP712CredentialParams {
-  walletClient: WalletClient
+export interface BuildAndSignVcParams {
+  signer: Signer
+  address: Hex
   chainId: number
   app: string
   appId?: string
   expiresInDays?: number
 }
 
-/**
- * Create and sign an EIP-712 Verifiable Credential
- */
-export async function createEIP712Credential(params: CreateEIP712CredentialParams) {
-  const {
-    walletClient,
-    chainId,
-    app,
-    appId,
-    expiresInDays = 7,
-  } = params
-
-  if (!walletClient.account?.address) {
-    throw new Error('Wallet not connected')
+export interface SignedVc {
+  credential: {
+    '@context': string[]
+    type: string[]
+    id: string
+    issuer: { id: string; ethereumAddress: Hex }
+    credentialSubject: { id: string; app: string }
+    credentialSchema: { id: string; type: string }
+    issuanceDate: string
+    expirationDate: string
   }
+  signature: Hex
+  domain: { version: string; chainId: number }
+}
 
-  const address = walletClient.account.address
+export async function buildAndSignEip712Vc(params: BuildAndSignVcParams): Promise<SignedVc> {
+  const { signer, address, chainId, app, appId, expiresInDays = 7 } = params
+
   const issuerId = `did:pkh:eip155:${chainId}:${address.toLowerCase()}`
   const credentialId = `urn:uuid:${uuidv4()}`
   const now = new Date()
   const expirationDate = new Date(now.getTime() + expiresInDays * 24 * 60 * 60 * 1000)
 
-  // Build the credential
-  const credential = {
+  const credential: SignedVc['credential'] = {
     '@context': ['https://www.w3.org/2018/credentials/v1'],
     type: ['VerifiableCredential', 'RenownCredential'],
     id: credentialId,
@@ -92,24 +93,17 @@ export async function createEIP712Credential(params: CreateEIP712CredentialParam
     expirationDate: expirationDate.toISOString(),
   }
 
-  // EIP-712 domain
   const domain = {
     version: '1',
-    chainId: BigInt(chainId),
+    chainId,
   }
 
-  // Sign with EIP-712
-  const signature = await walletClient.signTypedData({
-    account: walletClient.account,
+  const signature = await signer.signTypedData({
     domain,
     types: CREDENTIAL_TYPES,
     primaryType: 'VerifiableCredential',
-    message: credential as any,
+    message: credential as unknown as Record<string, unknown>,
   })
 
-  return {
-    credential,
-    signature,
-    domain,
-  }
+  return { credential, signature, domain }
 }

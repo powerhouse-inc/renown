@@ -1,10 +1,10 @@
 import Image from "next/image";
-import LandingGradient from "../assets/images/landing-gradient.jpg";
-import Noise from "../assets/images/noise.png";
+import LandingGradient from "../../assets/images/landing-gradient.jpg";
+import Noise from "../../assets/images/noise.png";
 import PhIconsBackground from "./ph-icons-background";
 import RenownLogo from "./renown-logo";
 import ThemeToggle from "./theme-toggle";
-import RenownLoginButton from "./renown-login-button";
+import RenownLoginButton from "../auth/renown-login-button";
 
 interface PageBackgroundProps {
   children: React.ReactNode;
