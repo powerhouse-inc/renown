@@ -23,3 +23,15 @@ export function useSupportedLoginMethods(): LoginMethod[] {
 
   return supportedMethods
 }
+
+/**
+ * True while any adapter has work in flight that the UI should reflect — e.g.
+ * Privy is authenticated but the embedded wallet is still being provisioned.
+ */
+export function useAuthBusy(): boolean {
+  return useSyncExternalStore<boolean>(
+    cb => orchestrator.subscribeBusy(() => cb()),
+    () => orchestrator.isBusy(),
+    () => false,
+  )
+}

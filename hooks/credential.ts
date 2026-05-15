@@ -12,13 +12,15 @@ interface ICredential {
     isAuth: boolean;
     hasCredential: boolean;
     loading: boolean;
+    /** True while the initial credential fetch for the current session has not yet completed. */
+    initializing: boolean;
     createCredential: (options?: CreateCredentialOptions) => Promise<string | undefined>;
     revokeCredential: () => Promise<void>;
 }
 
 export function useCredential(appId: string, returnUrl?: string): ICredential {
     const session = useSession();
-    const { jwt, isAuthenticated, login, logout, isLoading: authLoading } = useAuth(appId);
+    const { jwt, isAuthenticated, login, logout, isLoading: authLoading, isFetchingCredential } = useAuth(appId);
     const credential = jwt ?? undefined;
     const [isFetching, setIsFetching] = useState(false);
 
@@ -62,6 +64,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             isAuth: isAuthenticated,
             hasCredential: !!credential,
             loading: isFetching || authLoading,
+            initializing: isFetchingCredential,
             createCredential: (options?: CreateCredentialOptions) => {
                 if (!session?.address) {
                     throw new Error("Address is not set");
@@ -75,6 +78,7 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
             isAuthenticated,
             isFetching,
             authLoading,
+            isFetchingCredential,
             revokeCredential,
             session?.address,
             createCredential,

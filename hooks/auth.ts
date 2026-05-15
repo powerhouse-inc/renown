@@ -20,6 +20,8 @@ interface UseAuthReturn {
   userDocId: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  /** True while the initial credential fetch for the current address has not yet resolved. */
+  isFetchingCredential: boolean
   error: Error | null
   login: (options?: LoginOptions) => Promise<string>
   logout: () => Promise<void>
@@ -50,6 +52,10 @@ export function useAuth(appDid?: string): UseAuthReturn {
   const [userDocId, setUserDocId] = useAtom(userDocIdAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  // Tracks the address that the initial credential fetch most recently resolved
+  // for. Used to derive `isFetchingCredential` so the UI can wait for the first
+  // fetch before deciding which post-login view to render.
+  const [fetchedCredentialFor, setFetchedCredentialFor] = useState<string | null>(null)
 
   const did = useMemo(() => {
     if (!session) return null
@@ -60,6 +66,8 @@ export function useAuth(appDid?: string): UseAuthReturn {
 
   useEffect(() => {
     const address = session?.address
+    // No need to reset `fetchedCredentialFor` when the session clears — the
+    // derived `isFetchingCredential` below is already gated on `session?.address`.
     if (!address) return
 
     let cancelled = false
@@ -83,6 +91,8 @@ export function useAuth(appDid?: string): UseAuthReturn {
         }
       } catch (e) {
         if (!cancelled) console.error('Failed to fetch credential:', e)
+      } finally {
+        if (!cancelled) setFetchedCredentialFor(address)
       }
     })()
 
@@ -90,6 +100,8 @@ export function useAuth(appDid?: string): UseAuthReturn {
       cancelled = true
     }
   }, [session?.address, appDid, orchestrator, setJwt, setUserDocId])
+
+  const isFetchingCredential = !!session?.address && fetchedCredentialFor !== session.address
 
   const login = useCallback(
     async (options?: LoginOptions): Promise<string> => {
@@ -179,12 +191,13 @@ export function useAuth(appDid?: string): UseAuthReturn {
       userDocId,
       isAuthenticated,
       isLoading,
+      isFetchingCredential,
       error,
       login,
       logout,
       signOut,
       refreshToken,
     }),
-    [jwt, did, userDocId, isAuthenticated, isLoading, error, login, logout, signOut, refreshToken],
+    [jwt, did, userDocId, isAuthenticated, isLoading, isFetchingCredential, error, login, logout, signOut, refreshToken],
   )
 }
