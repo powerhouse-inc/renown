@@ -99,6 +99,12 @@ body {
 a {
     color: inherit;
     text-decoration: none;
+    cursor: pointer;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
 }
 
 * {
