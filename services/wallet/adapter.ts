@@ -6,6 +6,8 @@ import type {
   Unsubscribe,
 } from './types'
 
+export type BusyListener = (busy: boolean) => void
+
 export interface WalletAdapter {
   readonly name: string
   readonly supportedMethods: LoginMethod[]
@@ -13,6 +15,8 @@ export interface WalletAdapter {
   logout(): Promise<void>
   getSession(): Session | null
   subscribe(listener: AdapterListener): Unsubscribe
+  isBusy(): boolean
+  subscribeBusy(listener: BusyListener): Unsubscribe
 }
 
 export abstract class BaseWalletAdapter implements WalletAdapter {
@@ -21,6 +25,8 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
 
   protected current: Session | null = null
   private readonly listeners = new Set<AdapterListener>()
+  private busy = false
+  private readonly busyListeners = new Set<BusyListener>()
 
   subscribe(listener: AdapterListener): Unsubscribe {
     this.listeners.add(listener)
@@ -40,6 +46,26 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
 
   getSession(): Session | null {
     return this.current
+  }
+
+  isBusy(): boolean {
+    return this.busy
+  }
+
+  subscribeBusy(listener: BusyListener): Unsubscribe {
+    this.busyListeners.add(listener)
+    listener(this.busy)
+    return () => {
+      this.busyListeners.delete(listener)
+    }
+  }
+
+  protected setBusy(value: boolean): void {
+    if (this.busy === value) return
+    this.busy = value
+    for (const listener of this.busyListeners) {
+      listener(value)
+    }
   }
 
   abstract login(opts: LoginOptions): Promise<Session>

@@ -6,7 +6,7 @@ import IconConnectWhite from "../../assets/icons/connect-white.svg";
 import Button from "../ui/button";
 import { useCredential } from "../../hooks/credential";
 import { useAuth } from "../../hooks/auth";
-import { useSession } from "../../hooks/use-wallet-adapter";
+import { useAuthBusy, useSession } from "../../hooks/use-wallet-adapter";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
 import { LoginButtons } from "./login-buttons";
@@ -61,6 +61,27 @@ function useCredentialReady(address: string | undefined, chainId: number, connec
     return sessionKey !== null && readyKey === sessionKey;
 }
 
+// Skeleton block that mirrors the rough vertical rhythm of the login-button
+// stack so the card height stays stable while we wait for auth state.
+function LoadingBody() {
+    return (
+        <div className="flex flex-col w-full gap-3" aria-busy="true" aria-live="polite">
+            <div className="rounded-xl p-4 bg-secondary flex gap-3 w-full mb-3 animate-pulse">
+                <div className="w-9 h-9 rounded-lg bg-muted" />
+                <div className="flex-1 space-y-2">
+                    <div className="h-3 w-1/2 rounded bg-muted" />
+                    <div className="h-3 w-1/3 rounded bg-muted" />
+                </div>
+            </div>
+            <div className="h-11 w-full rounded-md bg-muted animate-pulse" />
+            <div className="h-11 w-full rounded-md bg-muted/70 animate-pulse" />
+            <p className="mt-2 text-center text-sm text-muted-foreground animate-pulse">
+                Signing you in&hellip;
+            </p>
+        </div>
+    );
+}
+
 export const WebFlow: React.FC<IProps> = ({
     appId,
     deeplink,
@@ -74,6 +95,7 @@ export const WebFlow: React.FC<IProps> = ({
     const { hasCredential } = useCredential(appId, returnUrl);
     const { userDocId, signOut } = useAuth(appId);
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
+    const authBusy = useAuthBusy();
 
     const disconnect = useCallback(() => {
         void signOut();
@@ -87,19 +109,33 @@ export const WebFlow: React.FC<IProps> = ({
         ? `${deeplink}://login/${user}`
         : buildUrl(returnUrl ?? "", user);
 
+    // Show the loading body only while an adapter is provisioning a session
+    // (Privy: authenticated → embedded wallet pending). Wagmi never sets this
+    // flag, so its flow is unchanged. After the session arrives the brief
+    // credential fetch runs alongside the regular Confirm/Credential view —
+    // the same path wagmi already takes smoothly.
+    const isAuthLoading = authBusy;
+    const showPreLogin = !address && !authBusy;
+    const titleLoading = isAuthLoading;
+    const title = titleLoading
+        ? "Signing you in"
+        : address
+            ? "Confirm Authorization"
+            : "Connect Wallet";
+    const subtitle = titleLoading
+        ? "Hang tight while we finish setting up your session."
+        : "Click on the button below to start signing messages in Connect on behalf of your Ethereum identity";
+
     return (
         <div className="flex flex-col items-center">
             <RenownCard className="max-w-[482px] rounded-3xl shadow-modal">
                 <div className="flex flex-col items-center bg-background px-8 pb-8 pt-10">
-                    <h2 className="mb-3 text-3xl font-semibold">
-                        {address ? "Confirm Authorization" : "Connect Wallet"}
-                    </h2>
+                    <h2 className="mb-3 text-3xl font-semibold">{title}</h2>
                     <p className="mb-10 text-center text-lg leading-6 text-muted-foreground-light">
-                        Click on the button below to start signing messages in
-                        Connect on behalf of your Ethereum identity
+                        {subtitle}
                     </p>
 
-                    {address && (
+                    {address && !isAuthLoading && (
                         <div className="rounded-xl p-4 mb-6 bg-secondary flex gap-3 w-full">
                             {ensAvatar ? (
                                 <Image src={ensAvatar} alt="Profile" width={48} height={48} unoptimized className="w-12 h-12 rounded-full object-cover" />
@@ -127,7 +163,9 @@ export const WebFlow: React.FC<IProps> = ({
                         </div>
                     )}
 
-                    {!address ? (
+                    {isAuthLoading ? (
+                        <LoadingBody />
+                    ) : showPreLogin ? (
                         <div className="flex flex-col w-full gap-3">
                             <AppCard appId={appId} returnUrl={returnUrl} className="mb-3" />
                             <LoginButtons />
@@ -141,7 +179,7 @@ export const WebFlow: React.FC<IProps> = ({
                         <Credential appId={appId} returnUrl={returnUrl} />
                     )}
 
-                    {address && hasCredential && (
+                    {address && hasCredential && !isAuthLoading && (
                         credentialReady ? (
                             <a href={url} className="text-center block w-full mt-12">
                                 <Button primary className="w-full">

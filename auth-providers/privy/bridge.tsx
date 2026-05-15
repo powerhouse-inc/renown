@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   getEmbeddedConnectedWallet,
   useLogin,
@@ -35,33 +35,51 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
     onError: error => adapter.handleLoginError(error),
   })
 
-  // Bind imperative handles into the adapter.
+  // Privy returns fresh function references on every render. Storing them in
+  // a ref and syncing inside a layout effect lets us bind once per adapter
+  // without re-binding on every render (which would briefly null out
+  // adapter.bindings between cleanup and effect).
+  const fnsRef = useRef({ openLoginModal, initOAuth, logout, signMessage, signTypedData })
+  useEffect(() => {
+    fnsRef.current = { openLoginModal, initOAuth, logout, signMessage, signTypedData }
+  }, [openLoginModal, initOAuth, logout, signMessage, signTypedData])
+
   useEffect(() => {
     return adapter.bind({
-      openLoginModal,
-      initOAuth: provider => initOAuth({ provider }),
-      logout,
+      openLoginModal: opts => fnsRef.current.openLoginModal(opts),
+      initOAuth: provider => fnsRef.current.initOAuth({ provider }),
+      logout: () => fnsRef.current.logout(),
       signMessage: async (message, address) => {
-        const result = await signMessage({ message }, { address })
+        const result = await fnsRef.current.signMessage({ message }, { address })
         return result.signature as Hex
       },
       signTypedData: async (args, address) => {
-        const result = await signTypedData(args as unknown as SignTypedDataParams, { address })
+        const result = await fnsRef.current.signTypedData(
+          args as unknown as SignTypedDataParams,
+          { address },
+        )
         return result.signature as Hex
       },
     })
-  }, [adapter, openLoginModal, initOAuth, logout, signMessage, signTypedData])
+  }, [adapter])
 
   // Sync session state into the adapter.
   useEffect(() => {
     if (!ready) return
     if (!authenticated) {
+      adapter.setProvisioning(false)
       adapter.clearSession()
       return
     }
     const embedded = getEmbeddedConnectedWallet(wallets)
     if (embedded) {
+      adapter.setProvisioning(false)
       adapter.syncFromEmbeddedWallet(embedded)
+    } else {
+      // Authenticated but embedded wallet not yet provisioned — show busy
+      // so the UI can render a coherent loading state instead of the
+      // pre-login view while we wait.
+      adapter.setProvisioning(true)
     }
   }, [adapter, ready, authenticated, wallets])
 

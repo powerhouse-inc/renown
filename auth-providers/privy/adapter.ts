@@ -145,6 +145,15 @@ export class PrivyAdapter extends BaseWalletAdapter {
     this.emit(null)
   }
 
+  /**
+   * Called by the bridge to signal that Privy is authenticated but the embedded
+   * wallet has not yet been provisioned. Drives the global "auth busy" signal
+   * that the UI consumes to render a stable loading state.
+   */
+  setProvisioning(value: boolean): void {
+    this.setBusy(value)
+  }
+
   /** Called by the bridge on Privy's onError callback. */
   handleLoginError(error: unknown): void {
     if (!this.pending) return

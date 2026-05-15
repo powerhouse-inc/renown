@@ -1,5 +1,5 @@
 import type { Hex } from 'viem'
-import type { WalletAdapter } from './adapter'
+import type { BusyListener, WalletAdapter } from './adapter'
 import type { AdapterRegistry } from './registry'
 import type { FetchCredentialResponse, RenownApi } from './renown-api'
 import type { SignatureVerifier } from './signature-verifier'
@@ -22,7 +22,8 @@ export interface IssueCredentialResult {
 export class AuthOrchestrator {
   private currentAdapter: WalletAdapter | null = null
   private readonly listeners = new Set<AdapterListener>()
-  private readonly adapterUnsubs = new Map<string, Unsubscribe>()
+  private readonly busyListeners = new Set<BusyListener>()
+  private readonly adapterUnsubs = new Map<string, Unsubscribe[]>()
 
   constructor(
     private readonly registry: AdapterRegistry,
@@ -37,7 +38,7 @@ export class AuthOrchestrator {
   /** Subscribe to an adapter so its session emissions propagate through the orchestrator. */
   attach(adapter: WalletAdapter): void {
     if (this.adapterUnsubs.has(adapter.name)) return
-    const unsub = adapter.subscribe(session => {
+    const sessionUnsub = adapter.subscribe(session => {
       if (session) {
         this.currentAdapter = adapter
         this.emit(session)
@@ -46,13 +47,16 @@ export class AuthOrchestrator {
         this.emit(null)
       }
     })
-    this.adapterUnsubs.set(adapter.name, unsub)
+    const busyUnsub = adapter.subscribeBusy(() => {
+      this.emitBusy()
+    })
+    this.adapterUnsubs.set(adapter.name, [sessionUnsub, busyUnsub])
   }
 
   detach(adapterName: string): void {
-    const unsub = this.adapterUnsubs.get(adapterName)
-    if (unsub) {
-      unsub()
+    const unsubs = this.adapterUnsubs.get(adapterName)
+    if (unsubs) {
+      for (const u of unsubs) u()
       this.adapterUnsubs.delete(adapterName)
     }
   }
@@ -77,9 +81,31 @@ export class AuthOrchestrator {
     }
   }
 
+  isBusy(): boolean {
+    for (const adapter of this.registry.list()) {
+      if (adapter.isBusy()) return true
+    }
+    return false
+  }
+
+  subscribeBusy(listener: BusyListener): Unsubscribe {
+    this.busyListeners.add(listener)
+    listener(this.isBusy())
+    return () => {
+      this.busyListeners.delete(listener)
+    }
+  }
+
   private emit(session: Session | null): void {
     for (const listener of this.listeners) {
       listener(session)
+    }
+  }
+
+  private emitBusy(): void {
+    const busy = this.isBusy()
+    for (const listener of this.busyListeners) {
+      listener(busy)
     }
   }
 
