@@ -2,12 +2,9 @@
 
 import { useAuthFlow, type AuthFlowView } from "../../hooks/use-auth-flow";
 import RenownCard from "../ui/renown-card";
-import { ConfirmAuthorization } from "./confirm-authorization";
-import Credential from "./credential";
-import { LoadingBody } from "./loading-body";
-import { PreLoginView } from "./pre-login-view";
 import { ProfileCard } from "./profile-card";
 import { ReturnToAppButton } from "./return-to-app-button";
+import { WebFlowViewBody } from "./web-flow-view-body";
 
 interface IProps {
     appId: string;
@@ -46,7 +43,7 @@ export const WebFlow: React.FC<IProps> = ({ appId, deeplink, returnUrl = connect
                         />
                     )}
 
-                    <ViewBody view={view} appId={appId} returnUrl={returnUrl} />
+                    <WebFlowViewBody view={view} appId={appId} returnUrl={returnUrl} />
 
                     {view.kind === "authorized" && (
                         <ReturnToAppButton
@@ -60,29 +57,3 @@ export const WebFlow: React.FC<IProps> = ({ appId, deeplink, returnUrl = connect
         </div>
     );
 };
-
-interface ViewBodyProps {
-    view: AuthFlowView;
-    appId: string;
-    returnUrl?: string;
-}
-
-function ViewBody({ view, appId, returnUrl }: ViewBodyProps) {
-    switch (view.kind) {
-        case "loading":
-            return <LoadingBody />;
-        case "pre-login":
-            return <PreLoginView appId={appId} returnUrl={returnUrl} />;
-        case "needs-authorization":
-            return (
-                <ConfirmAuthorization
-                    appId={appId}
-                    returnUrl={returnUrl}
-                    ensName={view.ensName}
-                    ensAvatar={view.ensAvatar}
-                />
-            );
-        case "authorized":
-            return <Credential appId={appId} returnUrl={returnUrl} />;
-    }
-}
