@@ -118,6 +118,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         })
       }
 
+      // Drop expired credentials so callers don't need to re-check client-side.
+      // Credentials with no expirationDate are treated as non-expiring.
+      const now = new Date()
+      credentials = credentials.filter((cred) => {
+        if (!cred.expirationDate) return true
+        return new Date(cred.expirationDate) > now
+      })
+
       // If no credentials are found after applying filters, return 404
       if (credentials.length === 0) {
         res.status(404).json({ error: 'Credential not found' })

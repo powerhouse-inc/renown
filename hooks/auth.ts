@@ -60,10 +60,13 @@ export function useAuth(appDid?: string): UseAuthReturn {
   const [, setRevokedAddress] = useAtom(revokedAddressAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  // Tracks the address that the initial credential fetch most recently resolved
-  // for. Used to derive `isFetchingCredential` so the UI can wait for the first
-  // fetch before deciding which post-login view to render.
+  // Tracks the (address, appDid) pair the initial credential fetch most
+  // recently resolved for. Keying on both lets `isFetchingCredential` stay
+  // true while the appDid changes (e.g. console flow's connectDid hydrating
+  // from the query string), so the UI can't act on a stale `jwt` issued for
+  // a different app.
   const [fetchedCredentialFor, setFetchedCredentialFor] = useState<string | null>(null)
+  const fetchKey = session?.address ? `${session.address}:${appDid ?? ''}` : null
 
   const did = useMemo(() => {
     if (!session) return null
@@ -88,19 +91,25 @@ export function useAuth(appDid?: string): UseAuthReturn {
         })
         if (cancelled) return
         const credential = data?.credential
-        if (credential) {
+        // Defensive: only accept a credential whose subject actually matches
+        // the requested appDid. The subgraph filter has historically not been
+        // tight enough to rely on alone — see the comment in
+        // console-flow.tsx's predecessor and the prior client-side check.
+        const subject = (credential as { credentialSubject?: { id?: string | null } } | undefined)?.credentialSubject
+        const subjectMatches = !appDid || subject?.id === appDid
+        if (credential && subjectMatches) {
           setJwt(credential.id)
         } else {
           setJwt(null)
           setUserDocId(null)
         }
-        if (data?.userDocumentId) {
+        if (data?.userDocumentId && subjectMatches) {
           setUserDocId(data.userDocumentId)
         }
       } catch (e) {
         if (!cancelled) console.error('Failed to fetch credential:', e)
       } finally {
-        if (!cancelled) setFetchedCredentialFor(address)
+        if (!cancelled) setFetchedCredentialFor(`${address}:${appDid ?? ''}`)
       }
     })()
 
@@ -109,7 +118,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
     }
   }, [session?.address, appDid, orchestrator, setJwt, setUserDocId])
 
-  const isFetchingCredential = !!session?.address && fetchedCredentialFor !== session.address
+  const isFetchingCredential = !!fetchKey && fetchedCredentialFor !== fetchKey
 
   const login = useCallback(
     async (options?: LoginOptions): Promise<string> => {
