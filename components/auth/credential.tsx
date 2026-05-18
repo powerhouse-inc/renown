@@ -90,7 +90,7 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                                 finally { setRevoking(false); }
                             }}
                         >
-                            Revoke
+                            {revoking ? 'Revoking...' : 'Revoke'}
                         </button>
                     </div>
                     {verificationResult && (

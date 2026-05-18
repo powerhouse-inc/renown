@@ -33,7 +33,7 @@ export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensNa
                 className={`w-full mb-3 ${loading ? "animate-pulse" : ""}`}
                 disabled={loading}
             >
-                Confirm Authorization
+                {loading ? "Confirming authorization..." : "Confirm Authorization"}
             </Button>
         </div>
     );
