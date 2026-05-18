@@ -40,6 +40,12 @@ export class WagmiAdapter extends BaseWalletAdapter {
     const account = getAccount(this.config)
     if (account.status === 'connected') {
       this.emit(this.toSession(account))
+      this.markReady()
+    } else if (account.status === 'disconnected') {
+      // No autoConnect in flight (or it already resolved) — wagmi has
+      // answered. Anything else ('reconnecting' / 'connecting') resolves
+      // through handleAccountChange.
+      this.markReady()
     }
   }
 
@@ -108,12 +114,14 @@ export class WagmiAdapter extends BaseWalletAdapter {
     if (account.status === 'connected') {
       const session = this.toSession(account)
       this.emit(session)
+      this.markReady()
       if (this.pending) {
         this.pending.resolve(session)
         this.pending = null
       }
     } else if (account.status === 'disconnected') {
       this.emit(null)
+      this.markReady()
     }
   }
 

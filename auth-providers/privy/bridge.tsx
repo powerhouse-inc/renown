@@ -31,7 +31,7 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
   const { login: openLoginModal } = useLogin({
     onError: error => adapter.handleLoginError(error),
   })
-  const { initOAuth } = useLoginWithOAuth({
+  const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
     onError: error => adapter.handleLoginError(error),
   })
 
@@ -69,9 +69,17 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
   // Sync session state into the adapter.
   useEffect(() => {
     if (!ready) return
+    // OAuth callback in flight — Privy is about to flip `authenticated` to
+    // true. Keep the UI in a loading state and defer markReady so we don't
+    // flash pre-login between redirect-return and session arrival.
+    if (oauthLoading) {
+      adapter.setProvisioning(true)
+      return
+    }
     if (!authenticated) {
       adapter.setProvisioning(false)
       adapter.clearSession()
+      adapter.markReady()
       return
     }
     const embedded = getEmbeddedConnectedWallet(wallets)
@@ -84,7 +92,10 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
       // pre-login view while we wait.
       adapter.setProvisioning(true)
     }
-  }, [adapter, ready, authenticated, wallets])
+    // Privy has answered the "are you logged in?" question. Even if the
+    // embedded wallet is still provisioning, busy now covers the rest.
+    adapter.markReady()
+  }, [adapter, ready, authenticated, wallets, oauthLoading])
 
   return null
 }

@@ -7,6 +7,7 @@ import type {
 } from './types'
 
 export type BusyListener = (busy: boolean) => void
+export type InitializingListener = (initializing: boolean) => void
 
 export interface WalletAdapter {
   readonly name: string
@@ -17,6 +18,14 @@ export interface WalletAdapter {
   subscribe(listener: AdapterListener): Unsubscribe
   isBusy(): boolean
   subscribeBusy(listener: BusyListener): Unsubscribe
+  /**
+   * True until the adapter has had a chance to probe its underlying auth
+   * provider and report the first definitive session state (connected or not).
+   * Used by the UI to render a stable loading state instead of pre-login while
+   * a previously authenticated session is being restored on page load.
+   */
+  isInitializing(): boolean
+  subscribeInitializing(listener: InitializingListener): Unsubscribe
 }
 
 export abstract class BaseWalletAdapter implements WalletAdapter {
@@ -27,6 +36,11 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
   private readonly listeners = new Set<AdapterListener>()
   private busy = false
   private readonly busyListeners = new Set<BusyListener>()
+  // Starts true so the first paint (before any adapter event) renders a
+  // loading state rather than pre-login. Cleared once via `markReady()` after
+  // the adapter has decided whether there is an existing session.
+  private initializing = true
+  private readonly initializingListeners = new Set<InitializingListener>()
 
   subscribe(listener: AdapterListener): Unsubscribe {
     this.listeners.add(listener)
@@ -65,6 +79,31 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
     this.busy = value
     for (const listener of this.busyListeners) {
       listener(value)
+    }
+  }
+
+  isInitializing(): boolean {
+    return this.initializing
+  }
+
+  subscribeInitializing(listener: InitializingListener): Unsubscribe {
+    this.initializingListeners.add(listener)
+    listener(this.initializing)
+    return () => {
+      this.initializingListeners.delete(listener)
+    }
+  }
+
+  /**
+   * Called by adapter bridges once they've observed the first definitive auth
+   * state (session present or not). Idempotent — only flips initializing→false
+   * once. Public so React-side bridges can call it without subclass plumbing.
+   */
+  markReady(): void {
+    if (!this.initializing) return
+    this.initializing = false
+    for (const listener of this.initializingListeners) {
+      listener(false)
     }
   }
 
