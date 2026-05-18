@@ -35,3 +35,16 @@ export function useAuthBusy(): boolean {
     () => false,
   )
 }
+
+/**
+ * True until every attached adapter has reported its first definitive auth
+ * state. Defaults to `true` on the server snapshot so the first paint renders
+ * a loading state instead of pre-login while Privy/wagmi restore a session.
+ */
+export function useAuthInitializing(): boolean {
+  return useSyncExternalStore<boolean>(
+    cb => orchestrator.subscribeInitializing(() => cb()),
+    () => orchestrator.isInitializing(),
+    () => true,
+  )
+}

@@ -1,13 +1,6 @@
 "use client";
 
-import { useEnsName, useEnsAvatar } from "wagmi";
-import { useAtomValue } from "jotai";
-import { useCallback } from "react";
-import { revokedAddressAtom, useAuth } from "../../hooks/auth";
-import { useCredential } from "../../hooks/credential";
-import { useAuthBusy, useSession } from "../../hooks/use-wallet-adapter";
-import { useCredentialReady } from "../../hooks/use-credential-ready";
-import { useAutoSignCredential } from "../../hooks/use-auto-sign-credential";
+import { useAuthFlow, type AuthFlowView } from "../../hooks/use-auth-flow";
 import RenownCard from "../ui/renown-card";
 import { ConfirmAuthorization } from "./confirm-authorization";
 import Credential from "./credential";
@@ -24,69 +17,15 @@ interface IProps {
 
 const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
 
-function buildRedirectUrl(args: {
-    address: string;
-    chainId: number;
-    deeplink?: string;
-    returnUrl?: string;
-}): string {
-    const { address, chainId, deeplink, returnUrl } = args;
-    const user = encodeURIComponent(`did:pkh:eip155:${chainId}:${address.toLowerCase()}`);
-    if (deeplink) return `${deeplink}://login/${user}`;
-    const url = new URL(returnUrl ?? "");
-    url.searchParams.set("user", user);
-    return url.toString();
-}
+const showsProfileCard = (kind: AuthFlowView["kind"]): boolean =>
+    kind === "needs-authorization" || kind === "authorized";
 
-export const WebFlow: React.FC<IProps> = ({
-    appId,
-    deeplink,
-    returnUrl = connectUrl,
-}) => {
-    const session = useSession();
-    const address = session?.address;
-    const chainId = session?.chainId ?? 1;
-    const autoSign = session?.autoSign ?? false;
-    const { data: ensName } = useEnsName({ address });
-    const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
-    const { hasCredential, loading, initializing, createCredential } = useCredential(appId, returnUrl);
-    const { userDocId, signOut } = useAuth(appId);
-    const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
-    const authBusy = useAuthBusy();
-    const revokedAddress = useAtomValue(revokedAddressAtom);
-    const justRevoked = !!address && revokedAddress === address;
-
-    const { autoFailedForCurrentAddress } = useAutoSignCredential({
-        address, autoSign, initializing, hasCredential, loading,
-        justRevoked, createCredential, ensName, ensAvatar,
+export const WebFlow: React.FC<IProps> = ({ appId, deeplink, returnUrl = connectUrl }) => {
+    const { view, title, subtitle, address, ensName, ensAvatar, userDocId, disconnect } = useAuthFlow({
+        appId,
+        returnUrl,
+        deeplink,
     });
-
-    const disconnect = useCallback(() => {
-        void signOut();
-    }, [signOut]);
-
-    // Show the loading body while:
-    //   - an adapter is provisioning a session (Privy authenticated → wallet pending), or
-    //   - we're auto-signing on behalf of a provider-managed wallet and haven't
-    //     either succeeded (hasCredential) or fallen back to manual (autoFailedFor).
-    // Wagmi (autoSign=false) never enters the auto-sign branch, so its flow is
-    // unchanged.
-    const isAutoSigning =
-        !!address && autoSign && !hasCredential && !autoFailedForCurrentAddress && !justRevoked;
-    const isAuthLoading = authBusy || isAutoSigning;
-    const showPreLogin = !address && !authBusy;
-    const title = isAuthLoading
-        ? "Signing you in"
-        : address
-            ? "Confirm Authorization"
-            : "Connect Wallet";
-    const appName = returnUrl ? new URL(returnUrl).hostname : "this app";
-    const subtitle = isAuthLoading
-        ? "Hang tight while we finish setting up your session."
-        : `Authorize ${appName} to sign actions on your behalf using your identity.`;
-    const redirectUrl = address && hasCredential
-        ? buildRedirectUrl({ address, chainId, deeplink, returnUrl })
-        : "";
 
     return (
         <div className="flex flex-col items-center">
@@ -97,7 +36,7 @@ export const WebFlow: React.FC<IProps> = ({
                         {subtitle}
                     </p>
 
-                    {address && !isAuthLoading && (
+                    {address && showsProfileCard(view.kind) && (
                         <ProfileCard
                             address={address}
                             ensName={ensName}
@@ -107,21 +46,43 @@ export const WebFlow: React.FC<IProps> = ({
                         />
                     )}
 
-                    {isAuthLoading ? (
-                        <LoadingBody />
-                    ) : showPreLogin ? (
-                        <PreLoginView appId={appId} returnUrl={returnUrl} />
-                    ) : !hasCredential ? (
-                        <ConfirmAuthorization appId={appId} returnUrl={returnUrl} ensName={ensName} ensAvatar={ensAvatar} />
-                    ) : (
-                        <Credential appId={appId} returnUrl={returnUrl} />
-                    )}
+                    <ViewBody view={view} appId={appId} returnUrl={returnUrl} />
 
-                    {address && hasCredential && !isAuthLoading && (
-                        <ReturnToAppButton url={redirectUrl} returnUrl={returnUrl} isReady={credentialReady} />
+                    {view.kind === "authorized" && (
+                        <ReturnToAppButton
+                            url={view.redirectUrl}
+                            returnUrl={returnUrl}
+                            isReady={view.credentialReady}
+                        />
                     )}
                 </div>
             </RenownCard>
         </div>
     );
 };
+
+interface ViewBodyProps {
+    view: AuthFlowView;
+    appId: string;
+    returnUrl?: string;
+}
+
+function ViewBody({ view, appId, returnUrl }: ViewBodyProps) {
+    switch (view.kind) {
+        case "loading":
+            return <LoadingBody />;
+        case "pre-login":
+            return <PreLoginView appId={appId} returnUrl={returnUrl} />;
+        case "needs-authorization":
+            return (
+                <ConfirmAuthorization
+                    appId={appId}
+                    returnUrl={returnUrl}
+                    ensName={view.ensName}
+                    ensAvatar={view.ensAvatar}
+                />
+            );
+        case "authorized":
+            return <Credential appId={appId} returnUrl={returnUrl} />;
+    }
+}

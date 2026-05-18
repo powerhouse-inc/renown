@@ -1,5 +1,5 @@
 import type { Hex } from 'viem'
-import type { BusyListener, WalletAdapter } from './adapter'
+import type { BusyListener, InitializingListener, WalletAdapter } from './adapter'
 import type { AdapterRegistry } from './registry'
 import type { FetchCredentialResponse, RenownApi } from './renown-api'
 import type { SignatureVerifier } from './signature-verifier'
@@ -23,6 +23,7 @@ export class AuthOrchestrator {
   private currentAdapter: WalletAdapter | null = null
   private readonly listeners = new Set<AdapterListener>()
   private readonly busyListeners = new Set<BusyListener>()
+  private readonly initializingListeners = new Set<InitializingListener>()
   private readonly adapterUnsubs = new Map<string, Unsubscribe[]>()
 
   constructor(
@@ -50,7 +51,10 @@ export class AuthOrchestrator {
     const busyUnsub = adapter.subscribeBusy(() => {
       this.emitBusy()
     })
-    this.adapterUnsubs.set(adapter.name, [sessionUnsub, busyUnsub])
+    const initUnsub = adapter.subscribeInitializing(() => {
+      this.emitInitializing()
+    })
+    this.adapterUnsubs.set(adapter.name, [sessionUnsub, busyUnsub, initUnsub])
   }
 
   detach(adapterName: string): void {
@@ -96,6 +100,26 @@ export class AuthOrchestrator {
     }
   }
 
+  /**
+   * True while any attached adapter is still probing for an existing session.
+   * The UI uses this to render a loading state on first paint instead of
+   * pre-login while Privy/wagmi restore.
+   */
+  isInitializing(): boolean {
+    for (const adapter of this.registry.list()) {
+      if (adapter.isInitializing()) return true
+    }
+    return false
+  }
+
+  subscribeInitializing(listener: InitializingListener): Unsubscribe {
+    this.initializingListeners.add(listener)
+    listener(this.isInitializing())
+    return () => {
+      this.initializingListeners.delete(listener)
+    }
+  }
+
   private emit(session: Session | null): void {
     for (const listener of this.listeners) {
       listener(session)
@@ -106,6 +130,13 @@ export class AuthOrchestrator {
     const busy = this.isBusy()
     for (const listener of this.busyListeners) {
       listener(busy)
+    }
+  }
+
+  private emitInitializing(): void {
+    const initializing = this.isInitializing()
+    for (const listener of this.initializingListeners) {
+      listener(initializing)
     }
   }
 
