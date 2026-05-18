@@ -2,10 +2,10 @@ import type { Hex } from 'viem'
 import type { BusyListener, InitializingListener, WalletAdapter } from './adapter'
 import type { AdapterRegistry } from './registry'
 import type { FetchCredentialResponse, RenownApi } from './renown-api'
-import type { SignatureVerifier } from './signature-verifier'
 import { buildAndSignEip712Vc } from './credentials'
 import type { AdapterListener, LoginMethod, LoginOptions, Session, Unsubscribe } from './types'
 
+/** Optional metadata sent with a newly issued delegation credential. */
 export interface IssueCredentialOptions {
   username?: string
   userImage?: string | null
@@ -14,11 +14,19 @@ export interface IssueCredentialOptions {
   expiresInDays?: number
 }
 
+/** Outcome of {@link AuthOrchestrator.issueDelegationVc}. */
 export interface IssueCredentialResult {
   credentialId: string
   userDocumentId?: string
 }
 
+/**
+ * Application-facing auth facade over one or more {@link WalletAdapter}s.
+ *
+ * Tracks which adapter owns the active session, fans out session/busy/
+ * initializing state to subscribers, and coordinates EIP-712 credential
+ * issuance and revocation via {@link RenownApi}.
+ */
 export class AuthOrchestrator {
   private currentAdapter: WalletAdapter | null = null
   private readonly listeners = new Set<AdapterListener>()
@@ -29,14 +37,16 @@ export class AuthOrchestrator {
   constructor(
     private readonly registry: AdapterRegistry,
     private readonly api: RenownApi,
-    private readonly verifier: SignatureVerifier,
   ) {
     for (const adapter of registry.list()) {
       this.attach(adapter)
     }
   }
 
-  /** Subscribe to an adapter so its session emissions propagate through the orchestrator. */
+  /**
+   * Wire an adapter's session, busy, and initializing streams into this orchestrator.
+   * Idempotent per `adapter.name`; called automatically for adapters in the registry at construction.
+   */
   attach(adapter: WalletAdapter): void {
     if (this.adapterUnsubs.has(adapter.name)) return
     const sessionUnsub = adapter.subscribe(session => {
@@ -57,6 +67,7 @@ export class AuthOrchestrator {
     this.adapterUnsubs.set(adapter.name, [sessionUnsub, busyUnsub, initUnsub])
   }
 
+  /** Unsubscribe all listeners for the named adapter and stop tracking its session. */
   detach(adapterName: string): void {
     const unsubs = this.adapterUnsubs.get(adapterName)
     if (unsubs) {
@@ -65,18 +76,22 @@ export class AuthOrchestrator {
     }
   }
 
+  /** Active session from the currently tracked adapter, or `null` if none is connected. */
   getSession(): Session | null {
     return this.currentAdapter?.getSession() ?? null
   }
 
+  /** Delegates to {@link AdapterRegistry.getSupportedMethods}. */
   getSupportedMethods(): LoginMethod[] {
     return this.registry.getSupportedMethods()
   }
 
+  /** Delegates to {@link AdapterRegistry.supportsMethod}. */
   supportsMethod(method: LoginMethod): boolean {
     return this.registry.supportsMethod(method)
   }
 
+  /** Subscribe to active-session changes; listener is invoked immediately with the current session. */
   subscribe(listener: AdapterListener): Unsubscribe {
     this.listeners.add(listener)
     listener(this.getSession())
@@ -85,6 +100,7 @@ export class AuthOrchestrator {
     }
   }
 
+  /** `true` if any registered adapter reports busy. */
   isBusy(): boolean {
     for (const adapter of this.registry.list()) {
       if (adapter.isBusy()) return true
@@ -92,6 +108,7 @@ export class AuthOrchestrator {
     return false
   }
 
+  /** Subscribe to aggregate busy state across all adapters. */
   subscribeBusy(listener: BusyListener): Unsubscribe {
     this.busyListeners.add(listener)
     listener(this.isBusy())
@@ -112,6 +129,7 @@ export class AuthOrchestrator {
     return false
   }
 
+  /** Subscribe to aggregate initializing state across all adapters; listener is invoked immediately with the current value. */
   subscribeInitializing(listener: InitializingListener): Unsubscribe {
     this.initializingListeners.add(listener)
     listener(this.isInitializing())
@@ -140,17 +158,23 @@ export class AuthOrchestrator {
     }
   }
 
+  /** Resolve the adapter for `opts.method` and run its login flow. */
   async signIn(opts: LoginOptions): Promise<Session> {
     const adapter = this.registry.resolveForMethod(opts.method)
     return adapter.login(opts)
   }
 
+  /** Log out of the adapter that owns the current session, if any. */
   async signOut(): Promise<void> {
     if (this.currentAdapter) {
       await this.currentAdapter.logout()
     }
   }
 
+  /**
+   * Build, sign, and persist an EIP-712 delegation VC for the active session.
+   * @throws If there is no active session.
+   */
   async issueDelegationVc(
     app: string,
     appId?: string,
@@ -186,6 +210,7 @@ export class AuthOrchestrator {
     }
   }
 
+  /** Load an existing credential for an address from the Renown API. */
   async fetchCredential(params: {
     address: Hex
     appId?: string
@@ -194,6 +219,7 @@ export class AuthOrchestrator {
     return this.api.fetchCredential(params)
   }
 
+  /** Revoke a credential on the Renown API (e.g. on logout). */
   async revokeCredential(credentialId: string, address: Hex, reason = 'User logged out'): Promise<void> {
     await this.api.deleteCredential({ credentialId, address, reason })
   }

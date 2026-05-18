@@ -1,6 +1,7 @@
 import type { Hex } from 'viem'
 import type { SignedVc } from './credentials'
 
+/** Request body for storing a signed delegation credential. */
 export interface PostCredentialBody {
   credential: SignedVc['credential']
   signature: Hex
@@ -11,31 +12,41 @@ export interface PostCredentialBody {
   docId?: string
 }
 
+/** Response from the credential store endpoint. */
 export interface PostCredentialResponse {
   credentialId?: string
   userDocumentId?: string
   [key: string]: unknown
 }
 
+/** Request body for revoking a credential. */
 export interface DeleteCredentialBody {
   credentialId: string
   address: Hex
   reason?: string
 }
 
+/** Credential payload returned by the auth credential lookup endpoint. */
 export interface FetchCredentialResponse {
   credential?: { id: string; [key: string]: unknown }
   userDocumentId?: string
   [key: string]: unknown
 }
 
+/**
+ * Thin HTTP client for Renown credential REST routes.
+ *
+ * Paths are relative to `baseUrl` (empty string uses same-origin `/api/...`).
+ */
 export class RenownApi {
+  /** @param baseUrl Origin prefix for API calls; defaults to same-origin. */
   constructor(private readonly baseUrl: string = '') {}
 
   private url(path: string): string {
     return `${this.baseUrl}${path}`
   }
 
+  /** `POST /api/credential/renown` — persist a signed VC. */
   async postCredential(body: PostCredentialBody): Promise<PostCredentialResponse> {
     const response = await fetch(this.url('/api/credential/renown'), {
       method: 'POST',
@@ -51,6 +62,7 @@ export class RenownApi {
     return response.json()
   }
 
+  /** `DELETE /api/credential/renown` — revoke a credential. */
   async deleteCredential(body: DeleteCredentialBody): Promise<void> {
     const response = await fetch(this.url('/api/credential/renown'), {
       method: 'DELETE',
@@ -64,6 +76,7 @@ export class RenownApi {
     }
   }
 
+  /** `GET /api/auth/credential` — fetch credential for an address; returns `null` on non-OK responses. */
   async fetchCredential(params: {
     address: Hex
     appId?: string

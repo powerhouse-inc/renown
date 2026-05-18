@@ -33,6 +33,7 @@ const ISSUER_TYPE = [
   { name: 'ethereumAddress', type: 'string' },
 ] as const
 
+/** EIP-712 type definitions for Renown delegation verifiable credentials. */
 export const CREDENTIAL_TYPES = {
   EIP712Domain: DOMAIN_TYPE,
   VerifiableCredential: VERIFIABLE_CREDENTIAL_EIP712_TYPE,
@@ -41,6 +42,7 @@ export const CREDENTIAL_TYPES = {
   Issuer: ISSUER_TYPE,
 } as const
 
+/** Inputs for constructing and signing a delegation VC. */
 export interface BuildAndSignVcParams {
   signer: Signer
   address: Hex
@@ -50,6 +52,7 @@ export interface BuildAndSignVcParams {
   expiresInDays?: number
 }
 
+/** Credential payload, EIP-712 domain, and signature ready for {@link RenownApi.postCredential}. */
 export interface SignedVc {
   credential: {
     '@context': string[]
@@ -65,6 +68,7 @@ export interface SignedVc {
   domain: { version: string; chainId: number }
 }
 
+/** Assemble a Renown delegation VC and sign it with the session signer. */
 export async function buildAndSignEip712Vc(params: BuildAndSignVcParams): Promise<SignedVc> {
   const { signer, address, chainId, app, appId, expiresInDays = 7 } = params
 
