@@ -1,3 +1,17 @@
+## 1.10.0 (2026-05-19)
+
+* feat(auth): add loading and pre-login components for improved user experience during authentication ([5e5ab68](https://github.com/powerhouse-inc/renown/commit/5e5ab68))
+* feat(auth): add Privy authentication provider and integrate with wallet adapter ([a270357](https://github.com/powerhouse-inc/renown/commit/a270357))
+* feat(auth): enhance Privy authentication flow with provisioning state and loading indicators ([2d2b709](https://github.com/powerhouse-inc/renown/commit/2d2b709))
+* feat(auth): implement console flow components for enhanced CLI authorization experience ([9abb19f](https://github.com/powerhouse-inc/renown/commit/9abb19f))
+* feat(auth): implement last used login method tracking in login buttons ([1614d4f](https://github.com/powerhouse-inc/renown/commit/1614d4f))
+* feat(auth): improve auto-sign functionality and manage revoked addresses in web flow ([0df2870](https://github.com/powerhouse-inc/renown/commit/0df2870))
+* feat(auth): introduce useAuthFlow hook for streamlined authorization state management and UI renderi ([09c5761](https://github.com/powerhouse-inc/renown/commit/09c5761))
+* feat(auth): update authorization messages for clarity in console and web flows ([fcd2433](https://github.com/powerhouse-inc/renown/commit/fcd2433))
+* feat(styles): add cursor pointer for links and buttons to enhance user interaction ([c248ea4](https://github.com/powerhouse-inc/renown/commit/c248ea4))
+* feat(wallet): enhance wallet adapter and orchestrator with session management and state subscription ([38085d0](https://github.com/powerhouse-inc/renown/commit/38085d0))
+* fix(auth): update loading messages for authorization and revocation actions ([db335de](https://github.com/powerhouse-inc/renown/commit/db335de))
+
 ## <small>1.9.2 (2026-05-13)</small>
 
 * fix: profile page on Vercel environment ([1cccc67](https://github.com/powerhouse-inc/renown/commit/1cccc67))
