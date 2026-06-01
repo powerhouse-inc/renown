@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useVerifyToken } from "../../hooks/useVerifyToken";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import AppCard from "../ui/app-card";
+import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface CredentialDetails {
     documentId: string;
@@ -38,6 +39,7 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
+    const { track } = useAnalytics();
 
     const { data: credentialDetails, isFetching: loadingDetails } = useQuery<CredentialDetails | null>({
         queryKey: ['credentialDetails', address, appId],
@@ -76,7 +78,12 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                         <button
                             className={`text-accent underline underline-offset-4 text-sm ${isVerifying && "animate-pulse pointer-events-none"}`}
                             disabled={isVerifying || !credential || !address}
-                            onClick={async () => { if (credential && address) await verifyToken(credential, address); }}
+                            onClick={async () => {
+                                if (credential && address) {
+                                    const result = await verifyToken(credential, address);
+                                    track(ANALYTICS_EVENTS.credentialVerified, { appId, valid: result.valid });
+                                }
+                            }}
                         >
                             {isVerifying ? 'Verifying...' : 'Verify'}
                         </button>
@@ -85,7 +92,10 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                             disabled={revoking || !credential}
                             onClick={async () => {
                                 setRevoking(true);
-                                try { await revokeCredential(); }
+                                try {
+                                    await revokeCredential();
+                                    track(ANALYTICS_EVENTS.credentialRevoked, { appId });
+                                }
                                 catch (error) { console.error('Failed to revoke credential:', error); }
                                 finally { setRevoking(false); }
                             }}

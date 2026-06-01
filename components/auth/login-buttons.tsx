@@ -13,6 +13,7 @@ import {
     useLastLoginMethod,
 } from "../../hooks/use-last-login-method";
 import { LoginCancelledError, LoginMethod } from "../../services/wallet/types";
+import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 // Brand-colored icons (logos collection) + a few from simple-icons where logos
 // doesn't carry the current brand mark (e.g. X uses a monochrome black mark).
@@ -94,6 +95,7 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
     const orchestrator = useOrchestrator();
     const supported = useSupportedLoginMethods();
     const lastLoginMethod = useLastLoginMethod();
+    const { track } = useAnalytics();
     const [pending, setPending] = useState<LoginMethod | null>(null);
 
     const walletEnabled = supported.includes(LoginMethod.WALLET);
@@ -103,6 +105,7 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
 
     const handle = async (method: LoginMethod) => {
         setPending(method);
+        track(ANALYTICS_EVENTS.loginMethodSelected, { method });
         // Set optimistically: OAuth flows trigger a full-page redirect, so
         // anything we'd write *after* signIn never runs. Reverted below on
         // failure so cancelled flows don't get stickered as "last used".
@@ -113,9 +116,13 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
         } catch (e) {
             if (previous !== null) setLastLoginMethod(previous);
             else clearLastLoginMethod();
-            if (e instanceof LoginCancelledError) return;
+            if (e instanceof LoginCancelledError) {
+                track(ANALYTICS_EVENTS.loginCancelled, { method });
+                return;
+            }
             const error = e instanceof Error ? e : new Error(String(e));
             console.error(`Login (${method}) failed:`, error);
+            track(ANALYTICS_EVENTS.loginFailed, { method });
             onError?.(error);
         } finally {
             setPending(null);

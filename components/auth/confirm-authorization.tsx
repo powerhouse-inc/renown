@@ -3,6 +3,7 @@ import { useCredential } from "../../hooks/credential";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import { useCallback } from "react";
 import AppCard from "../ui/app-card";
+import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface IProps {
     appId: string;
@@ -14,13 +15,15 @@ interface IProps {
 export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensName, ensAvatar }) => {
     const session = useSession();
     const { createCredential, loading } = useCredential(appId, returnUrl);
+    const { track } = useAnalytics();
 
     const handleCreateCredential = useCallback(() => {
+        track(ANALYTICS_EVENTS.authorizationConfirm, { appId });
         return createCredential({
             ensName: ensName ?? null,
             ensAvatar: ensAvatar ?? null,
         });
-    }, [createCredential, ensName, ensAvatar]);
+    }, [createCredential, ensName, ensAvatar, track, appId]);
 
     if (!session) return null;
 

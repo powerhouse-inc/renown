@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Renown } from '@powerhousedao/reactor-browser/renown'
 import { AuthRootProvider } from '../services/wallet'
+import { Analytics } from '../components/analytics/analytics'
 import '@rainbow-me/rainbowkit/styles.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -26,6 +27,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                 console.error(error)
               }}
             />
+            <Analytics />
             <Component {...pageProps} />
           </AuthRootProvider>
         </QueryClientProvider>

@@ -5,6 +5,7 @@ import { revokedAddressAtom, useAuth } from "./auth";
 import { useCredential } from "./credential";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
 import { useAutoSignCredential } from "./use-auto-sign-credential";
+import { useAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
 
 /**
  * Tagged union of the paint states the console authorization flow can be in.
@@ -55,6 +56,7 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
     } = useCredential(connectDid ?? "");
     const { userDocId, did, signOut } = useAuth(connectDid);
 
+    const { track } = useAnalytics();
     const authBusy = useAuthBusy();
     const authInitializing = useAuthInitializing();
     const revokedAddress = useAtomValue(revokedAddressAtom);
@@ -127,9 +129,11 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
                 if (cancelled) return;
 
                 if (response.ok) {
+                    track(ANALYTICS_EVENTS.consoleCompleted, { connectDid });
                     setCompletionRecord({ key: completionKey, completed: true, error: null });
                 } else {
                     const data = await response.json().catch(() => ({}));
+                    track(ANALYTICS_EVENTS.consoleFailed, { connectDid });
                     setCompletionRecord({
                         key: completionKey,
                         completed: false,
@@ -139,6 +143,7 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
             } catch (e) {
                 if (cancelled) return;
                 console.error("Failed to complete console session:", e);
+                track(ANALYTICS_EVENTS.consoleFailed, { connectDid });
                 setCompletionRecord({
                     key: completionKey,
                     completed: false,
@@ -162,11 +167,13 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
         completionKey,
         sessionCompleted,
         completionError,
+        track,
     ]);
 
     const disconnect = useCallback(() => {
+        track(ANALYTICS_EVENTS.signOut, { flow: "console" });
         void signOut();
-    }, [signOut]);
+    }, [signOut, track]);
 
     const view = useMemo<ConsoleAuthFlowView>(() => {
         if (!connectDid) return { kind: "invalid-link" };

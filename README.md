@@ -30,6 +30,63 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
 
+Copy `.env.example` to `.env.local` and fill in the values for the features you need (wallet
+connect, Privy, analytics, etc.).
+
+## Analytics
+
+Renown uses [OpenPanel](https://openpanel.dev) (`@openpanel/nextjs`) for product analytics. The
+integration is **env-gated and a complete no-op when unconfigured** — if
+`NEXT_PUBLIC_OPENPANEL_CLIENT_ID` is empty the SDK script is never loaded and no events are sent.
+
+### Configuration
+
+Add to `.env.local`:
+
+```sh
+NEXT_PUBLIC_OPENPANEL_CLIENT_ID=""   # enables analytics when set
+NEXT_PUBLIC_OPENPANEL_API_URL=""     # optional; blank = OpenPanel cloud
+```
+
+When enabled, OpenPanel automatically tracks pageviews and outgoing-link clicks. A user is
+identified by their wallet address on connect and cleared on disconnect. Every event carries an
+`app: renown` global property so Renown's data is distinguishable from sibling Powerhouse products
+in the shared dashboard.
+
+### Architecture
+
+The integration lives in two places:
+
+- `services/analytics/` — the abstraction layer. `events.ts` is the **single source of truth for
+  event names** (`ANALYTICS_EVENTS`), and `use-analytics.ts` exposes a fail-safe `useAnalytics()`
+  hook (`{ track, identify, clear }`) that wraps OpenPanel. Every SDK call is wrapped in try/catch:
+  analytics must never break the app.
+- `components/analytics/` — `analytics.tsx` mounts `<OpenPanelComponent>` (gated on the client ID)
+  and `analytics-identity.tsx` drives identify/clear from the wallet session. Mounted once in
+  `pages/_app.tsx`.
+
+### Contract for contributors
+
+- Call sites use `useAnalytics()` from `services/analytics` — **never import the SDK directly.**
+- Add any new event name to `ANALYTICS_EVENTS` in `services/analytics/events.ts`; don't pass raw
+  strings to `track()`.
+- Keep payloads small and free of secrets — never send JWTs/credentials.
+
+### Tracked events
+
+| Event | When |
+|---|---|
+| `login.method.selected` | A login method button is clicked (`{ method }`) |
+| `login.cancelled` | User dismisses the login flow |
+| `login.failed` | Login throws a non-cancellation error |
+| `authorization.confirm.clicked` | "Confirm Authorization" / "Authorize CLI" clicked |
+| `credential.revoked` | A credential is successfully revoked |
+| `credential.verified` | A credential is verified (`{ valid }`) |
+| `console.authorization.completed` | CLI session handshake (`PUT`) succeeds |
+| `console.authorization.failed` | CLI session handshake fails |
+| `app.return.clicked` | "Return to app" button clicked |
+| `auth.sign.out` | User disconnects |
+
 ## Learn More
 
 To learn more about this stack, take a look at the following resources:

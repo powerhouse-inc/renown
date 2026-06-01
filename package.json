@@ -22,6 +22,7 @@
     "@iconify-icons/lucide": "^1.2.135",
     "@iconify-icons/simple-icons": "^1.2.74",
     "@iconify/react": "^6.0.2",
+    "@openpanel/nextjs": "^1.5.1",
     "@powerhousedao/reactor-browser": "6.0.2-staging.8",
     "@privy-io/react-auth": "^3.25.0",
     "@rainbow-me/rainbowkit": "^2.2.11",

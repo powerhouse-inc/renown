@@ -1,6 +1,7 @@
 import Image from "next/image";
 import IconConnectWhite from "../../assets/icons/connect-white.svg";
 import Button from "../ui/button";
+import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface ReturnToAppButtonProps {
     url: string;
@@ -9,6 +10,8 @@ interface ReturnToAppButtonProps {
 }
 
 export function ReturnToAppButton({ url, returnUrl, isReady }: ReturnToAppButtonProps) {
+    const { track } = useAnalytics();
+
     if (!isReady) {
         return (
             <div className="text-center block w-full mt-12">
@@ -22,7 +25,11 @@ export function ReturnToAppButton({ url, returnUrl, isReady }: ReturnToAppButton
     }
 
     return (
-        <a href={url} className="text-center block w-full mt-12">
+        <a
+            href={url}
+            className="text-center block w-full mt-12"
+            onClick={() => track(ANALYTICS_EVENTS.returnToApp, { returnUrl })}
+        >
             <Button primary className="w-full">
                 <div className="flex items-center justify-center gap-2">
                     <Image src={IconConnectWhite} alt="Connect" />
