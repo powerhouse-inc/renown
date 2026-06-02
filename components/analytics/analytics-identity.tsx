@@ -19,7 +19,7 @@ import {
  * properties. No credentials/JWTs are ever forwarded.
  *
  * The transition also writes/clears the `op_profile` cookie that seeds the
- * next load's first pageview (see profile-hint.ts) — same pattern as Vetra.
+ * next load's first pageview (see profile-hint.ts).
  */
 export function AnalyticsIdentity() {
   const session = useSession()

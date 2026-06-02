@@ -14,7 +14,7 @@ import { AnalyticsIdentity } from './analytics-identity'
  *
  * `initialProfileId` is the wallet from the `op_profile` cookie (read in
  * `_app.getInitialProps`); it seeds OpenPanel so a returning user's first
- * pageview is attributed instead of anonymous — same pattern as Vetra.
+ * pageview is attributed instead of anonymous.
  */
 export function Analytics({
   initialProfileId,

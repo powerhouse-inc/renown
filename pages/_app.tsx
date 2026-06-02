@@ -45,18 +45,15 @@ function MyApp({ Component, pageProps, initialProfileId }: MyAppProps) {
 
 /**
  * Reads the `op_profile` cookie so `<Analytics />` can seed OpenPanel with the
- * returning user's wallet before the session restores — the Pages Router
- * equivalent of Vetra's server-layout `cookies()` read.
+ * returning user's wallet before the session restores.
  *
- * Note: defining `getInitialProps` on `_app` opts the app out of Automatic
- * Static Optimization. Renown is served by a Node server (Docker), so every
- * page is SSR'd anyway and the trade-off is acceptable.
+ * Note: `getInitialProps` on `_app` opts the app out of Automatic Static
+ * Optimization — acceptable since Renown is served by a Node server.
  */
 MyApp.getInitialProps = async (appContext: AppContext) => {
   const appProps = await App.getInitialProps(appContext)
 
-  // Server render: raw Cookie header. Client-side transition: document.cookie
-  // (keeps the prop stable so the already-executed init script isn't churned).
+  // Raw Cookie header on the server; document.cookie on client transitions.
   const cookieHeader =
     appContext.ctx.req?.headers.cookie ??
     (typeof document !== 'undefined' ? document.cookie : undefined)

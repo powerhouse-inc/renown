@@ -1,10 +1,6 @@
 // Wallet (public address) persisted on login so `_app.getInitialProps` can
 // seed `<OpenPanelComponent profileId>` and attribute a returning user's
-// first pageview instead of leaving it anonymous. A cookie (not localStorage)
-// so it's readable at SSR time.
-//
-// Ported from Vetra (`modules/shared/analytics/profile-hint.ts`) — the same
-// cookie name and semantics keep the apps aligned.
+// first pageview. A cookie (not localStorage) so it's readable at SSR time.
 export const OP_PROFILE_COOKIE = 'op_profile'
 
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 365
