@@ -2,7 +2,11 @@
 
 import { useEffect, useRef } from 'react'
 import { useSession } from '../../hooks/use-wallet-adapter'
-import { useAnalytics } from '../../services/analytics'
+import {
+  clearProfileHint,
+  useOpenPanelAnalytics,
+  writeProfileHint,
+} from '../../services/analytics'
 
 /**
  * Drives OpenPanel user identity from the active wallet session.
@@ -13,10 +17,13 @@ import { useAnalytics } from '../../services/analytics'
  *
  * The wallet address is the stable profile ID; chain context travels as
  * properties. No credentials/JWTs are ever forwarded.
+ *
+ * The transition also writes/clears the `op_profile` cookie that seeds the
+ * next load's first pageview (see profile-hint.ts) — same pattern as Vetra.
  */
 export function AnalyticsIdentity() {
   const session = useSession()
-  const { identify, clear } = useAnalytics()
+  const { identify, clear } = useOpenPanelAnalytics()
   const prevAddressRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -34,8 +41,18 @@ export function AnalyticsIdentity() {
           accountType: session.accountType,
         },
       })
+      try {
+        writeProfileHint(address)
+      } catch (e) {
+        console.warn('[analytics] failed to write profile hint', e)
+      }
     } else {
       clear()
+      try {
+        clearProfileHint()
+      } catch (e) {
+        console.warn('[analytics] failed to clear profile hint', e)
+      }
     }
   }, [session, identify, clear])
 

@@ -26,7 +26,7 @@ export interface Analytics {
  * never break the app. When the client ID is unset the SDK's `window.op` proxy
  * simply queues calls that are never flushed, so this remains safe to call.
  */
-export function useAnalytics(): Analytics {
+export function useOpenPanelAnalytics(): Analytics {
   const op = useOpenPanel()
 
   const track = useCallback<Analytics['track']>(

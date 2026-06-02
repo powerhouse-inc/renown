@@ -3,7 +3,7 @@ import Button from "../ui/button";
 import { useCredential } from "../../hooks/credential";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import { CliCard } from "./cli-card";
-import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface ConsoleConfirmAuthorizationProps {
     sessionId: string;
@@ -20,7 +20,7 @@ export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationPr
 }) => {
     const session = useSession();
     const { createCredential, loading } = useCredential(connectDid);
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
 
     const handleCreateCredential = useCallback(() => {
         track(ANALYTICS_EVENTS.authorizationConfirm, { appId: connectDid, flow: "console" });

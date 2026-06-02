@@ -6,7 +6,7 @@ import { useCredential } from "./credential";
 import { useCredentialReady } from "./use-credential-ready";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
 import { useAutoSignCredential } from "./use-auto-sign-credential";
-import { useAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
 
 /**
  * Tagged union of the four paint states the web authorization flow can be in.
@@ -64,7 +64,7 @@ export function useAuthFlow({ appId, returnUrl, deeplink }: UseAuthFlowArgs): Au
     const { hasCredential, loading: credentialLoading, initializing: credentialInitializing, createCredential } =
         useCredential(appId, returnUrl);
     const { userDocId, signOut } = useAuth(appId);
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);
 
     const authBusy = useAuthBusy();

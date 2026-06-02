@@ -5,7 +5,7 @@ import { revokedAddressAtom, useAuth } from "./auth";
 import { useCredential } from "./credential";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
 import { useAutoSignCredential } from "./use-auto-sign-credential";
-import { useAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
 
 /**
  * Tagged union of the paint states the console authorization flow can be in.
@@ -56,7 +56,7 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
     } = useCredential(connectDid ?? "");
     const { userDocId, did, signOut } = useAuth(connectDid);
 
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
     const authBusy = useAuthBusy();
     const authInitializing = useAuthInitializing();
     const revokedAddress = useAtomValue(revokedAddressAtom);

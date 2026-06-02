@@ -3,7 +3,7 @@ import { useCredential } from "../../hooks/credential";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import { useCallback } from "react";
 import AppCard from "../ui/app-card";
-import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface IProps {
     appId: string;
@@ -15,7 +15,7 @@ interface IProps {
 export const ConfirmAuthorization: React.FC<IProps> = ({ appId, returnUrl, ensName, ensAvatar }) => {
     const session = useSession();
     const { createCredential, loading } = useCredential(appId, returnUrl);
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
 
     const handleCreateCredential = useCallback(() => {
         track(ANALYTICS_EVENTS.authorizationConfirm, { appId });

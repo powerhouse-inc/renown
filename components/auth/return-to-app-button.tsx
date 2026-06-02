@@ -1,7 +1,7 @@
 import Image from "next/image";
 import IconConnectWhite from "../../assets/icons/connect-white.svg";
 import Button from "../ui/button";
-import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface ReturnToAppButtonProps {
     url: string;
@@ -10,7 +10,7 @@ interface ReturnToAppButtonProps {
 }
 
 export function ReturnToAppButton({ url, returnUrl, isReady }: ReturnToAppButtonProps) {
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
 
     if (!isReady) {
         return (

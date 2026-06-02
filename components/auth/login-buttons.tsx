@@ -13,7 +13,7 @@ import {
     useLastLoginMethod,
 } from "../../hooks/use-last-login-method";
 import { LoginCancelledError, LoginMethod } from "../../services/wallet/types";
-import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 // Brand-colored icons (logos collection) + a few from simple-icons where logos
 // doesn't carry the current brand mark (e.g. X uses a monochrome black mark).
@@ -95,7 +95,7 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
     const orchestrator = useOrchestrator();
     const supported = useSupportedLoginMethods();
     const lastLoginMethod = useLastLoginMethod();
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
     const [pending, setPending] = useState<LoginMethod | null>(null);
 
     const walletEnabled = supported.includes(LoginMethod.WALLET);

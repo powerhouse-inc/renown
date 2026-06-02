@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useVerifyToken } from "../../hooks/useVerifyToken";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import AppCard from "../ui/app-card";
-import { useAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
 
 interface CredentialDetails {
     documentId: string;
@@ -39,7 +39,7 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
-    const { track } = useAnalytics();
+    const { track } = useOpenPanelAnalytics();
 
     const { data: credentialDetails, isFetching: loadingDetails } = useQuery<CredentialDetails | null>({
         queryKey: ['credentialDetails', address, appId],
