@@ -8,6 +8,7 @@ export interface AnalyticsIdentity {
   firstName?: string
   lastName?: string
   email?: string
+  avatar?: string
   properties?: Record<string, unknown>
 }
 

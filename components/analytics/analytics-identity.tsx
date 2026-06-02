@@ -36,6 +36,8 @@ export function AnalyticsIdentity() {
         profileId: address,
         properties: {
           address,
+          did: `did:pkh:${session.caip2}:${address}`,
+          networkId: session.caip2.split(':')[0],
           chainId: session.chainId,
           caip2: session.caip2,
           accountType: session.accountType,
