@@ -1,7 +1,15 @@
-allowBuilds:
-  '@reown/appkit': true
-  bufferutil: true
-  keccak: true
-  sharp: true
-  unrs-resolver: true
-  utf-8-validate: true
+# pnpm requires a `packages` field whenever this file exists. This is a
+# single-package repo, so the root is the only member.
+packages:
+  - '.'
+# Replaces the invalid `allowBuilds` key (which made `pnpm install` fail with
+# "packages field missing or empty" on pnpm 9/10/11, breaking CI + Vercel).
+# `onlyBuiltDependencies` is the pnpm@10 way to approve dependency build
+# scripts — these are transitive native modules that need to compile.
+onlyBuiltDependencies:
+  - '@reown/appkit'
+  - bufferutil
+  - keccak
+  - sharp
+  - unrs-resolver
+  - utf-8-validate
