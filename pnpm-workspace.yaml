@@ -13,3 +13,6 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - utf-8-validate
+overrides:
+  '@types/react': 19.2.14
+  '@faker-js/faker': 8.4.1
