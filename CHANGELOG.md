@@ -1,3 +1,7 @@
+## <small>1.10.2 (2026-06-03)</small>
+
+* fix: pin @faker-js/faker to 8.4.1 (CJS) to stop Vercel runtime crash ([8de4e74](https://github.com/powerhouse-inc/renown/commit/8de4e74))
+
 ## <small>1.10.1 (2026-06-03)</small>
 
 * fix: declare packageManager pnpm@10.1.0 (fix Vercel build) ([a2d5870](https://github.com/powerhouse-inc/renown/commit/a2d5870))
