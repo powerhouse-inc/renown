@@ -98,3 +98,5 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             TAG=${{ steps.get_version.outputs.version || github.ref_name }}
+            NEXT_PUBLIC_OPENPANEL_CLIENT_ID=7496b8b9-281d-40c7-af8e-541aaa228af8
+            NEXT_PUBLIC_OPENPANEL_API_URL=https://openpanel.monitoring.vetra.io/api
