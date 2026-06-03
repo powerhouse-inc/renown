@@ -1,3 +1,15 @@
+## <small>1.10.1 (2026-06-03)</small>
+
+* fix: declare packageManager pnpm@10.1.0 (fix Vercel build) ([a2d5870](https://github.com/powerhouse-inc/renown/commit/a2d5870))
+* fix: move pnpm overrides into pnpm-workspace.yaml ([d94654b](https://github.com/powerhouse-inc/renown/commit/d94654b))
+* fix: update dockerfile to include NEXT_PUBLIC vars ([5e7e7b5](https://github.com/powerhouse-inc/renown/commit/5e7e7b5))
+* fix: valid pnpm-workspace.yaml (unblock CI + Vercel builds) ([1093180](https://github.com/powerhouse-inc/renown/commit/1093180))
+* ci: pass OpenPanel NEXT_PUBLIC build-args to the image build ([8a910df](https://github.com/powerhouse-inc/renown/commit/8a910df))
+* chore: attaching all the data we have in indent ([15c5119](https://github.com/powerhouse-inc/renown/commit/15c5119))
+* chore: slimming comments ([0dee3b9](https://github.com/powerhouse-inc/renown/commit/0dee3b9))
+* refactor: renaming a few things to line up with other projects, also steal the initial page landing  ([6c51671](https://github.com/powerhouse-inc/renown/commit/6c51671))
+* initial openpanel implementation ([94a2f04](https://github.com/powerhouse-inc/renown/commit/94a2f04))
+
 ## 1.10.0 (2026-05-19)
 
 * feat(auth): add loading and pre-login components for improved user experience during authentication ([5e5ab68](https://github.com/powerhouse-inc/renown/commit/5e5ab68))
