@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
 import { GraphQLClient } from 'graphql-request'
 import { revokeCredential } from '../../../services/renown-credential'
+import { CREDENTIAL_TYPES } from '../../../services/wallet'
 import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
 
 const SWITCHBOARD_ENDPOINT =
@@ -137,11 +138,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return prev.issuanceDate > curr.issuanceDate ? prev : curr
       })
 
-      // Parse EIP-712 domain from JSON string
+      // Parse EIP-712 domain from JSON string. The processor stores the
+      // domain object itself (e.g. {"version":"1","chainId":1}), but also
+      // accept a legacy wrapper shape ({domain, types}) just in case.
       let eip712Domain
       try {
-        eip712Domain = JSON.parse(credential.proofEip712Domain)
+        const parsed = JSON.parse(credential.proofEip712Domain)
+        eip712Domain = parsed?.domain ?? parsed
       } catch {
+        eip712Domain = null
+      }
+      if (eip712Domain && typeof eip712Domain.chainId !== 'number') {
         eip712Domain = null
       }
 
@@ -207,8 +214,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             proofValue: credential.proofValue,
             eip712: eip712Domain
               ? {
-                  domain: eip712Domain.domain,
-                  types: eip712Domain.types,
+                  domain: eip712Domain,
+                  types: CREDENTIAL_TYPES,
                   primaryType: credential.proofEip712PrimaryType as 'VerifiableCredential',
                 }
               : undefined,
