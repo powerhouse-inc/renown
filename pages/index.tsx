@@ -14,8 +14,10 @@ const Home: NextPage = () => {
     const returnUrl = router.query["returnUrl"]?.toString();
     const isClient = useIsClient();
 
+    const inAuthFlow = Boolean(appId) && isClient;
+
     return (
-        <PageBackground>
+        <PageBackground hideLoginButton={inAuthFlow}>
             <div className={styles.container}>
                 <Head>
                     <title>Renown</title>
