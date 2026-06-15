@@ -8,9 +8,17 @@ import RenownLoginButton from "../auth/renown-login-button";
 
 interface PageBackgroundProps {
   children: React.ReactNode;
+  /**
+   * Hide the top-right login button. Used during auth/confirm flows where the
+   * user should act on the card instead of the topbar login.
+   */
+  hideLoginButton?: boolean;
 }
 
-const PageBackground: React.FC<PageBackgroundProps> = ({ children }) => {
+const PageBackground: React.FC<PageBackgroundProps> = ({
+  children,
+  hideLoginButton = false,
+}) => {
   return (
     <div className="relative overflow-hidden min-h-screen">
       {/* Dark mode background images */}
@@ -41,7 +49,7 @@ const PageBackground: React.FC<PageBackgroundProps> = ({ children }) => {
         <RenownLogo aria-label="Renown" className="text-foreground" />
       </div>
       <div className="absolute right-8 top-3 z-10 flex items-center gap-3">
-        <RenownLoginButton />
+        {!hideLoginButton && <RenownLoginButton />}
         <ThemeToggle />
       </div>
 

@@ -13,7 +13,7 @@ const ConsolePage: NextPage = () => {
     const isClient = useIsClient();
 
     return (
-        <PageBackground>
+        <PageBackground hideLoginButton={Boolean(sessionId) && isClient}>
             <div className={styles.container}>
                 <Head>
                     <title>Renown - Console Login</title>
