@@ -1,3 +1,7 @@
+## <small>1.10.3 (2026-06-15)</small>
+
+* fix: return stored eip712 domain directly in credential api response ([f6f1385](https://github.com/powerhouse-inc/renown/commit/f6f1385))
+
 ## <small>1.10.2 (2026-06-03)</small>
 
 * fix: pin @faker-js/faker to 8.4.1 (CJS) to stop Vercel runtime crash ([8de4e74](https://github.com/powerhouse-inc/renown/commit/8de4e74))
