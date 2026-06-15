@@ -1,3 +1,7 @@
+## 1.11.0 (2026-06-15)
+
+* feat: hide topbar login button during auth confirm flows ([8a44f62](https://github.com/powerhouse-inc/renown/commit/8a44f62))
+
 ## <small>1.10.3 (2026-06-15)</small>
 
 * fix: return stored eip712 domain directly in credential api response ([f6f1385](https://github.com/powerhouse-inc/renown/commit/f6f1385))
