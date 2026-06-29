@@ -1,3 +1,7 @@
+## 1.12.0 (2026-06-29)
+
+* feat: update RenownLogo component for Vetra variant (#2783) ([0529263](https://github.com/powerhouse-inc/renown/commit/0529263)), closes [#2783](https://github.com/powerhouse-inc/renown/issues/2783)
+
 ## 1.11.0 (2026-06-15)
 
 * feat: hide topbar login button during auth confirm flows ([8a44f62](https://github.com/powerhouse-inc/renown/commit/8a44f62))
