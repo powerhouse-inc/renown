@@ -1,3 +1,8 @@
+## <small>1.12.1 (2026-07-02)</small>
+
+* fix(api): preserve graceful degradation while keeping perf ([5abc58c](https://github.com/powerhouse-inc/renown/commit/5abc58c))
+* perf(api): cut GraphQL round-trips in login routes ([0a51c42](https://github.com/powerhouse-inc/renown/commit/0a51c42))
+
 ## 1.12.0 (2026-06-29)
 
 * feat: update RenownLogo component for Vetra variant (#2783) ([0529263](https://github.com/powerhouse-inc/renown/commit/0529263)), closes [#2783](https://github.com/powerhouse-inc/renown/issues/2783)
