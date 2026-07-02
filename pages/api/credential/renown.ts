@@ -87,7 +87,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const userDriveId = `renown-${ethAddress.toLowerCase()}`
 
-      if (!finalDocId) {
+      // Resolve the user's profile doc (find-or-create + refresh fields) in
+      // parallel with storing the credential — they touch independent documents.
+      const resolveUserDocId = async (): Promise<string | undefined> => {
+        if (finalDocId) return finalDocId
+
         console.log('Setting up user drive for ethAddress:', ethAddress)
 
         // Try to find existing RenownUser document
@@ -110,8 +114,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         })
 
         if (profileData.renownUsers.length > 0) {
-          finalDocId = profileData.renownUsers[0].documentId
-          console.log('Found existing RenownUser document:', finalDocId)
+          const existingId = profileData.renownUsers[0].documentId
+          console.log('Found existing RenownUser document:', existingId)
 
           // Refresh username/userImage on the existing document
           const updateActions: ReturnType<typeof makeAction>[] = []
@@ -131,67 +135,69 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                   }
                 }
               `, {
-                documentIdentifier: finalDocId,
+                documentIdentifier: existingId,
                 actions: updateActions,
               })
             } catch (e) {
               console.error('Failed to update user fields:', e)
             }
           }
-        } else {
-          // Create RenownUser document
-          console.log('Creating RenownUser document')
-          const createResult = await client.request<{
-            createEmptyDocument: { id: string }
-          }>(`
-            mutation CreateEmptyDocument($documentType: String!) {
-              createEmptyDocument(documentType: $documentType) {
-                id
-              }
-            }
-          `, {
-            documentType: 'powerhouse/renown-user',
-          })
-
-          finalDocId = createResult.createEmptyDocument.id
-          console.log('Created new RenownUser document:', finalDocId)
-
-          // Set eth address, username, and userImage in a single mutateDocument call
-          const actions = [
-            makeAction('SET_ETH_ADDRESS', { ethAddress }),
-          ]
-
-          if (username) {
-            actions.push(makeAction('SET_USERNAME', { username }))
-          }
-
-          if (userImage) {
-            actions.push(makeAction('SET_USER_IMAGE', { userImage }))
-          }
-
-          await client.request(`
-            mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-              mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-                id
-              }
-            }
-          `, {
-            documentIdentifier: finalDocId,
-            actions,
-          })
-
-          console.log('Set user fields on document')
+          return existingId
         }
+
+        // Create RenownUser document
+        console.log('Creating RenownUser document')
+        const createResult = await client.request<{
+          createEmptyDocument: { id: string }
+        }>(`
+          mutation CreateEmptyDocument($documentType: String!) {
+            createEmptyDocument(documentType: $documentType) {
+              id
+            }
+          }
+        `, {
+          documentType: 'powerhouse/renown-user',
+        })
+
+        const newId = createResult.createEmptyDocument.id
+        console.log('Created new RenownUser document:', newId)
+
+        // Set eth address, username, and userImage in a single mutateDocument call
+        const actions = [makeAction('SET_ETH_ADDRESS', { ethAddress })]
+        if (username) {
+          actions.push(makeAction('SET_USERNAME', { username }))
+        }
+        if (userImage) {
+          actions.push(makeAction('SET_USER_IMAGE', { userImage }))
+        }
+
+        await client.request(`
+          mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
+            mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
+              id
+            }
+          }
+        `, {
+          documentIdentifier: newId,
+          actions,
+        })
+
+        console.log('Set user fields on document')
+        return newId
       }
 
-      // Store credential
-      const result = await storeCredential({
-        driveId: userDriveId,
-        credential,
-        signature,
-        domain,
-        ethAddress,
-      })
+      // Store the credential concurrently with resolving the user doc.
+      const [resolvedUserDocId, result] = await Promise.all([
+        resolveUserDocId(),
+        storeCredential({
+          driveId: userDriveId,
+          credential,
+          signature,
+          domain,
+          ethAddress,
+        }),
+      ])
+      finalDocId = resolvedUserDocId
 
       if (result.success && result.credentialId) {
         res.status(200).json({
