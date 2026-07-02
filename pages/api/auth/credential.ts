@@ -25,9 +25,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const finalDriveId = (driveId as string) || userDriveId
 
     try {
-      // Query RenownCredential documents by eth address
-      const GET_CREDENTIALS_QUERY = `
-        query GetRenownCredentials($input: RenownCredentialsInput!) {
+      // Fetch the credentials and the profile doc id in a single round trip.
+      // GraphQL resolves these same-subgraph root fields in one fetch.
+      const GET_LOGIN_DATA_QUERY = `
+        query GetLoginData($input: RenownCredentialsInput!, $userInput: RenownUsersInput!) {
           renownCredentials(input: $input) {
             documentId
             credentialId
@@ -56,6 +57,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             revocationReason
             createdAt
             updatedAt
+          }
+          renownUsers(input: $userInput) {
+            documentId
           }
         }
       `
@@ -93,12 +97,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           createdAt: string | null
           updatedAt: string | null
         }>
-      }>(GET_CREDENTIALS_QUERY, {
+        renownUsers: { documentId: string }[]
+      }>(GET_LOGIN_DATA_QUERY, {
         input: {
           driveId: finalDriveId,
           ethAddress: (address as string).toLowerCase(),
           did: appDid as string | undefined,
           includeRevoked: includeRevoked === 'true',
+        },
+        userInput: {
+          driveId: finalDriveId,
+          ethAddresses: [(address as string).toLowerCase()],
         },
       })
 
@@ -152,31 +161,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         eip712Domain = null
       }
 
-      // Look up the user's profile document ID so the client can rehydrate
-      // it after a page reload without going through login again
-      let userDocumentId: string | undefined
-      try {
-        const profileData = await client.request<{
-          renownUsers: { documentId: string }[]
-        }>(
-          `
-            query RenownUsers($input: RenownUsersInput!) {
-              renownUsers(input: $input) {
-                documentId
-              }
-            }
-          `,
-          {
-            input: {
-              driveId: finalDriveId,
-              ethAddresses: [(address as string).toLowerCase()],
-            },
-          },
-        )
-        userDocumentId = profileData.renownUsers[0]?.documentId
-      } catch (e) {
-        console.error('Failed to fetch user profile documentId:', e)
-      }
+      // Profile doc id came back in the same query as the credentials.
+      const userDocumentId = credentialsData.renownUsers[0]?.documentId
 
       // Transform to SDK format (PowerhouseVerifiableCredential)
       res.status(200).json({
