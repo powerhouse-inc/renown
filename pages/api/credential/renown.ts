@@ -186,9 +186,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return newId
       }
 
-      // Store the credential concurrently with resolving the user doc.
+      // Credential store is the critical path; user-doc resolution runs
+      // concurrently but best-effort (its failure must not fail the store).
       const [resolvedUserDocId, result] = await Promise.all([
-        resolveUserDocId(),
+        resolveUserDocId().catch((e) => {
+          console.error('Failed to resolve user profile document:', e)
+          return undefined
+        }),
         storeCredential({
           driveId: userDriveId,
           credential,
