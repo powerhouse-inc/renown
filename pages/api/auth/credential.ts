@@ -1,16 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
-import { GraphQLClient } from 'graphql-request'
 import { revokeCredential } from '../../../services/renown-credential'
+import { queryRenownCredentials, queryRenownUsers } from '../../../services/switchboard'
 import { CREDENTIAL_TYPES } from '../../../services/wallet'
-import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || 'https://switchboard.renown.vetra.io/graphql'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
-
   if (req.method === 'GET') {
     // Get credentials by address/chainId/appId
     const { address, chainId, appId, connectId, driveId, includeRevoked } = req.query
@@ -25,102 +19,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const finalDriveId = (driveId as string) || userDriveId
 
     try {
-      // Query RenownCredential documents by eth address
-      const GET_CREDENTIALS_QUERY = `
-        query GetRenownCredentials($input: RenownCredentialsInput!) {
-          renownCredentials(input: $input) {
-            documentId
-            credentialId
-            context
-            type
-            issuerId
-            issuerEthereumAddress
-            issuanceDate
-            expirationDate
-            credentialSubjectId
-            credentialSubjectApp
-            credentialStatusId
-            credentialStatusType
-            credentialSchemaId
-            credentialSchemaType
-            proofVerificationMethod
-            proofEthereumAddress
-            proofCreated
-            proofPurpose
-            proofType
-            proofValue
-            proofEip712Domain
-            proofEip712PrimaryType
-            revoked
-            revokedAt
-            revocationReason
-            createdAt
-            updatedAt
-          }
-        }
-      `
-
       // Pass app DID to the subgraph query for server-side filtering
       const appDid = appId || connectId
 
       // Profile doc id fetched concurrently but as a SEPARATE request, so a
       // failure degrades to undefined instead of failing the credential fetch.
-      const userDocumentIdPromise = client
-        .request<{ renownUsers: { documentId: string }[] }>(
-          `query RenownUsers($input: RenownUsersInput!) { renownUsers(input: $input) { documentId } }`,
-          {
-            input: {
-              driveId: finalDriveId,
-              ethAddresses: [(address as string).toLowerCase()],
-            },
-          },
-        )
-        .then((d) => d.renownUsers[0]?.documentId)
+      const userDocumentIdPromise = queryRenownUsers({
+        driveId: finalDriveId,
+        ethAddresses: [(address as string).toLowerCase()],
+      })
+        .then((users) => users[0]?.documentId)
         .catch((e) => {
           console.error('Failed to fetch user profile documentId:', e)
           return undefined as string | undefined
         })
 
-      const credentialsData = await client.request<{
-        renownCredentials: Array<{
-          documentId: string
-          credentialId: string
-          context: string[]
-          type: string[]
-          issuerId: string
-          issuerEthereumAddress: string
-          issuanceDate: string
-          expirationDate: string | null
-          credentialSubjectId: string | null
-          credentialSubjectApp: string
-          credentialStatusId: string | null
-          credentialStatusType: string | null
-          credentialSchemaId: string
-          credentialSchemaType: string
-          proofVerificationMethod: string
-          proofEthereumAddress: string
-          proofCreated: string
-          proofPurpose: string
-          proofType: string
-          proofValue: string
-          proofEip712Domain: string
-          proofEip712PrimaryType: string
-          revoked: boolean
-          revokedAt: string | null
-          revocationReason: string | null
-          createdAt: string | null
-          updatedAt: string | null
-        }>
-      }>(GET_CREDENTIALS_QUERY, {
-        input: {
-          driveId: finalDriveId,
-          ethAddress: (address as string).toLowerCase(),
-          did: appDid as string | undefined,
-          includeRevoked: includeRevoked === 'true',
-        },
+      let credentials = await queryRenownCredentials({
+        driveId: finalDriveId,
+        ethAddress: (address as string).toLowerCase(),
+        did: appDid as string | undefined,
+        includeRevoked: includeRevoked === 'true',
       })
-
-      let credentials = credentialsData.renownCredentials
 
       console.log(
         `Found ${credentials.length} credentials for address ${address} ${appDid ? `and app ${appDid}` : ''}`,

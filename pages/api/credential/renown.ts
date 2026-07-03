@@ -1,24 +1,15 @@
 // v6 reactor API - uses createEmptyDocument + mutateDocument
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
-import { GraphQLClient } from 'graphql-request'
-import { v4 as uuidv4 } from 'uuid'
 import { storeCredential, revokeCredential } from '../../../services/renown-credential'
+import {
+  createEmptyDocument,
+  makeAction,
+  mutateDocument,
+  queryRenownCredentials,
+  queryRenownUsers,
+} from '../../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
-
-function makeAction(type: string, input: Record<string, unknown>) {
-  return {
-    id: uuidv4(),
-    type,
-    input,
-    scope: 'global',
-    timestampUtcMs: Date.now(),
-  }
-}
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
 
 interface EIP712Domain {
   version: string
@@ -46,8 +37,6 @@ interface EIP712Credential {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
-
   if (req.method === 'POST') {
     // Create/Add an EIP-712 credential
     const { driveId, docId, credential, signature, domain, username, userImage } = req.body as {
@@ -95,26 +84,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         console.log('Setting up user drive for ethAddress:', ethAddress)
 
         // Try to find existing RenownUser document
-        const GET_PROFILE_QUERY = `
-          query RenownUsers($input: RenownUsersInput!) {
-            renownUsers(input: $input) {
-              documentId
-              ethAddress
-            }
-          }
-        `
-
-        const profileData = await client.request<{
-          renownUsers: { documentId: string; ethAddress: string }[]
-        }>(GET_PROFILE_QUERY, {
-          input: {
-            driveId: userDriveId,
-            ethAddresses: [ethAddress],
-          },
+        const existingUsers = await queryRenownUsers({
+          driveId: userDriveId,
+          ethAddresses: [ethAddress],
         })
 
-        if (profileData.renownUsers.length > 0) {
-          const existingId = profileData.renownUsers[0].documentId
+        if (existingUsers.length > 0) {
+          const existingId = existingUsers[0].documentId
           console.log('Found existing RenownUser document:', existingId)
 
           // Refresh username/userImage on the existing document
@@ -128,16 +104,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
           if (updateActions.length > 0) {
             try {
-              await client.request(`
-                mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-                  mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-                    id
-                  }
-                }
-              `, {
-                documentIdentifier: existingId,
-                actions: updateActions,
-              })
+              await mutateDocument(existingId, updateActions)
             } catch (e) {
               console.error('Failed to update user fields:', e)
             }
@@ -147,19 +114,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Create RenownUser document
         console.log('Creating RenownUser document')
-        const createResult = await client.request<{
-          createEmptyDocument: { id: string }
-        }>(`
-          mutation CreateEmptyDocument($documentType: String!) {
-            createEmptyDocument(documentType: $documentType) {
-              id
-            }
-          }
-        `, {
-          documentType: 'powerhouse/renown-user',
-        })
-
-        const newId = createResult.createEmptyDocument.id
+        const newId = await createEmptyDocument('powerhouse/renown-user')
         console.log('Created new RenownUser document:', newId)
 
         // Set eth address, username, and userImage in a single mutateDocument call
@@ -171,16 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           actions.push(makeAction('SET_USER_IMAGE', { userImage }))
         }
 
-        await client.request(`
-          mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-            mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-              id
-            }
-          }
-        `, {
-          documentIdentifier: newId,
-          actions,
-        })
+        await mutateDocument(newId, actions)
 
         console.log('Set user fields on document')
         return newId
@@ -236,25 +182,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       // Resolve the credential URI to its document ID by querying the user's drive
       const userDriveId = `renown-${address.toLowerCase()}`
-      const LOOKUP_QUERY = `
-        query LookupCredential($input: RenownCredentialsInput!) {
-          renownCredentials(input: $input) {
-            documentId
-            credentialId
-          }
-        }
-      `
-      const lookup = await client.request<{
-        renownCredentials: { documentId: string; credentialId: string }[]
-      }>(LOOKUP_QUERY, {
-        input: {
-          driveId: userDriveId,
-          ethAddress: address.toLowerCase(),
-          includeRevoked: false,
-        },
+      const credentials = await queryRenownCredentials({
+        driveId: userDriveId,
+        ethAddress: address.toLowerCase(),
+        includeRevoked: false,
       })
 
-      const match = lookup.renownCredentials.find(c => c.credentialId === credentialId)
+      const match = credentials.find(c => c.credentialId === credentialId)
       if (!match) {
         res.status(404).json({ error: 'Credential not found' })
         return

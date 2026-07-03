@@ -1,51 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../[utils]'
-import { GraphQLClient, gql } from 'graphql-request'
-import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
-
-interface RenownCredential {
-  documentId: string
-  credentialId: string
-  context: string[]
-  type: string[]
-  issuerId: string
-  issuerEthereumAddress: string
-  issuanceDate: string
-  expirationDate: string | null
-  credentialSubjectId: string | null
-  credentialSubjectApp: string
-  revoked: boolean
-  revokedAt: string | null
-  revocationReason: string | null
-  createdAt: string | null
-  updatedAt: string | null
-}
-
-const GET_CREDENTIALS_QUERY = gql`
-  query RenownCredentials($input: RenownCredentialsInput!) {
-    renownCredentials(input: $input) {
-      documentId
-      credentialId
-      context
-      type
-      issuerId
-      issuerEthereumAddress
-      issuanceDate
-      expirationDate
-      credentialSubjectId
-      credentialSubjectApp
-      revoked
-      revokedAt
-      revocationReason
-      createdAt
-      updatedAt
-    }
-  }
-`
+import {
+  queryRenownCredentials,
+  type RenownCredentialsInput,
+} from '../../../services/switchboard'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -65,10 +23,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
-
     // Build the query input
-    const queryInput: any = {
+    const queryInput: RenownCredentialsInput = {
       includeRevoked,
       did: appDid,
     }
@@ -100,13 +56,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     console.log('Querying credentials with input:', queryInput)
 
     // Query for credentials
-    const data = await client.request<{
-      renownCredentials: RenownCredential[]
-    }>(GET_CREDENTIALS_QUERY, {
-      input: queryInput,
-    })
+    const credentials = await queryRenownCredentials(queryInput)
 
-    if (!data.renownCredentials || data.renownCredentials.length === 0) {
+    if (credentials.length === 0) {
       res.status(404).json({
         error: 'Credential not found',
         searched: queryInput,
@@ -115,7 +67,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Return the most recent credential by issuanceDate
-    const matchedCredential = data.renownCredentials.reduce((prev, curr) =>
+    const matchedCredential = credentials.reduce((prev, curr) =>
       prev.issuanceDate > curr.issuanceDate ? prev : curr
     )
 

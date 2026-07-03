@@ -1,35 +1,4 @@
-import { request, gql } from 'graphql-request'
-import { v4 as uuidv4 } from 'uuid'
-
-function makeAction(type: string, input: Record<string, unknown>) {
-  return {
-    id: uuidv4(),
-    type,
-    input,
-    scope: 'global',
-    timestampUtcMs: Date.now(),
-  }
-}
-
-const SWITCHBOARD_URL =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
-
-const CREATE_EMPTY_DOCUMENT = gql`
-  mutation CreateEmptyDocument($documentType: String!, $parentIdentifier: String) {
-    createEmptyDocument(documentType: $documentType, parentIdentifier: $parentIdentifier) {
-      id
-    }
-  }
-`
-
-const MUTATE_DOCUMENT = gql`
-  mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-    mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-      id
-    }
-  }
-`
+import { createEmptyDocument, makeAction, mutateDocument } from './switchboard'
 
 interface EIP712Domain {
   version: string
@@ -56,9 +25,7 @@ interface EIP712Credential {
   expirationDate: string
 }
 
-/**
- * Create and initialize a new RenownCredential document with EIP-712 credential
- */
+// Create and initialize a new RenownCredential document with EIP-712 credential
 export async function storeCredential(params: {
   driveId?: string
   credential: EIP712Credential
@@ -67,14 +34,10 @@ export async function storeCredential(params: {
   ethAddress: string
 }): Promise<{ success: boolean; credentialId?: string }> {
   try {
-    const { credential, signature, domain, ethAddress } = params
+    const { credential, signature, domain } = params
 
     // Create a new RenownCredential document
-    const createResult = (await request(SWITCHBOARD_URL, CREATE_EMPTY_DOCUMENT, {
-      documentType: 'powerhouse/renown-credential',
-    })) as { createEmptyDocument: { id: string } }
-
-    const credentialId = createResult.createEmptyDocument.id
+    const credentialId = await createEmptyDocument('powerhouse/renown-credential')
 
     if (!credentialId) {
       throw new Error('Failed to create credential document')
@@ -117,10 +80,7 @@ export async function storeCredential(params: {
     }
 
     // Initialize the credential with EIP-712 data
-    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
-      documentIdentifier: credentialId,
-      actions: [makeAction('INIT', initInput)],
-    })
+    await mutateDocument(credentialId, [makeAction('INIT', initInput)])
 
     return {
       success: true,
@@ -132,22 +92,19 @@ export async function storeCredential(params: {
   }
 }
 
-/**
- * Revoke an existing credential
- */
+// Revoke an existing credential
 export async function revokeCredential(params: {
   credentialId: string
   reason?: string
   revokedAt?: string
 }): Promise<boolean> {
   try {
-    await request(SWITCHBOARD_URL, MUTATE_DOCUMENT, {
-      documentIdentifier: params.credentialId,
-      actions: [makeAction('REVOKE', {
+    await mutateDocument(params.credentialId, [
+      makeAction('REVOKE', {
         revokedAt: params.revokedAt || new Date().toISOString(),
         reason: params.reason || null,
-      })],
-    })
+      }),
+    ])
 
     return true
   } catch (error) {
