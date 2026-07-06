@@ -24,6 +24,8 @@ export function ReturnToAppButton({ url, returnUrl, isReady }: ReturnToAppButton
         );
     }
 
+    const target = returnUrl ? new URL(returnUrl).hostname : 'Connect';
+
     return (
         <a
             href={url}
@@ -32,8 +34,10 @@ export function ReturnToAppButton({ url, returnUrl, isReady }: ReturnToAppButton
         >
             <Button primary className="w-full">
                 <div className="flex items-center justify-center gap-2">
-                    <Image src={IconConnectWhite} alt="Connect" />
-                    Return to {returnUrl ? new URL(returnUrl).hostname : 'Connect'}
+                    <Image src={IconConnectWhite} alt="Connect" className="shrink-0" />
+                    <span className="min-w-0 truncate" title={`Return to ${target}`}>
+                        Return to {target}
+                    </span>
                 </div>
             </Button>
         </a>
