@@ -1,3 +1,7 @@
+## <small>1.12.2 (2026-07-06)</small>
+
+* fix(auth): keep return-to-host button on one line ([8e8d4e7](https://github.com/powerhouse-inc/renown/commit/8e8d4e7))
+
 ## <small>1.12.1 (2026-07-02)</small>
 
 * fix(api): preserve graceful degradation while keeping perf ([5abc58c](https://github.com/powerhouse-inc/renown/commit/5abc58c))
