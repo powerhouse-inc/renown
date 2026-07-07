@@ -1,40 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from './[utils]'
-import { GraphQLClient } from 'graphql-request'
+import { queryRenownUsers, type RenownUsersInput } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
-
-const GET_PROFILE_QUERY = `
-    query ($input: RenownUsersInput!) {
-        renownUsers(input: $input) {
-            createdAt
-            documentId
-            ethAddress
-            updatedAt
-            userImage
-            username
-        }
-    }
-`
-
-interface RenownUsersInput {
-  driveId?: string
-  phids?: string[]
-  ethAddresses?: string[]
-  usernames?: string[]
-}
-
-interface Profile {
-  createdAt: string
-  documentId: string
-  ethAddress: string
-  updatedAt: string
-  userImage?: string
-  username?: string
-}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
@@ -61,11 +28,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-      const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
-      const data = await client.request<{ renownUsers: Profile[] }>(GET_PROFILE_QUERY, { input })
+      const users = await queryRenownUsers(input)
 
       // Return first result or null
-      const profile = data.renownUsers.length > 0 ? data.renownUsers[0] : null
+      const profile = users.length > 0 ? users[0] : null
       res.status(200).json({ profile })
     } catch (e) {
       console.error('Failed to fetch profile:', e)
