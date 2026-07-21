@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
-import { allowCors } from '../[utils]'
+import { allowCors } from '../../../utils/allow-cors'
 import { GraphQLClient } from 'graphql-request'
 import { revokeCredential } from '../../../services/renown-credential'
 import { CREDENTIAL_TYPES } from '../../../services/wallet'

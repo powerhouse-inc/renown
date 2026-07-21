@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
-import { allowCors } from './[utils]'
+import { allowCors } from '../../utils/allow-cors'
 import { GraphQLClient } from 'graphql-request'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 

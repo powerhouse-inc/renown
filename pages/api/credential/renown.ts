@@ -1,6 +1,6 @@
 // v6 reactor API - uses createEmptyDocument + mutateDocument
 import { NextApiRequest, NextApiResponse } from 'next/types'
-import { allowCors } from '../[utils]'
+import { allowCors } from '../../../utils/allow-cors'
 import { GraphQLClient } from 'graphql-request'
 import { v4 as uuidv4 } from 'uuid'
 import { storeCredential, revokeCredential } from '../../../services/renown-credential'

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next/types";
-import { allowCors } from "../[utils]";
+import { allowCors } from "../../../utils/allow-cors";
 import { GraphQLClient, gql } from 'graphql-request';
 
 const SWITCHBOARD_ENDPOINT =
