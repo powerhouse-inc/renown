@@ -1,3 +1,7 @@
+## <small>1.12.3 (2026-07-21)</small>
+
+* fix(api): move allowCors out of pages/api to stop /api/* hanging ([6f0f3bd](https://github.com/powerhouse-inc/renown/commit/6f0f3bd))
+
 ## <small>1.12.2 (2026-07-06)</small>
 
 * fix(auth): keep return-to-host button on one line ([8e8d4e7](https://github.com/powerhouse-inc/renown/commit/8e8d4e7))
