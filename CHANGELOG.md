@@ -1,3 +1,7 @@
+## 1.13.0 (2026-07-21)
+
+* feat(api): add /api/switchboard discovery endpoint ([e934406](https://github.com/powerhouse-inc/renown/commit/e934406))
+
 ## <small>1.12.3 (2026-07-21)</small>
 
 * fix(api): move allowCors out of pages/api to stop /api/* hanging ([6f0f3bd](https://github.com/powerhouse-inc/renown/commit/6f0f3bd))
