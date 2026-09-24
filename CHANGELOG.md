@@ -1,3 +1,7 @@
+## 1.14.0 (2026-09-24)
+
+* feat(analytics): Umami tracking ([8202e82](https://github.com/powerhouse-inc/renown/commit/8202e82))
+
 ## 1.13.0 (2026-07-21)
 
 * feat(api): add /api/switchboard discovery endpoint ([e934406](https://github.com/powerhouse-inc/renown/commit/e934406))
