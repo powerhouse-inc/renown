@@ -13,6 +13,9 @@ export default function Document() {
                     src="https://umami.monitoring.vetra.io/script.js"
                     data-website-id="c5102484-ab3d-4c46-9198-0fbe81f27789"
                     data-domains="renown.vetra.io,www.renown.id"
+                    data-do-not-track="true"
+                    data-exclude-search="true"
+                    data-performance="true"
                 />
             </Head>
             <body>
