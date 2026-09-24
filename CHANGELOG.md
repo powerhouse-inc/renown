@@ -1,3 +1,7 @@
+## 1.15.0 (2026-09-24)
+
+* feat(analytics): Umami respects Do Not Track, drops query strings, records Web Vitals ([639b937](https://github.com/powerhouse-inc/renown/commit/639b937))
+
 ## 1.14.0 (2026-09-24)
 
 * feat(analytics): Umami tracking ([8202e82](https://github.com/powerhouse-inc/renown/commit/8202e82))
