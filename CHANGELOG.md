@@ -1,3 +1,11 @@
+## 1.16.0 (2026-09-26)
+
+* test(oidc): e2e coverage for /oidc/login ([a40c3ec](https://github.com/powerhouse-inc/renown/commit/a40c3ec))
+* test(oidc): mock the issuer the page actually resolves ([91a33e0](https://github.com/powerhouse-inc/renown/commit/91a33e0))
+* fix(credential): send action timestamps as ISO strings ([39ffd58](https://github.com/powerhouse-inc/renown/commit/39ffd58))
+* fix(oidc): reset denied/error state across a client-side navigation ([b6bea1b](https://github.com/powerhouse-inc/renown/commit/b6bea1b))
+* feat(oidc): sign-in page for Renown OIDC ([51163c2](https://github.com/powerhouse-inc/renown/commit/51163c2))
+
 ## 1.15.0 (2026-09-24)
 
 * feat(analytics): Umami respects Do Not Track, drops query strings, records Web Vitals ([639b937](https://github.com/powerhouse-inc/renown/commit/639b937))
