@@ -40,6 +40,14 @@ interface FetchRecord {
 
 const EMPTY_FETCH_RECORD: FetchRecord = { key: "", interaction: null, errorMessage: null };
 
+interface SubmitOutcome {
+    key: string;
+    deniedMessage: string | null;
+    errorMessage: string | null;
+}
+
+const EMPTY_SUBMIT_OUTCOME: SubmitOutcome = { key: "", deniedMessage: null, errorMessage: null };
+
 export function useOidcLoginFlow(requestId: string | undefined, issuer?: string): OidcLoginFlowView {
     const resolvedIssuer = useMemo(() => resolveIssuer(issuer), [issuer]);
     const session = useSession();
@@ -57,8 +65,15 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
     const loadingInteraction = requestId !== undefined && !interactionLoaded;
 
     const [submitting, setSubmitting] = useState(false);
-    const [submitErrorMessage, setSubmitErrorMessage] = useState<string | null>(null);
-    const [deniedMessage, setDeniedMessage] = useState<string | null>(null);
+
+    // Keyed the same way as `fetchRecord`: a submit outcome (denied/error)
+    // from a previous request/issuer stops matching `requestKey` the moment
+    // either changes, instead of lingering across a Pages Router client-side
+    // navigation (which doesn't remount this hook) to a different request id.
+    const [submitOutcome, setSubmitOutcome] = useState<SubmitOutcome>(EMPTY_SUBMIT_OUTCOME);
+    const submitOutcomeCurrent = requestKey !== "" && submitOutcome.key === requestKey;
+    const deniedMessage = submitOutcomeCurrent ? submitOutcome.deniedMessage : null;
+    const submitErrorMessage = submitOutcomeCurrent ? submitOutcome.errorMessage : null;
 
     useEffect(() => {
         if (!requestId) return;
@@ -86,7 +101,7 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
         if (!interaction || !session || !requestId) return;
 
         setSubmitting(true);
-        setSubmitErrorMessage(null);
+        setSubmitOutcome(EMPTY_SUBMIT_OUTCOME);
         try {
             const message = buildMessage(interaction.siwe, session.address, session.chainId);
             const signature = await session.signer.signMessage(message);
@@ -94,15 +109,19 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
             window.location.assign(redirect);
         } catch (e) {
             if (e instanceof OidcLoginError && e.code === "access_denied") {
-                setDeniedMessage(e.description ?? "Access denied.");
+                setSubmitOutcome({
+                    key: requestKey,
+                    deniedMessage: e.description ?? "Access denied.",
+                    errorMessage: null,
+                });
             } else {
                 console.error("Failed to complete OIDC interaction:", e);
-                setSubmitErrorMessage(GENERIC_ERROR_MESSAGE);
+                setSubmitOutcome({ key: requestKey, deniedMessage: null, errorMessage: GENERIC_ERROR_MESSAGE });
             }
         } finally {
             setSubmitting(false);
         }
-    }, [interaction, session, requestId, resolvedIssuer]);
+    }, [interaction, session, requestId, resolvedIssuer, requestKey]);
 
     return useMemo<OidcLoginFlowView>(() => {
         if (!requestId) return { kind: "invalid" };
