@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 
-const ISSUER = "https://switchboard.renown.vetra.io/api/@powerhousedao/renown-package/oidc";
+// The page falls back to the deployment's configured issuer, then the default.
+const ISSUER =
+  process.env.NEXT_PUBLIC_RENOWN_OIDC_ISSUER ||
+  "https://switchboard.renown.vetra.io/api/@powerhousedao/renown-package/oidc";
 
 test.describe("OIDC login page", () => {
   test("invalid link without request id", async ({ page }) => {
