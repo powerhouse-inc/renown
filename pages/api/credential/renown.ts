@@ -12,7 +12,7 @@ function makeAction(type: string, input: Record<string, unknown>) {
     type,
     input,
     scope: 'global',
-    timestampUtcMs: Date.now(),
+    timestampUtcMs: new Date().toISOString(),
   }
 }
 
