@@ -46,8 +46,9 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
         [login]
     );
 
-    // Rejects with RevokeSignatureRejectedError when the wallet did not sign
-    // the revocation; the credential is then still active.
+    // Rejects when the revocation didn't happen (RevokeSignatureRejectedError
+    // for a declined signature, or the Renown API's refusal); the credential
+    // is then still active.
     const revokeCredential = useCallback(async () => {
         if (!jwt) {
             return;

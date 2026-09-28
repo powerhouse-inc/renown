@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { atom, useAtom } from 'jotai'
 import { useOrchestrator, useSession } from './use-wallet-adapter'
 import { RevokeSignatureRejectedError } from '../services/wallet/orchestrator'
+import { getProfile } from '../services/switchboard'
 
 const credentialIdAtom = atom<string | null>(null)
 const userDocIdAtom = atom<string | null>(null)
@@ -12,6 +13,11 @@ const userDocIdAtom = atom<string | null>(null)
  * Cleared when the user fully signs out (Disconnect) or on page refresh.
  */
 export const revokedAddressAtom = atom<string | null>(null)
+/**
+ * Set when a Disconnect went ahead without revoking the credential; shown on
+ * the login screen. Cleared by the next successful login.
+ */
+export const signOutNoticeAtom = atom<string | null>(null)
 
 interface LoginOptions {
   appId?: string
@@ -59,6 +65,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
   const [jwt, setJwt] = useAtom(credentialIdAtom)
   const [userDocId, setUserDocId] = useAtom(userDocIdAtom)
   const [, setRevokedAddress] = useAtom(revokedAddressAtom)
+  const [, setSignOutNotice] = useAtom(signOutNoticeAtom)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   // Tracks the (address, appDid) pair the initial credential fetch most
@@ -142,8 +149,24 @@ export function useAuth(appDid?: string): UseAuthReturn {
           },
         )
 
+        // Issuance only seeds a missing profile; refresh an existing one
+        // whose ENS name/avatar changed. Best effort: never fails the login.
+        if (options?.ensName) {
+          const address = session.address
+          try {
+            await orchestrator.refreshProfile({
+              ensName: options.ensName,
+              ensAvatar: options.ensAvatar,
+              readProfile: () => getProfile({ driveId: `renown-${address.toLowerCase()}`, ethAddress: address.toLowerCase() }),
+            })
+          } catch (e) {
+            console.warn('Skipped refreshing the Renown profile:', e)
+          }
+        }
+
         if (userDocumentId) setUserDocId(userDocumentId)
         setJwt(credentialId)
+        setSignOutNotice(null)
         return credentialId
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e))
@@ -154,22 +177,18 @@ export function useAuth(appDid?: string): UseAuthReturn {
         setIsLoading(false)
       }
     },
-    [session, orchestrator, setJwt, setUserDocId],
+    [session, orchestrator, setJwt, setUserDocId, setSignOutNotice],
   )
 
   /**
    * Revoke the current credential and clear it locally.
    * @throws {RevokeSignatureRejectedError} If the wallet did not sign the
-   * revocation; the credential stays active and is kept.
+   * revocation, or the error the Renown API refused it with; either way the
+   * credential stays active and is kept.
    */
   const logout = useCallback(async () => {
     if (jwt && session) {
-      try {
-        await orchestrator.revokeCredential(jwt, session.address)
-      } catch (e) {
-        if (e instanceof RevokeSignatureRejectedError) throw e
-        console.error('Error revoking credential on Renown Switchboard:', e)
-      }
+      await orchestrator.revokeCredential(jwt, session.address)
     }
     setJwt(null)
     setUserDocId(null)
@@ -181,11 +200,16 @@ export function useAuth(appDid?: string): UseAuthReturn {
       await logout()
     } catch (e) {
       // Disconnecting goes ahead without the revocation; the credential
-      // stays active until it expires.
+      // stays active until it expires, which the login screen points out.
       console.warn('Signing out without revoking the credential:', e)
       setJwt(null)
       setUserDocId(null)
       setError(null)
+      setSignOutNotice(
+        e instanceof RevokeSignatureRejectedError
+          ? 'Signed out without revoking your authorization (the signature was declined). It stays active until it expires.'
+          : 'Signed out, but your authorization could not be revoked. It stays active until it expires.',
+      )
     }
     try {
       await orchestrator.signOut()
@@ -195,7 +219,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
     // A full sign-out (Disconnect) clears any prior revoke suppression so the
     // next login can auto-sign normally.
     setRevokedAddress(null)
-  }, [logout, orchestrator, setRevokedAddress, setJwt, setUserDocId])
+  }, [logout, orchestrator, setRevokedAddress, setJwt, setUserDocId, setSignOutNotice])
 
   const refreshToken = useCallback(async (): Promise<string | null> => {
     if (!session) return null
