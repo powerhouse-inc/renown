@@ -73,7 +73,7 @@ async function readErrorBody(response: Response): Promise<{ error: string; error
 
 /** GET `<issuer>/interaction/<id>`. Throws `OidcLoginError` on a non-2xx response. */
 export async function fetchInteraction(issuer: string, id: string): Promise<OidcInteraction> {
-    const response = await fetch(`${issuer}/interaction/${id}`);
+    const response = await fetch(`${issuer}/interaction/${encodeURIComponent(id)}`);
     if (!response.ok) {
         const { error, error_description } = await readErrorBody(response);
         throw new OidcLoginError(error, error_description);
@@ -88,7 +88,7 @@ export async function completeInteraction(
     message: string,
     signature: string,
 ): Promise<OidcCompleteResult> {
-    const response = await fetch(`${issuer}/interaction/${id}/complete`, {
+    const response = await fetch(`${issuer}/interaction/${encodeURIComponent(id)}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, signature }),

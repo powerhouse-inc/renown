@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "./use-wallet-adapter";
 import {
     buildMessage,
@@ -28,6 +28,8 @@ export type OidcLoginFlowView =
           address: string;
           submit: () => Promise<void>;
           submitting: boolean;
+          /** Set after a failed submit; the view stays retryable. */
+          errorMessage: string | null;
       }
     | { kind: "denied"; client: OidcClient; message: string }
     | { kind: "error"; message: string };
@@ -65,6 +67,9 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
     const loadingInteraction = requestId !== undefined && !interactionLoaded;
 
     const [submitting, setSubmitting] = useState(false);
+    // Synchronous guard: `submitting` state lags a render behind, so a fast
+    // double click could otherwise start two signatures.
+    const inFlight = useRef(false);
 
     // Keyed the same way as `fetchRecord`: a submit outcome (denied/error)
     // from a previous request/issuer stops matching `requestKey` the moment
@@ -98,14 +103,19 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
     }, [requestId, resolvedIssuer, requestKey]);
 
     const submit = useCallback(async () => {
-        if (!interaction || !session || !requestId) return;
+        if (!interaction || !session || !requestId || inFlight.current) return;
 
+        inFlight.current = true;
+        let redirecting = false;
         setSubmitting(true);
         setSubmitOutcome(EMPTY_SUBMIT_OUTCOME);
         try {
             const message = buildMessage(interaction.siwe, session.address, session.chainId);
             const signature = await session.signer.signMessage(message);
             const { redirect } = await completeInteraction(resolvedIssuer, requestId, message, signature);
+            // Stay submitting while the browser navigates away, so the button
+            // can't POST again to the already-consumed interaction.
+            redirecting = true;
             window.location.assign(redirect);
         } catch (e) {
             if (e instanceof OidcLoginError && e.code === "access_denied") {
@@ -119,7 +129,10 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
                 setSubmitOutcome({ key: requestKey, deniedMessage: null, errorMessage: GENERIC_ERROR_MESSAGE });
             }
         } finally {
-            setSubmitting(false);
+            if (!redirecting) {
+                inFlight.current = false;
+                setSubmitting(false);
+            }
         }
     }, [interaction, session, requestId, resolvedIssuer, requestKey]);
 
@@ -129,7 +142,6 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
         if (fetchErrorMessage) return { kind: "error", message: fetchErrorMessage };
         if (!interaction) return { kind: "loading" };
         if (deniedMessage) return { kind: "denied", client: interaction.client, message: deniedMessage };
-        if (submitErrorMessage) return { kind: "error", message: submitErrorMessage };
         if (!session) return { kind: "pre-login", client: interaction.client };
 
         return {
@@ -138,6 +150,7 @@ export function useOidcLoginFlow(requestId: string | undefined, issuer?: string)
             address: session.address,
             submit,
             submitting,
+            errorMessage: submitErrorMessage,
         };
     }, [
         requestId,
