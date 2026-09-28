@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import {
   getEmbeddedConnectedWallet,
+  useCreateWallet,
   useLogin,
   useLoginWithOAuth,
   useLogout,
@@ -12,6 +13,11 @@ import {
 } from '@privy-io/react-auth'
 import type { Hex } from 'viem'
 import type { PrivyAdapter } from './adapter'
+
+// Privy normally creates the embedded wallet at login (`createOnLogin:
+// 'users-without-wallets'`), but skips a user who already has any wallet
+// linked, e.g. an external one. Give it this long, then create it explicitly.
+const CREATE_WALLET_GRACE_MS = 5_000
 
 interface PrivyAdapterBridgeProps {
   adapter: PrivyAdapter
@@ -34,15 +40,28 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
     onError: error => adapter.handleLoginError(error),
   })
+  const { createWallet } = useCreateWallet()
 
   // Privy returns fresh function references on every render. Storing them in
   // a ref and syncing inside a layout effect lets us bind once per adapter
   // without re-binding on every render (which would briefly null out
   // adapter.bindings between cleanup and effect).
-  const fnsRef = useRef({ openLoginModal, initOAuth, logout, signMessage, signTypedData })
+  const fnsRef = useRef({ openLoginModal, initOAuth, logout, signMessage, signTypedData, createWallet })
   useEffect(() => {
-    fnsRef.current = { openLoginModal, initOAuth, logout, signMessage, signTypedData }
-  }, [openLoginModal, initOAuth, logout, signMessage, signTypedData])
+    fnsRef.current = { openLoginModal, initOAuth, logout, signMessage, signTypedData, createWallet }
+  }, [openLoginModal, initOAuth, logout, signMessage, signTypedData, createWallet])
+
+  // One explicit creation attempt per authenticated session, after the grace
+  // period. On failure the session is ended so the user gets back to the login
+  // screen (with Privy's error in the console) instead of an endless spinner.
+  const createTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const createAttemptedRef = useRef(false)
+  useEffect(
+    () => () => {
+      if (createTimerRef.current) clearTimeout(createTimerRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     return adapter.bind({
@@ -77,6 +96,7 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
       return
     }
     if (!authenticated) {
+      createAttemptedRef.current = false
       adapter.setProvisioning(false)
       adapter.clearSession()
       adapter.markReady()
@@ -84,6 +104,10 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
     }
     const embedded = getEmbeddedConnectedWallet(wallets)
     if (embedded) {
+      if (createTimerRef.current) {
+        clearTimeout(createTimerRef.current)
+        createTimerRef.current = null
+      }
       adapter.setProvisioning(false)
       adapter.syncFromEmbeddedWallet(embedded)
     } else {
@@ -91,6 +115,18 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
       // so the UI can render a coherent loading state instead of the
       // pre-login view while we wait.
       adapter.setProvisioning(true)
+      if (!createAttemptedRef.current && !createTimerRef.current) {
+        createTimerRef.current = setTimeout(() => {
+          createTimerRef.current = null
+          createAttemptedRef.current = true
+          fnsRef.current.createWallet().catch((error: unknown) => {
+            console.error('Privy could not create the embedded wallet:', error)
+            adapter.setProvisioning(false)
+            adapter.handleLoginError(error)
+            void fnsRef.current.logout()
+          })
+        }, CREATE_WALLET_GRACE_MS)
+      }
     }
     // Privy has answered the "are you logged in?" question. Even if the
     // embedded wallet is still provisioning, busy now covers the rest.
