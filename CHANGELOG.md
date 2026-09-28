@@ -1,3 +1,8 @@
+## <small>1.17.2 (2026-09-28)</small>
+
+* fix(privy): create the embedded wallet when Privy skipped it at login ([dece736](https://github.com/powerhouse-inc/renown/commit/dece736))
+* fix(privy): only end the session if no wallet appears after a failed create ([5fb877d](https://github.com/powerhouse-inc/renown/commit/5fb877d))
+
 ## <small>1.17.1 (2026-09-28)</small>
 
 * fix(auth): fall back to Confirm when a silent sign fails or never settles ([3bcc50f](https://github.com/powerhouse-inc/renown/commit/3bcc50f))
