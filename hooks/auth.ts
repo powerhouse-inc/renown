@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { atom, useAtom } from 'jotai'
 import { useOrchestrator, useSession } from './use-wallet-adapter'
+import { RevokeSignatureRejectedError } from '../services/wallet/orchestrator'
 
 const credentialIdAtom = atom<string | null>(null)
 const userDocIdAtom = atom<string | null>(null)
@@ -156,11 +157,17 @@ export function useAuth(appDid?: string): UseAuthReturn {
     [session, orchestrator, setJwt, setUserDocId],
   )
 
+  /**
+   * Revoke the current credential and clear it locally.
+   * @throws {RevokeSignatureRejectedError} If the wallet did not sign the
+   * revocation; the credential stays active and is kept.
+   */
   const logout = useCallback(async () => {
     if (jwt && session) {
       try {
         await orchestrator.revokeCredential(jwt, session.address)
       } catch (e) {
+        if (e instanceof RevokeSignatureRejectedError) throw e
         console.error('Error revoking credential on Renown Switchboard:', e)
       }
     }
@@ -170,7 +177,16 @@ export function useAuth(appDid?: string): UseAuthReturn {
   }, [jwt, session, orchestrator, setJwt, setUserDocId])
 
   const signOut = useCallback(async () => {
-    await logout()
+    try {
+      await logout()
+    } catch (e) {
+      // Disconnecting goes ahead without the revocation; the credential
+      // stays active until it expires.
+      console.warn('Signing out without revoking the credential:', e)
+      setJwt(null)
+      setUserDocId(null)
+      setError(null)
+    }
     try {
       await orchestrator.signOut()
     } catch (e) {
@@ -179,7 +195,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
     // A full sign-out (Disconnect) clears any prior revoke suppression so the
     // next login can auto-sign normally.
     setRevokedAddress(null)
-  }, [logout, orchestrator, setRevokedAddress])
+  }, [logout, orchestrator, setRevokedAddress, setJwt, setUserDocId])
 
   const refreshToken = useCallback(async (): Promise<string | null> => {
     if (!session) return null
