@@ -1,56 +1,33 @@
-// v6 reactor API - uses createEmptyDocument + mutateDocument
+// Credential writes, forwarded to the switchboard's self-authenticating
+// renown_* mutations (see services/renown-credential.ts).
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../../../utils/allow-cors'
-import { GraphQLClient } from 'graphql-request'
-import { v4 as uuidv4 } from 'uuid'
-import { storeCredential, revokeCredential } from '../../../services/renown-credential'
-import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
-
-function makeAction(type: string, input: Record<string, unknown>) {
-  return {
-    id: uuidv4(),
-    type,
-    input,
-    scope: 'global',
-    timestampUtcMs: new Date().toISOString(),
-  }
-}
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
+import {
+  CredentialWriteError,
+  issueCredential,
+  issuerAddressOf,
+  revokeCredential,
+  type EIP712Credential,
+} from '../../../services/renown-credential'
 
 interface EIP712Domain {
   version: string
   chainId: bigint | number
 }
 
-interface EIP712Credential {
-  '@context': string[]
-  type: string[]
-  id: string
-  issuer: {
-    id: string
-    ethereumAddress: string
+function sendWriteError(res: NextApiResponse, e: unknown, message: string) {
+  if (e instanceof CredentialWriteError) {
+    res.status(e.status).json({ error: e.message, code: e.code })
+    return
   }
-  credentialSubject: {
-    id: string
-    app: string
-  }
-  credentialSchema: {
-    id: string
-    type: string
-  }
-  issuanceDate: string
-  expirationDate: string
+  console.error(`${message}:`, e)
+  res.status(500).json({ error: message, details: String(e) })
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
-
   if (req.method === 'POST') {
-    // Create/Add an EIP-712 credential
-    const { driveId, docId, credential, signature, domain, username, userImage } = req.body as {
+    // Store an EIP-712 delegation credential
+    const { docId, credential, signature, domain, username, userImage } = req.body as {
       driveId?: string
       docId?: string
       credential: EIP712Credential
@@ -65,161 +42,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return
     }
 
-    const finalDriveId = driveId || DEFAULT_DRIVE_ID
+    const ethAddress = issuerAddressOf(credential)
+    if (!ethAddress) {
+      res.status(400).json({ error: 'Cannot determine user identity - address not found in credential' })
+      return
+    }
 
     try {
-      let finalDocId = docId
-
-      // Extract Ethereum address from the issuer DID
-      const issuerParts = credential.issuer.id.split(':')
-      let ethAddress: string | undefined
-
-      if (issuerParts.length >= 5 && issuerParts[0] === 'did' && issuerParts[1] === 'pkh') {
-        ethAddress = issuerParts[4]
-      } else {
-        ethAddress = credential.issuer.ethereumAddress
-      }
-
-      if (!ethAddress) {
-        res.status(400).json({ error: 'Cannot determine user identity - address not found in credential' })
-        return
-      }
-
-      const userDriveId = `renown-${ethAddress.toLowerCase()}`
-
-      // Resolve the user's profile doc (find-or-create + refresh fields) in
-      // parallel with storing the credential — they touch independent documents.
-      const resolveUserDocId = async (): Promise<string | undefined> => {
-        if (finalDocId) return finalDocId
-
-        console.log('Setting up user drive for ethAddress:', ethAddress)
-
-        // Try to find existing RenownUser document
-        const GET_PROFILE_QUERY = `
-          query RenownUsers($input: RenownUsersInput!) {
-            renownUsers(input: $input) {
-              documentId
-              ethAddress
-            }
-          }
-        `
-
-        const profileData = await client.request<{
-          renownUsers: { documentId: string; ethAddress: string }[]
-        }>(GET_PROFILE_QUERY, {
-          input: {
-            driveId: userDriveId,
-            ethAddresses: [ethAddress],
-          },
-        })
-
-        if (profileData.renownUsers.length > 0) {
-          const existingId = profileData.renownUsers[0].documentId
-          console.log('Found existing RenownUser document:', existingId)
-
-          // Refresh username/userImage on the existing document
-          const updateActions: ReturnType<typeof makeAction>[] = []
-          if (username) {
-            updateActions.push(makeAction('SET_USERNAME', { username }))
-          }
-          if (userImage) {
-            updateActions.push(makeAction('SET_USER_IMAGE', { userImage }))
-          }
-
-          if (updateActions.length > 0) {
-            try {
-              await client.request(`
-                mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-                  mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-                    id
-                  }
-                }
-              `, {
-                documentIdentifier: existingId,
-                actions: updateActions,
-              })
-            } catch (e) {
-              console.error('Failed to update user fields:', e)
-            }
-          }
-          return existingId
-        }
-
-        // Create RenownUser document
-        console.log('Creating RenownUser document')
-        const createResult = await client.request<{
-          createEmptyDocument: { id: string }
-        }>(`
-          mutation CreateEmptyDocument($documentType: String!) {
-            createEmptyDocument(documentType: $documentType) {
-              id
-            }
-          }
-        `, {
-          documentType: 'powerhouse/renown-user',
-        })
-
-        const newId = createResult.createEmptyDocument.id
-        console.log('Created new RenownUser document:', newId)
-
-        // Set eth address, username, and userImage in a single mutateDocument call
-        const actions = [makeAction('SET_ETH_ADDRESS', { ethAddress })]
-        if (username) {
-          actions.push(makeAction('SET_USERNAME', { username }))
-        }
-        if (userImage) {
-          actions.push(makeAction('SET_USER_IMAGE', { userImage }))
-        }
-
-        await client.request(`
-          mutation MutateDocument($documentIdentifier: String!, $actions: [JSONObject!]!) {
-            mutateDocument(documentIdentifier: $documentIdentifier, actions: $actions) {
-              id
-            }
-          }
-        `, {
-          documentIdentifier: newId,
-          actions,
-        })
-
-        console.log('Set user fields on document')
-        return newId
-      }
-
-      // Credential store is the critical path; user-doc resolution runs
-      // concurrently but best-effort (its failure must not fail the store).
-      const [resolvedUserDocId, result] = await Promise.all([
-        resolveUserDocId().catch((e) => {
-          console.error('Failed to resolve user profile document:', e)
-          return undefined
-        }),
-        storeCredential({
-          driveId: userDriveId,
-          credential,
-          signature,
-          domain,
-          ethAddress,
-        }),
-      ])
-      finalDocId = resolvedUserDocId
-
-      if (result.success && result.credentialId) {
-        res.status(200).json({
-          result: true,
-          documentId: result.credentialId,
-          credentialId: result.credentialId,
-          userDocumentId: finalDocId,
-        })
-      } else {
-        res.status(500).json({ error: 'Failed to store credential' })
-      }
+      const { documentId, userDocumentId } = await issueCredential({
+        credential,
+        signature,
+        domain,
+        ethAddress,
+        username,
+        userImage,
+        docId,
+      })
+      res.status(200).json({
+        result: true,
+        documentId,
+        credentialId: documentId,
+        userDocumentId,
+      })
     } catch (e) {
-      console.error('Failed to store credential:', e)
-      res.status(500).json({ error: 'Failed to store credential', details: String(e) })
+      sendWriteError(res, e, 'Failed to store credential')
     }
   } else if (req.method === 'DELETE') {
-    const { credentialId, address, reason } = req.body as {
+    // Revoke a credential by its VC id, authorized by the issuer's
+    // personal_sign of revokeMessage(credentialId, timestamp).
+    const { credentialId, signature, timestamp, address, reason } = (req.body ?? {}) as {
       credentialId?: string
+      signature?: string
+      timestamp?: string
       address?: string
       reason?: string
     }
@@ -228,51 +82,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.status(400).json({ error: 'credentialId is required' })
       return
     }
-    if (!address) {
-      res.status(400).json({ error: 'address is required' })
+    if (!signature || !timestamp) {
+      res.status(401).json({ error: 'A signature and timestamp are required to revoke a credential' })
       return
     }
 
     try {
-      // Resolve the credential URI to its document ID by querying the user's drive
-      const userDriveId = `renown-${address.toLowerCase()}`
-      const LOOKUP_QUERY = `
-        query LookupCredential($input: RenownCredentialsInput!) {
-          renownCredentials(input: $input) {
-            documentId
-            credentialId
-          }
-        }
-      `
-      const lookup = await client.request<{
-        renownCredentials: { documentId: string; credentialId: string }[]
-      }>(LOOKUP_QUERY, {
-        input: {
-          driveId: userDriveId,
-          ethAddress: address.toLowerCase(),
-          includeRevoked: false,
-        },
-      })
-
-      const match = lookup.renownCredentials.find(c => c.credentialId === credentialId)
-      if (!match) {
-        res.status(404).json({ error: 'Credential not found' })
-        return
-      }
-
-      const success = await revokeCredential({
-        credentialId: match.documentId,
-        reason,
-      })
-
-      if (success) {
-        res.status(200).json({ result: true })
-      } else {
-        res.status(500).json({ error: 'Failed to revoke credential' })
-      }
+      await revokeCredential({ credentialId, signature, timestamp, address, reason })
+      res.status(200).json({ result: true })
     } catch (e) {
-      console.error('Failed to revoke credential:', e)
-      res.status(500).json({ error: 'Failed to revoke credential', details: String(e) })
+      sendWriteError(res, e, 'Failed to revoke credential')
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' })

@@ -1,7 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../../../utils/allow-cors'
 import { GraphQLClient } from 'graphql-request'
-import { revokeCredential } from '../../../services/renown-credential'
+import {
+  CredentialWriteError,
+  findCredentialDocuments,
+  revokeCredential,
+} from '../../../services/renown-credential'
 import { CREDENTIAL_TYPES } from '../../../services/wallet'
 import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
 
@@ -222,26 +226,56 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res.status(500).json({ error: 'Failed to fetch credentials', details: String(e) })
     }
   } else if (req.method === 'DELETE') {
-    // Revoke a credential
-    const { id, reason } = req.query
+    // Revoke the credential stored in document `id`, authorized by the
+    // issuer's personal_sign of revokeMessage(<VC id>, timestamp). The
+    // signature, timestamp and issuer address come from the JSON body or the
+    // query string.
+    const body = (req.body ?? {}) as Record<string, unknown>
+    const param = (name: string): string | undefined => {
+      const value = body[name] ?? req.query[name]
+      return typeof value === 'string' && value !== '' ? value : undefined
+    }
+    const id = param('id')
+    const signature = param('signature')
+    const timestamp = param('timestamp')
+    const address = param('address')
 
     if (!id) {
       res.status(400).json({ error: 'Credential ID is required' })
       return
     }
+    if (!signature || !timestamp) {
+      res.status(401).json({ error: 'A signature and timestamp are required to revoke a credential' })
+      return
+    }
+    if (!address) {
+      res.status(400).json({ error: 'address is required' })
+      return
+    }
 
     try {
-      const success = await revokeCredential({
-        credentialId: id as string,
-        reason: reason as string | undefined,
-      })
-
-      if (success) {
-        res.status(200).json({ result: true, credentialId: id })
-      } else {
-        res.status(500).json({ error: 'Failed to revoke credential' })
+      // The signed message names the VC id, so map the document id to it.
+      const documents = await findCredentialDocuments(address, { includeRevoked: true })
+      const match = documents.find((doc) => doc.documentId === id)
+      if (!match) {
+        res.status(404).json({ error: 'Credential not found' })
+        return
       }
+
+      await revokeCredential({
+        credentialId: match.credentialId,
+        signature,
+        timestamp,
+        address,
+        documentId: match.documentId,
+        reason: param('reason'),
+      })
+      res.status(200).json({ result: true, credentialId: id })
     } catch (e) {
+      if (e instanceof CredentialWriteError) {
+        res.status(e.status).json({ error: e.message, code: e.code })
+        return
+      }
       console.error('Failed to revoke credential:', e)
       res.status(500).json({ error: 'Failed to revoke credential', details: String(e) })
     }
