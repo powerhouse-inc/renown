@@ -1,5 +1,6 @@
 import type { Hex } from 'viem'
 import type { SignedVc } from './credentials'
+import type { UpdateProfileBody } from './profile-refresh'
 
 /** Request body for storing a signed delegation credential. */
 export interface PostCredentialBody {
@@ -77,6 +78,21 @@ export class RenownApi {
     if (!response.ok) {
       const responseData = await response.json().catch(() => ({}))
       throw new Error(responseData.error || `Failed to revoke credential (${response.status})`)
+    }
+  }
+
+  /** `POST /api/profile/update` — signed profile update; `keepalive` so a redirect right after login doesn't cancel it. */
+  async updateProfile(body: UpdateProfileBody): Promise<void> {
+    const response = await fetch(this.url('/api/profile/update'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      keepalive: true,
+    })
+
+    if (!response.ok) {
+      const responseData = await response.json().catch(() => ({}))
+      throw new Error(responseData.error || `Failed to update profile (${response.status})`)
     }
   }
 

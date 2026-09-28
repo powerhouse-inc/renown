@@ -5,6 +5,7 @@ import type { FetchCredentialResponse, RenownApi } from './renown-api'
 import { buildAndSignEip712Vc } from './credentials'
 import type { AdapterListener, LoginMethod, LoginOptions, Session, Unsubscribe } from './types'
 import { revokeMessage } from '../renown-signed-messages'
+import { refreshProfile, type ProfileRefreshOutcome, type StoredProfile } from './profile-refresh'
 
 /** Optional metadata sent with a newly issued delegation credential. */
 export interface IssueCredentialOptions {
@@ -217,6 +218,27 @@ export class AuthOrchestrator {
       credentialId: credential.id,
       userDocumentId: result.userDocumentId,
     }
+  }
+
+  /**
+   * Sign and send a profile update when the active session's ENS name or
+   * avatar differs from the stored profile. See {@link refreshProfile}.
+   */
+  async refreshProfile(params: {
+    ensName?: string | null
+    ensAvatar?: string | null
+    readProfile: (address: Hex) => Promise<StoredProfile | null>
+  }): Promise<ProfileRefreshOutcome> {
+    const session = this.getSession()
+    if (!session) return 'skipped'
+    return refreshProfile({
+      address: session.address,
+      ensName: params.ensName,
+      ensAvatar: params.ensAvatar,
+      signer: session.signer,
+      readProfile: params.readProfile,
+      updateProfile: body => this.api.updateProfile(body),
+    })
   }
 
   /** Load an existing credential for an address from the Renown API. */
