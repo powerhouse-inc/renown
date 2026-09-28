@@ -99,6 +99,19 @@ async function resolveProfileDocument(params: {
   return newId
 }
 
+/** Find-or-create the address's profile document and set the given fields; returns its id. */
+export async function legacyUpsertProfile(params: {
+  ethAddress: string
+  username?: string | null
+  userImage?: string | null
+}): Promise<string> {
+  return resolveProfileDocument({
+    ethAddress: params.ethAddress,
+    username: params.username ?? undefined,
+    userImage: params.userImage,
+  })
+}
+
 /**
  * Store a credential as a new RenownCredential document, resolving the
  * issuer's profile document alongside (best effort: its failure does not fail
