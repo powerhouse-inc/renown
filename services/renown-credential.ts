@@ -115,8 +115,35 @@ export function isUnknownSchemaError(error: unknown): boolean {
   )
 }
 
+/**
+ * For the legacy fallback, where the switchboard can't check signatures:
+ * passes only when `signature` is `address`'s fresh personal_sign of
+ * `message`, as the renown-auth subgraph would require.
+ * @throws {CredentialWriteError} 403 otherwise.
+ */
+export async function assertSignedBy(
+  address: string,
+  message: string,
+  signature: string,
+  timestamp: string,
+): Promise<void> {
+  let signed = false
+  try {
+    signed =
+      isFreshTimestamp(timestamp, new Date()) &&
+      (await verifyMessage({
+        address: address as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`,
+      }))
+  } catch {
+    signed = false
+  }
+  if (!signed) throw new CredentialWriteError(403, 'Forbidden', 'FORBIDDEN')
+}
+
 /** Maps a switchboard GraphQL error to the status the API route relays. */
-function toWriteError(error: unknown, fallbackMessage: string): CredentialWriteError {
+export function toWriteError(error: unknown, fallbackMessage: string): CredentialWriteError {
   const [first] = graphqlErrors(error)
   if (first) {
     const code = typeof first.extensions?.code === 'string' ? first.extensions.code : undefined
@@ -125,7 +152,8 @@ function toWriteError(error: unknown, fallbackMessage: string): CredentialWriteE
   return new CredentialWriteError(500, `${fallbackMessage}: ${String(error)}`)
 }
 
-function client(): GraphQLClient {
+/** A switchboard client that sends no Authorization header. */
+export function client(): GraphQLClient {
   return new GraphQLClient(SWITCHBOARD_URL)
 }
 
@@ -291,19 +319,7 @@ async function legacyRevoke(params: {
   const { credentialId, signature, timestamp, address, reason } = params
   if (!address) throw new CredentialWriteError(400, 'address is required')
 
-  let signedByAddress = false
-  try {
-    signedByAddress =
-      isFreshTimestamp(timestamp, new Date()) &&
-      (await verifyMessage({
-        address: address as `0x${string}`,
-        message: revokeMessage(credentialId, timestamp),
-        signature: signature as `0x${string}`,
-      }))
-  } catch {
-    signedByAddress = false
-  }
-  if (!signedByAddress) throw new CredentialWriteError(403, 'Forbidden', 'FORBIDDEN')
+  await assertSignedBy(address, revokeMessage(credentialId, timestamp), signature, timestamp)
 
   let documentId = params.documentId
   if (!documentId) {
