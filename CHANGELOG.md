@@ -1,3 +1,14 @@
+## 1.17.0 (2026-09-28)
+
+* test(e2e): add a scriptable stub switchboard for API-route tests ([f949a79](https://github.com/powerhouse-inc/renown/commit/f949a79))
+* test(e2e): cover profile updates and the browser revoke paths ([6615d36](https://github.com/powerhouse-inc/renown/commit/6615d36))
+* feat(api): add signed profile updates through renown_upsertProfile ([403cdb9](https://github.com/powerhouse-inc/renown/commit/403cdb9))
+* feat(api): write credentials through the renown_* mutations ([fc8f7a5](https://github.com/powerhouse-inc/renown/commit/fc8f7a5))
+* feat(auth): add a login-time profile refresh for changed ENS data ([f9152c7](https://github.com/powerhouse-inc/renown/commit/f9152c7))
+* feat(auth): add the canonical Renown signed-write messages ([e6b0067](https://github.com/powerhouse-inc/renown/commit/e6b0067))
+* feat(auth): refresh the ENS profile at login and report failed revokes ([3236097](https://github.com/powerhouse-inc/renown/commit/3236097))
+* feat(auth): sign credential revocations with the session wallet ([c29d346](https://github.com/powerhouse-inc/renown/commit/c29d346))
+
 ## 1.16.0 (2026-09-26)
 
 * test(oidc): e2e coverage for /oidc/login ([a40c3ec](https://github.com/powerhouse-inc/renown/commit/a40c3ec))
