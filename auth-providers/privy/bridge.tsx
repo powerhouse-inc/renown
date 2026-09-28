@@ -18,6 +18,9 @@ import type { PrivyAdapter } from './adapter'
 // 'users-without-wallets'`), but skips a user who already has any wallet
 // linked, e.g. an external one. Give it this long, then create it explicitly.
 const CREATE_WALLET_GRACE_MS = 5_000
+// A failed creation can race Privy's own (it errors when the wallet already
+// exists); only give up if no wallet has shown up this much later.
+const CREATE_WALLET_GIVE_UP_MS = 10_000
 
 interface PrivyAdapterBridgeProps {
   adapter: PrivyAdapter
@@ -56,6 +59,7 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
   // screen (with Privy's error in the console) instead of an endless spinner.
   const createTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const createAttemptedRef = useRef(false)
+  const hasEmbeddedRef = useRef(false)
   useEffect(
     () => () => {
       if (createTimerRef.current) clearTimeout(createTimerRef.current)
@@ -97,12 +101,14 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
     }
     if (!authenticated) {
       createAttemptedRef.current = false
+      hasEmbeddedRef.current = false
       adapter.setProvisioning(false)
       adapter.clearSession()
       adapter.markReady()
       return
     }
     const embedded = getEmbeddedConnectedWallet(wallets)
+    hasEmbeddedRef.current = !!embedded
     if (embedded) {
       if (createTimerRef.current) {
         clearTimeout(createTimerRef.current)
@@ -121,9 +127,13 @@ export function PrivyAdapterBridge({ adapter }: PrivyAdapterBridgeProps) {
           createAttemptedRef.current = true
           fnsRef.current.createWallet().catch((error: unknown) => {
             console.error('Privy could not create the embedded wallet:', error)
-            adapter.setProvisioning(false)
-            adapter.handleLoginError(error)
-            void fnsRef.current.logout()
+            createTimerRef.current = setTimeout(() => {
+              createTimerRef.current = null
+              if (hasEmbeddedRef.current) return
+              adapter.setProvisioning(false)
+              adapter.handleLoginError(error)
+              void fnsRef.current.logout()
+            }, CREATE_WALLET_GIVE_UP_MS)
           })
         }, CREATE_WALLET_GRACE_MS)
       }
