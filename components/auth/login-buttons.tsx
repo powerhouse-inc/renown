@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAtomValue } from "jotai";
+import { signOutNoticeAtom } from "../../hooks/auth";
 import { Icon, type IconifyIcon } from "@iconify/react";
 import Button from "../ui/button";
 import {
@@ -97,6 +99,7 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
     const lastLoginMethod = useLastLoginMethod();
     const { track } = useOpenPanelAnalytics();
     const [pending, setPending] = useState<LoginMethod | null>(null);
+    const signOutNotice = useAtomValue(signOutNoticeAtom);
 
     const walletEnabled = supported.includes(LoginMethod.WALLET);
     const others = NON_WALLET_ORDER.filter(method => supported.includes(method));
@@ -193,6 +196,11 @@ export function LoginButtons({ onError, className, plain = false }: LoginButtons
 
     return (
         <div className={`flex flex-col w-full gap-3 ${className ?? ""}`}>
+            {signOutNotice && (
+                <p role="status" className="p-2 rounded-sm text-xs bg-destructive/10 text-destructive">
+                    {signOutNotice}
+                </p>
+            )}
             {walletEnabled && renderButton(LoginMethod.WALLET, "primary")}
             {walletEnabled && others.length > 0 && (
                 <div className="flex items-center gap-3 my-1">
