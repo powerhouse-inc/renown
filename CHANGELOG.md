@@ -1,3 +1,7 @@
+## <small>1.17.1 (2026-09-28)</small>
+
+* fix(auth): fall back to Confirm when a silent sign fails or never settles ([3bcc50f](https://github.com/powerhouse-inc/renown/commit/3bcc50f))
+
 ## 1.17.0 (2026-09-28)
 
 * test(e2e): add a scriptable stub switchboard for API-route tests ([f949a79](https://github.com/powerhouse-inc/renown/commit/f949a79))
