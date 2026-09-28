@@ -23,6 +23,10 @@ export interface PostCredentialResponse {
 export interface DeleteCredentialBody {
   credentialId: string
   address: Hex
+  /** The issuer's personal_sign of `revokeMessage(credentialId, timestamp)`. */
+  signature: Hex
+  /** ISO-8601 time the revocation was signed at. */
+  timestamp: string
   reason?: string
 }
 

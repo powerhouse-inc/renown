@@ -7,6 +7,7 @@ import { useVerifyToken } from "../../hooks/useVerifyToken";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import AppCard from "../ui/app-card";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { RevokeSignatureRejectedError } from "../../services/wallet/orchestrator";
 
 interface CredentialDetails {
     documentId: string;
@@ -38,6 +39,7 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
     const address = session?.address;
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [revoking, setRevoking] = useState(false);
+    const [revokeError, setRevokeError] = useState<string | null>(null);
     const { verifyToken, isVerifying, verificationResult } = useVerifyToken();
     const { track } = useOpenPanelAnalytics();
 
@@ -92,17 +94,30 @@ const Credential: React.FC<IProps> = ({ appId, returnUrl }) => {
                             disabled={revoking || !credential}
                             onClick={async () => {
                                 setRevoking(true);
+                                setRevokeError(null);
                                 try {
                                     await revokeCredential();
                                     track(ANALYTICS_EVENTS.credentialRevoked, { appId });
                                 }
-                                catch (error) { console.error('Failed to revoke credential:', error); }
+                                catch (error) {
+                                    if (error instanceof RevokeSignatureRejectedError) {
+                                        setRevokeError('Revocation cancelled: approve the signature request in your wallet to revoke. Your authorization is still active.');
+                                    } else {
+                                        console.error('Failed to revoke credential:', error);
+                                        setRevokeError('Could not revoke the authorization. Please try again.');
+                                    }
+                                }
                                 finally { setRevoking(false); }
                             }}
                         >
                             {revoking ? 'Revoking...' : 'Revoke'}
                         </button>
                     </div>
+                    {revokeError && (
+                        <div role="alert" className="mt-2 p-2 rounded-sm text-xs bg-destructive/10 text-destructive">
+                            {revokeError}
+                        </div>
+                    )}
                     {verificationResult && (
                         <div className={`mt-2 p-2 rounded-sm text-xs ${verificationResult.valid ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                             {verificationResult.valid ? '✓ Token is valid' : `✗ ${verificationResult.error || 'Token is invalid'}`}

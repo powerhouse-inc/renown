@@ -4,6 +4,7 @@ import type { AdapterRegistry } from './registry'
 import type { FetchCredentialResponse, RenownApi } from './renown-api'
 import { buildAndSignEip712Vc } from './credentials'
 import type { AdapterListener, LoginMethod, LoginOptions, Session, Unsubscribe } from './types'
+import { revokeMessage } from '../renown-signed-messages'
 
 /** Optional metadata sent with a newly issued delegation credential. */
 export interface IssueCredentialOptions {
@@ -12,6 +13,14 @@ export interface IssueCredentialOptions {
   driveId?: string
   docId?: string
   expiresInDays?: number
+}
+
+/** Thrown when the wallet did not sign a revocation (the user declined, or signing failed). */
+export class RevokeSignatureRejectedError extends Error {
+  constructor(cause?: unknown) {
+    super('The revocation was not signed, so the credential is still active.', { cause })
+    this.name = 'RevokeSignatureRejectedError'
+  }
 }
 
 /** Outcome of {@link AuthOrchestrator.issueDelegationVc}. */
@@ -219,8 +228,27 @@ export class AuthOrchestrator {
     return this.api.fetchCredential(params)
   }
 
-  /** Revoke a credential on the Renown API (e.g. on logout). */
+  /**
+   * Revoke a credential on the Renown API (e.g. on logout). The active
+   * session's signer signs `revokeMessage(credentialId, now)`, which the
+   * switchboard checks against the credential's issuer: Privy signs silently,
+   * an external wallet prompts the user.
+   * @throws {RevokeSignatureRejectedError} If the signature was not given; nothing is revoked.
+   */
   async revokeCredential(credentialId: string, address: Hex, reason = 'User logged out'): Promise<void> {
-    await this.api.deleteCredential({ credentialId, address, reason })
+    const session = this.getSession()
+    if (!session) {
+      throw new Error('Cannot revoke credential: no active session')
+    }
+
+    const timestamp = new Date().toISOString()
+    let signature: Hex
+    try {
+      signature = await session.signer.signMessage(revokeMessage(credentialId, timestamp))
+    } catch (e) {
+      throw new RevokeSignatureRejectedError(e)
+    }
+
+    await this.api.deleteCredential({ credentialId, address, signature, timestamp, reason })
   }
 }

@@ -46,19 +46,17 @@ export function useCredential(appId: string, returnUrl?: string): ICredential {
         [login]
     );
 
+    // Rejects with RevokeSignatureRejectedError when the wallet did not sign
+    // the revocation; the credential is then still active.
     const revokeCredential = useCallback(async () => {
-        try {
-            if (!jwt) {
-                return;
-            }
-            await logout();
-            // Mark this address as just-revoked so the auto-sign effect in the
-            // web flow won't immediately recreate a credential for the same
-            // session. Cleared by signOut (Disconnect) or page refresh.
-            if (session?.address) setRevokedAddress(session.address);
-        } catch (e) {
-            console.error('Failed to revoke credential:', e);
+        if (!jwt) {
+            return;
         }
+        await logout();
+        // Mark this address as just-revoked so the auto-sign effect in the
+        // web flow won't immediately recreate a credential for the same
+        // session. Cleared by signOut (Disconnect) or page refresh.
+        if (session?.address) setRevokedAddress(session.address);
     }, [
         logout,
         jwt,
