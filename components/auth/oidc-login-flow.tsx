@@ -89,6 +89,9 @@ const OidcLoginFlow: React.FC<OidcLoginFlowProps> = ({ requestId, issuer }) => {
                     >
                         {view.submitting ? "Signing…" : `Continue as ${shortenAddress(view.address)}`}
                     </Button>
+                    {view.errorMessage && (
+                        <p className="mt-4 text-center text-destructive">{view.errorMessage}</p>
+                    )}
                     <p className="mt-4 text-center text-sm text-muted-foreground">
                         You will be asked to sign a message. It costs nothing and grants no access
                         to your funds.
