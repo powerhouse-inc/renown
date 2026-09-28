@@ -1,15 +1,19 @@
 import { test, expect } from '@playwright/test'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { revokeMessage } from '../services/renown-signed-messages'
+import { verifyMessage } from 'viem'
+import { profileMessage, revokeMessage } from '../services/renown-signed-messages'
+import { installInjectedWallet, type InjectedWallet } from './support/injected-wallet'
 import { graphqlError, resetStub, scriptStub, stubRequests } from './support/stub-switchboard-client'
 
-// The credential write routes call the switchboard server-side, so these
-// tests drive the stub switchboard the dev server is pointed at (see
-// playwright.config.ts) and assert on what it received.
+// The write routes call the switchboard server-side, so these tests drive the
+// stub switchboard the dev server is pointed at (see playwright.config.ts) and
+// assert on what it received. Every test that scripts the stub lives in this
+// file: the stub is shared, so they must run one at a time.
 test.describe.configure({ mode: 'serial' })
 
 const UNKNOWN_REVOKE = 'Cannot query field "renown_revokeCredential" on type "Mutation".'
 const UNKNOWN_ISSUE = 'Cannot query field "renown_issueCredential" on type "Mutation".'
+const UNKNOWN_UPSERT = 'Cannot query field "renown_upsertProfile" on type "Mutation".'
 
 let counter = 0
 function uniqueId(prefix: string): string {
@@ -279,7 +283,241 @@ test.describe('POST /api/credential/renown', () => {
     const response = await request.post('/api/credential/renown', {
       data: makeCredentialBody(account.address, credentialId),
     })
-    expect(response.status()).toBeGreaterThanOrEqual(400)
+    expect(response.status()).toBe(500)
     expect(await stubRequests('createEmptyDocument')).toHaveLength(0)
+  })
+})
+
+async function signedProfile(
+  profile: { username: string; userImage: string | null },
+  key = generatePrivateKey(),
+) {
+  const account = privateKeyToAccount(key)
+  const timestamp = new Date().toISOString()
+  const signature = await account.signMessage({
+    message: await profileMessage(account.address, profile, timestamp),
+  })
+  return { address: account.address, ...profile, signature, timestamp }
+}
+
+test.describe('POST /api/profile/update', () => {
+  test('without a signature returns 401 and writes nothing', async ({ request }) => {
+    const address = privateKeyToAccount(generatePrivateKey()).address
+    const response = await request.post('/api/profile/update', { data: { address, username: 'frank.eth' } })
+    expect(response.status()).toBe(401)
+    expect(await stubRequests('renown_upsertProfile')).toHaveLength(0)
+    expect(await stubRequests('mutateDocument')).toHaveLength(0)
+  })
+
+  test('forwards renown_upsertProfile without a bearer', async ({ request }) => {
+    const body = await signedProfile({ username: 'frank.eth', userImage: 'https://example.com/a.png' })
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: body.address,
+      response: { data: { renown_upsertProfile: 'doc-profile' } },
+    })
+
+    const response = await request.post('/api/profile/update', {
+      data: body,
+      headers: { Authorization: 'Bearer should-not-be-forwarded' },
+    })
+    expect(response.status()).toBe(200)
+    expect(await response.json()).toMatchObject({ result: true, documentId: 'doc-profile' })
+
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === body.address)
+    expect(call?.variables).toEqual({
+      address: body.address,
+      username: 'frank.eth',
+      userImage: 'https://example.com/a.png',
+      signature: body.signature,
+      timestamp: body.timestamp,
+    })
+    expect(call?.headers.authorization).toBeUndefined()
+    expect(await stubRequests('mutateDocument')).toHaveLength(0)
+  })
+
+  for (const [code, status] of [
+    ['FORBIDDEN', 403],
+    ['BAD_USER_INPUT', 400],
+    ['RATE_LIMITED', 429],
+  ] as const) {
+    test(`relays ${code} as ${status} without falling back`, async ({ request }) => {
+      const body = await signedProfile({ username: 'frank.eth', userImage: null })
+      await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: graphqlError(code, code) })
+
+      const response = await request.post('/api/profile/update', { data: body })
+      expect(response.status()).toBe(status)
+      expect(await stubRequests('mutateDocument')).toHaveLength(0)
+    })
+  }
+
+  test('falls back to the legacy profile write on a switchboard without renown_* mutations', async ({ request }) => {
+    const body = await signedProfile({ username: 'frank.eth', userImage: null })
+    const documentId = uniqueId('doc-profile-legacy')
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: graphqlError(UNKNOWN_UPSERT) })
+    await scriptStub({
+      match: 'renownUsers',
+      variables: body.address.toLowerCase(),
+      response: { data: { renownUsers: [{ documentId, ethAddress: body.address.toLowerCase() }] } },
+    })
+    await scriptStub({ match: 'mutateDocument', variables: documentId, response: { data: { mutateDocument: { id: documentId } } } })
+
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(200)
+    expect(await response.json()).toMatchObject({ documentId })
+
+    const write = (await stubRequests('mutateDocument')).find((c) => c.variables.documentIdentifier === documentId)
+    expect(JSON.stringify(write?.variables.actions)).toContain('"type":"SET_USERNAME"')
+  })
+
+  test('legacy fallback refuses a signature by another address', async ({ request }) => {
+    const body = await signedProfile({ username: 'frank.eth', userImage: null })
+    const victim = privateKeyToAccount(generatePrivateKey()).address
+    await scriptStub({ match: 'renown_upsertProfile', variables: victim, response: graphqlError(UNKNOWN_UPSERT) })
+
+    const response = await request.post('/api/profile/update', { data: { ...body, address: victim } })
+    expect(response.status()).toBe(403)
+    expect(await stubRequests('mutateDocument')).toHaveLength(0)
+  })
+})
+
+// Browser-level: the web flow with an injected test wallet. The credential
+// read (GET /api/auth/credential) is answered in the browser once the
+// credential was posted, since the stub has no read model; the writes go
+// through the real API routes to the stub switchboard.
+test.describe('web flow credential revocation', () => {
+  const APP_DID = 'did:web:test.example'
+  const FLOW_URL = `/?app=${APP_DID}&returnUrl=${encodeURIComponent('http://localhost:3000/done')}`
+
+  interface Flow {
+    wallet: InjectedWallet
+    /** DELETE requests the browser sent. */
+    deletes: string[]
+    /** Profile updates the browser sent. */
+    profileUpdates: string[]
+    credentialId: () => string
+  }
+
+  async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
+    // Nothing leaves localhost: ENS lookups fail fast, so the flow has no ENS name.
+    await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
+    const wallet = await installInjectedWallet(page)
+    let issued: { credential: { id: string; credentialSubject: unknown } } | null = null
+    let revoked = false
+    await page.route('**/api/credential/renown', async (route) => {
+      const method = route.request().method()
+      if (method === 'POST') issued = route.request().postDataJSON()
+      const response = await route.fetch()
+      if (method === 'DELETE' && response.ok()) revoked = true
+      await route.fulfill({ response })
+    })
+    // Like the real read (includeRevoked: false), a revoked credential is gone.
+    await page.route('**/api/auth/credential?*', (route) =>
+      issued && !revoked
+        ? route.fulfill({
+            json: { credential: { id: issued.credential.id, credentialSubject: issued.credential.credentialSubject } },
+          })
+        : route.fulfill({ status: 404, json: { error: 'Credential not found' } }),
+    )
+    const deletes: string[] = []
+    const profileUpdates: string[] = []
+    page.on('request', (r) => {
+      if (r.method() === 'DELETE') deletes.push(r.url())
+      if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
+    })
+    await scriptStub({
+      match: 'renown_issueCredential',
+      variables: wallet.address.toLowerCase(),
+      response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
+    })
+
+    await page.goto(FLOW_URL)
+    await page.getByRole('button', { name: 'Confirm Authorization' }).click({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
+    return {
+      wallet,
+      deletes,
+      profileUpdates,
+      credentialId: () => {
+        if (!issued) throw new Error('no credential was issued')
+        return issued.credential.id
+      },
+    }
+  }
+
+  test.beforeEach(() => {
+    test.setTimeout(90_000)
+  })
+
+  test('login without an ENS name signs nothing beyond the credential', async ({ page }) => {
+    const flow = await authorize(page)
+    expect(flow.wallet.personalSignRequests).toEqual([])
+    expect(flow.profileUpdates).toEqual([])
+  })
+
+  test('a declined revoke signature sends no DELETE and says so', async ({ page }) => {
+    const flow = await authorize(page)
+    flow.wallet.declinePersonalSign = true
+
+    await page.getByRole('button', { name: 'Revoke' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Revocation cancelled' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible()
+    expect(flow.wallet.personalSignRequests).toHaveLength(1)
+    expect(flow.wallet.personalSignRequests[0]).toMatch(
+      new RegExp(`^Revoke Renown credential ${flow.credentialId()} at \\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z$`),
+    )
+    expect(flow.deletes).toEqual([])
+  })
+
+  test('a revoke the switchboard refuses is reported, not shown as done', async ({ page }) => {
+    const flow = await authorize(page)
+    await scriptStub({
+      match: 'renown_revokeCredential',
+      variables: flow.credentialId(),
+      response: graphqlError('Forbidden', 'FORBIDDEN'),
+    })
+
+    await page.getByRole('button', { name: 'Revoke' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not revoke' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible()
+    expect(flow.deletes).toHaveLength(1)
+  })
+
+  test('a signed revoke reaches the switchboard with a signature by the wallet', async ({ page }) => {
+    const flow = await authorize(page)
+    await scriptStub({
+      match: 'renown_revokeCredential',
+      variables: flow.credentialId(),
+      response: { data: { renown_revokeCredential: true } },
+    })
+
+    await page.getByRole('button', { name: 'Revoke' }).click()
+    await expect(page.getByRole('button', { name: 'Confirm Authorization' })).toBeVisible({ timeout: 30_000 })
+
+    const call = (await stubRequests('renown_revokeCredential')).find(
+      (c) => c.variables.credentialId === flow.credentialId(),
+    )
+    const { signature, timestamp } = call!.variables as { signature: `0x${string}`; timestamp: string }
+    expect(
+      await verifyMessage({
+        address: flow.wallet.address,
+        message: revokeMessage(flow.credentialId(), timestamp),
+        signature,
+      }),
+    ).toBe(true)
+    expect(call!.headers.authorization).toBeUndefined()
+  })
+
+  test('Disconnect with a declined revoke signature signs out and says the authorization stays active', async ({
+    page,
+  }) => {
+    const flow = await authorize(page)
+    flow.wallet.declinePersonalSign = true
+
+    await page.getByRole('button', { name: 'Disconnect' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'without revoking your authorization' })).toBeVisible({
+      timeout: 30_000,
+    })
+    expect(flow.deletes).toEqual([])
   })
 })
