@@ -4,12 +4,14 @@ import { useCredential } from "../../hooks/credential";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import { CliCard } from "./cli-card";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
+import { CredentialValidityNotice } from "./credential-validity-notice";
 
 interface ConsoleConfirmAuthorizationProps {
     sessionId: string;
     connectDid: string;
     ensName?: string | null;
     ensAvatar?: string | null;
+    expiresInDays: number;
 }
 
 export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationProps> = ({
@@ -17,9 +19,10 @@ export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationPr
     connectDid,
     ensName,
     ensAvatar,
+    expiresInDays,
 }) => {
     const session = useSession();
-    const { createCredential, loading } = useCredential(connectDid);
+    const { createCredential, loading } = useCredential(connectDid, undefined, expiresInDays);
     const { track } = useOpenPanelAnalytics();
 
     const handleCreateCredential = useCallback(() => {
@@ -35,6 +38,7 @@ export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationPr
     return (
         <div className="flex flex-col w-full gap-3">
             <CliCard sessionId={sessionId} />
+            <CredentialValidityNotice expiresInDays={expiresInDays} />
             <Button
                 primary
                 onClick={handleCreateCredential}

@@ -5,11 +5,13 @@ import { useRouter } from "next/router";
 import ConsoleFlow from "../components/auth/console-flow";
 import PageBackground from "../components/ui/page-background";
 import { useIsClient } from "../hooks/useIsClient";
+import { parseExpiresInDays } from "../utils/credential-validity";
 
 const ConsolePage: NextPage = () => {
     const router = useRouter();
     const sessionId = router.query["session"]?.toString();
     const connectDid = router.query["connect"]?.toString(); // CLI's DID to authorize
+    const expiresInDays = parseExpiresInDays(router.query["expiresInDays"]);
     const isClient = useIsClient();
 
     return (
@@ -22,7 +24,7 @@ const ConsolePage: NextPage = () => {
 
                 <main className={styles.main}>
                     {sessionId && isClient ? (
-                        <ConsoleFlow sessionId={sessionId} connectDid={connectDid} />
+                        <ConsoleFlow sessionId={sessionId} connectDid={connectDid} expiresInDays={expiresInDays} />
                     ) : !sessionId && isClient ? (
                         <div className="text-center text-muted-foreground">
                             <h2 className="text-2xl font-semibold mb-4">Invalid Session</h2>

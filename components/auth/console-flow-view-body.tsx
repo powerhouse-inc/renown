@@ -11,6 +11,7 @@ interface ConsoleFlowViewBodyProps {
     address?: string;
     ensName?: string | null;
     ensAvatar?: string | null;
+    expiresInDays: number;
 }
 
 export function ConsoleFlowViewBody({
@@ -20,6 +21,7 @@ export function ConsoleFlowViewBody({
     address,
     ensName,
     ensAvatar,
+    expiresInDays,
 }: ConsoleFlowViewBodyProps) {
     switch (view.kind) {
         case "loading":
@@ -33,6 +35,7 @@ export function ConsoleFlowViewBody({
                     connectDid={connectDid!}
                     ensName={view.ensName}
                     ensAvatar={view.ensAvatar}
+                    expiresInDays={expiresInDays}
                 />
             );
         case "completed":

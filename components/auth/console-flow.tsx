@@ -5,15 +5,22 @@ import RenownCard from "../ui/renown-card";
 import { ConsoleFlowViewBody } from "./console-flow-view-body";
 import { InvalidConsoleLink } from "./invalid-console-link";
 import { ProfileCard } from "./profile-card";
+import { DEFAULT_CREDENTIAL_VALIDITY_DAYS } from "../../utils/credential-validity";
 
 interface IProps {
     sessionId: string;
     connectDid?: string;
+    /** Validity of the credential to issue, already parsed and clamped. */
+    expiresInDays?: number;
 }
 
-const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
+const ConsoleFlow: React.FC<IProps> = ({
+    sessionId,
+    connectDid,
+    expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+}) => {
     const { view, title, subtitle, address, ensName, ensAvatar, userDocId, disconnect } =
-        useConsoleAuthFlow({ sessionId, connectDid });
+        useConsoleAuthFlow({ sessionId, connectDid, expiresInDays });
 
     if (view.kind === "invalid-link") {
         return <InvalidConsoleLink />;
@@ -45,6 +52,7 @@ const ConsoleFlow: React.FC<IProps> = ({ sessionId, connectDid }) => {
                         address={address}
                         ensName={ensName}
                         ensAvatar={ensAvatar}
+                        expiresInDays={expiresInDays}
                     />
                 </div>
             </RenownCard>
