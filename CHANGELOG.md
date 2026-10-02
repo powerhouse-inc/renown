@@ -1,3 +1,9 @@
+## 1.18.0 (2026-10-02)
+
+* feat(auth): accept expiresInDays on the app and console flows ([d6d4375](https://github.com/powerhouse-inc/renown/commit/d6d4375))
+* feat(auth): thread a requested credential validity through the auth hooks ([2c59dcf](https://github.com/powerhouse-inc/renown/commit/2c59dcf))
+* feat(credential): parse and describe a requested credential validity ([c917d6f](https://github.com/powerhouse-inc/renown/commit/c917d6f))
+
 ## <small>1.17.2 (2026-09-28)</small>
 
 * fix(privy): create the embedded wallet when Privy skipped it at login ([dece736](https://github.com/powerhouse-inc/renown/commit/dece736))
