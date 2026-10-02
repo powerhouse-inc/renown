@@ -8,9 +8,10 @@ interface WebFlowViewBodyProps {
     view: AuthFlowView;
     appId: string;
     returnUrl?: string;
+    expiresInDays: number;
 }
 
-export function WebFlowViewBody({ view, appId, returnUrl }: WebFlowViewBodyProps) {
+export function WebFlowViewBody({ view, appId, returnUrl, expiresInDays }: WebFlowViewBodyProps) {
     switch (view.kind) {
         case "loading":
             return <LoadingBody />;
@@ -23,6 +24,7 @@ export function WebFlowViewBody({ view, appId, returnUrl }: WebFlowViewBodyProps
                     returnUrl={returnUrl}
                     ensName={view.ensName}
                     ensAvatar={view.ensAvatar}
+                    expiresInDays={expiresInDays}
                 />
             );
         case "authorized":

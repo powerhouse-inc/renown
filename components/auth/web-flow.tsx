@@ -5,11 +5,14 @@ import RenownCard from "../ui/renown-card";
 import { ProfileCard } from "./profile-card";
 import { ReturnToAppButton } from "./return-to-app-button";
 import { WebFlowViewBody } from "./web-flow-view-body";
+import { DEFAULT_CREDENTIAL_VALIDITY_DAYS } from "../../utils/credential-validity";
 
 interface IProps {
     appId: string;
     deeplink?: string;
     returnUrl?: string;
+    /** Validity of the credential to issue, already parsed and clamped. */
+    expiresInDays?: number;
 }
 
 const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
@@ -17,11 +20,17 @@ const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
 const showsProfileCard = (kind: AuthFlowView["kind"]): boolean =>
     kind === "needs-authorization" || kind === "authorized";
 
-export const WebFlow: React.FC<IProps> = ({ appId, deeplink, returnUrl = connectUrl }) => {
+export const WebFlow: React.FC<IProps> = ({
+    appId,
+    deeplink,
+    returnUrl = connectUrl,
+    expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+}) => {
     const { view, title, subtitle, address, ensName, ensAvatar, userDocId, disconnect } = useAuthFlow({
         appId,
         returnUrl,
         deeplink,
+        expiresInDays,
     });
 
     return (
@@ -43,7 +52,7 @@ export const WebFlow: React.FC<IProps> = ({ appId, deeplink, returnUrl = connect
                         />
                     )}
 
-                    <WebFlowViewBody view={view} appId={appId} returnUrl={returnUrl} />
+                    <WebFlowViewBody view={view} appId={appId} returnUrl={returnUrl} expiresInDays={expiresInDays} />
 
                     {view.kind === "authorized" && (
                         <ReturnToAppButton
