@@ -26,6 +26,8 @@ interface LoginOptions {
   returnUrl?: string
   ensName?: string | null
   ensAvatar?: string | null
+  /** Validity of the issued credential; the orchestrator's default when unset. */
+  expiresInDays?: number
 }
 
 interface UseAuthReturn {
@@ -146,6 +148,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
             userImage: options?.ensAvatar,
             driveId: options?.driveId,
             docId: options?.userDocId,
+            expiresInDays: options?.expiresInDays,
           },
         )
 

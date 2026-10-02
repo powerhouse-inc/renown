@@ -7,6 +7,7 @@ import { useCredentialReady } from "./use-credential-ready";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
 import { useAutoSignCredential } from "./use-auto-sign-credential";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
+import { DEFAULT_CREDENTIAL_VALIDITY_DAYS, isDefaultCredentialValidity } from "../utils/credential-validity";
 
 /**
  * Tagged union of the four paint states the web authorization flow can be in.
@@ -36,6 +37,8 @@ interface UseAuthFlowArgs {
     appId: string;
     returnUrl?: string;
     deeplink?: string;
+    /** Validity of the credential this flow issues; defaults to 7 days. */
+    expiresInDays?: number;
 }
 
 function buildRedirectUrl(args: {
@@ -52,17 +55,24 @@ function buildRedirectUrl(args: {
     return url.toString();
 }
 
-export function useAuthFlow({ appId, returnUrl, deeplink }: UseAuthFlowArgs): AuthFlowResult {
+export function useAuthFlow({
+    appId,
+    returnUrl,
+    deeplink,
+    expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+}: UseAuthFlowArgs): AuthFlowResult {
     const session = useSession();
     const address = session?.address;
     const chainId = session?.chainId ?? 1;
-    const autoSign = session?.autoSign ?? false;
+    // A non-default validity is never signed silently: the user confirms it
+    // on the Confirm Authorization view, which states it.
+    const autoSign = (session?.autoSign ?? false) && isDefaultCredentialValidity(expiresInDays);
 
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
 
     const { hasCredential, loading: credentialLoading, initializing: credentialInitializing, createCredential } =
-        useCredential(appId, returnUrl);
+        useCredential(appId, returnUrl, expiresInDays);
     const { userDocId, signOut } = useAuth(appId);
     const { track } = useOpenPanelAnalytics();
     const credentialReady = useCredentialReady(address, chainId, appId, hasCredential);

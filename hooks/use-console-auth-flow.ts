@@ -6,6 +6,7 @@ import { useCredential } from "./credential";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
 import { useAutoSignCredential } from "./use-auto-sign-credential";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
+import { DEFAULT_CREDENTIAL_VALIDITY_DAYS, isDefaultCredentialValidity } from "../utils/credential-validity";
 
 /**
  * Tagged union of the paint states the console authorization flow can be in.
@@ -36,13 +37,21 @@ export interface ConsoleAuthFlowResult {
 interface UseConsoleAuthFlowArgs {
     sessionId: string;
     connectDid?: string;
+    /** Validity of the credential this flow issues; defaults to 7 days. */
+    expiresInDays?: number;
 }
 
-export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlowArgs): ConsoleAuthFlowResult {
+export function useConsoleAuthFlow({
+    sessionId,
+    connectDid,
+    expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+}: UseConsoleAuthFlowArgs): ConsoleAuthFlowResult {
     const session = useSession();
     const address = session?.address;
     const chainId = session?.chainId ?? 1;
-    const autoSign = session?.autoSign ?? false;
+    // A non-default validity is never signed silently: the user confirms it
+    // on the authorization view, which states it.
+    const autoSign = (session?.autoSign ?? false) && isDefaultCredentialValidity(expiresInDays);
 
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
@@ -53,7 +62,7 @@ export function useConsoleAuthFlow({ sessionId, connectDid }: UseConsoleAuthFlow
         loading: credentialLoading,
         initializing: credentialInitializing,
         createCredential,
-    } = useCredential(connectDid ?? "");
+    } = useCredential(connectDid ?? "", undefined, expiresInDays);
     const { userDocId, did, signOut } = useAuth(connectDid);
 
     const { track } = useOpenPanelAnalytics();
