@@ -3,7 +3,13 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { verifyMessage } from 'viem'
 import { profileMessage, revokeMessage, type ProfileFields } from '../services/renown-signed-messages'
 import { installInjectedWallet, type InjectedWallet } from './support/injected-wallet'
-import { graphqlError, resetStub, scriptStub, stubRequests } from './support/stub-switchboard-client'
+import {
+  graphqlError,
+  resetStub,
+  scriptStub,
+  stubRequests,
+  STUB_SWITCHBOARD_URL,
+} from './support/stub-switchboard-client'
 
 // The write routes call the switchboard server-side, so these tests drive the
 // stub switchboard the dev server is pointed at (see playwright.config.ts) and
@@ -434,66 +440,67 @@ test.describe('POST /api/profile/update', () => {
 // read (GET /api/auth/credential) is answered in the browser once the
 // credential was posted, since the stub has no read model; the writes go
 // through the real API routes to the stub switchboard.
+const APP_DID = 'did:web:test.example'
+const FLOW_URL = `/?app=${APP_DID}&returnUrl=${encodeURIComponent('http://localhost:3000/done')}`
+
+interface Flow {
+  wallet: InjectedWallet
+  /** DELETE requests the browser sent. */
+  deletes: string[]
+  /** Profile updates the browser sent. */
+  profileUpdates: string[]
+  credentialId: () => string
+}
+
+async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
+  // Nothing leaves localhost: ENS lookups fail fast, so the flow has no ENS name.
+  await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
+  const wallet = await installInjectedWallet(page)
+  let issued: { credential: { id: string; credentialSubject: unknown } } | null = null
+  let revoked = false
+  await page.route('**/api/credential/renown', async (route) => {
+    const method = route.request().method()
+    if (method === 'POST') issued = route.request().postDataJSON()
+    const response = await route.fetch()
+    if (method === 'DELETE' && response.ok()) revoked = true
+    await route.fulfill({ response })
+  })
+  // Like the real read (includeRevoked: false), a revoked credential is gone.
+  await page.route('**/api/auth/credential?*', (route) =>
+    issued && !revoked
+      ? route.fulfill({
+          json: { credential: { id: issued.credential.id, credentialSubject: issued.credential.credentialSubject } },
+        })
+      : route.fulfill({ status: 404, json: { error: 'Credential not found' } }),
+  )
+  const deletes: string[] = []
+  const profileUpdates: string[] = []
+  page.on('request', (r) => {
+    if (r.method() === 'DELETE') deletes.push(r.url())
+    if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
+  })
+  await scriptStub({
+    match: 'renown_issueCredential',
+    variables: wallet.address.toLowerCase(),
+    response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
+  })
+
+  await page.goto(FLOW_URL)
+  await page.getByRole('button', { name: 'Confirm Authorization' }).click({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
+  return {
+    wallet,
+    deletes,
+    profileUpdates,
+    credentialId: () => {
+      if (!issued) throw new Error('no credential was issued')
+      return issued.credential.id
+    },
+  }
+}
+
+
 test.describe('web flow credential revocation', () => {
-  const APP_DID = 'did:web:test.example'
-  const FLOW_URL = `/?app=${APP_DID}&returnUrl=${encodeURIComponent('http://localhost:3000/done')}`
-
-  interface Flow {
-    wallet: InjectedWallet
-    /** DELETE requests the browser sent. */
-    deletes: string[]
-    /** Profile updates the browser sent. */
-    profileUpdates: string[]
-    credentialId: () => string
-  }
-
-  async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
-    // Nothing leaves localhost: ENS lookups fail fast, so the flow has no ENS name.
-    await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
-    const wallet = await installInjectedWallet(page)
-    let issued: { credential: { id: string; credentialSubject: unknown } } | null = null
-    let revoked = false
-    await page.route('**/api/credential/renown', async (route) => {
-      const method = route.request().method()
-      if (method === 'POST') issued = route.request().postDataJSON()
-      const response = await route.fetch()
-      if (method === 'DELETE' && response.ok()) revoked = true
-      await route.fulfill({ response })
-    })
-    // Like the real read (includeRevoked: false), a revoked credential is gone.
-    await page.route('**/api/auth/credential?*', (route) =>
-      issued && !revoked
-        ? route.fulfill({
-            json: { credential: { id: issued.credential.id, credentialSubject: issued.credential.credentialSubject } },
-          })
-        : route.fulfill({ status: 404, json: { error: 'Credential not found' } }),
-    )
-    const deletes: string[] = []
-    const profileUpdates: string[] = []
-    page.on('request', (r) => {
-      if (r.method() === 'DELETE') deletes.push(r.url())
-      if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
-    })
-    await scriptStub({
-      match: 'renown_issueCredential',
-      variables: wallet.address.toLowerCase(),
-      response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
-    })
-
-    await page.goto(FLOW_URL)
-    await page.getByRole('button', { name: 'Confirm Authorization' }).click({ timeout: 30_000 })
-    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
-    return {
-      wallet,
-      deletes,
-      profileUpdates,
-      credentialId: () => {
-        if (!issued) throw new Error('no credential was issued')
-        return issued.credential.id
-      },
-    }
-  }
-
   test.beforeEach(() => {
     test.setTimeout(90_000)
   })
@@ -570,3 +577,126 @@ test.describe('web flow credential revocation', () => {
     expect(flow.deletes).toEqual([])
   })
 })
+
+// The profile editor in the browser: the wallet session comes from the web
+// flow (authorize), the upload bearer from window.__renownE2eBearer, uploads
+// go to the stub's media route and its fake S3, and the save goes through
+// /api/profile/update to the stub switchboard.
+test.describe('profile editor', () => {
+  // 1×1 PNG.
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+
+  test.beforeEach(() => {
+    test.setTimeout(120_000)
+  })
+
+  async function openEditor(page: import('@playwright/test').Page, taken: string[] = []) {
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eBearer?: string }).__renownE2eBearer = 'e2e-bearer'
+    })
+    const flow = await authorize(page)
+    const uploads: { authorization?: string; body: unknown }[] = []
+    page.on('request', (r) => {
+      if (r.url().endsWith('/media/uploads')) uploads.push({ authorization: r.headers().authorization, body: r.postDataJSON() })
+    })
+    // The editor reads the profile and checks handles from the browser.
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql`, async (route) => {
+      const { query, variables } = route.request().postDataJSON() as { query: string; variables: Record<string, unknown> }
+      if (query.includes('renownHandleAvailability')) {
+        const handle = String(variables.handle)
+        const isTaken = taken.includes(handle)
+        return route.fulfill({
+          json: { data: { renownHandleAvailability: { handle, available: !isTaken, reason: isTaken ? 'TAKEN' : null } } },
+        })
+      }
+      if (query.includes('renownUsers')) {
+        return route.fulfill({
+          json: {
+            data: {
+              renownUsers: [
+                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null },
+              ],
+            },
+          },
+        })
+      }
+      return route.continue()
+    })
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('heading', { name: 'Edit profile' })).toBeVisible({ timeout: 30_000 })
+    return { ...flow, uploads }
+  }
+
+  test('is gated behind sign-in', async ({ page }) => {
+    await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
+  })
+
+  test('uploads an avatar and saves the whole profile with one signature', async ({ page }) => {
+    const editor = await openEditor(page)
+
+    await page.getByTestId('avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG })
+    await page.getByRole('button', { name: 'Use this crop' }).click()
+    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible()
+    expect(editor.uploads).toHaveLength(1)
+    expect(editor.uploads[0].authorization).toBe('Bearer e2e-bearer')
+    expect(editor.uploads[0].body).toMatchObject({ purpose: 'avatar', sha256: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown })
+
+    await page.getByLabel('Display name').fill('Edie Editor')
+    await page.getByLabel('Handle').fill('edie-editor')
+    await expect(page.getByText('renown.id/@edie-editor is available.')).toBeVisible()
+    await page.getByLabel('Bio').fill('Edits profiles.')
+    await page.getByRole('button', { name: '+ Add link' }).click()
+    await page.getByLabel('Link 1 label').fill('Site')
+    await page.getByLabel('Link 1 URL').fill('https://edie.example')
+    // The preview follows the form.
+    await expect(page.getByRole('complementary', { name: 'Preview' }).getByRole('heading', { name: 'Edie Editor' })).toBeVisible()
+
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: editor.wallet.address,
+      response: { data: { renown_upsertProfile: 'doc-edit' } },
+    })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('status')).toContainText('Profile saved.')
+
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === editor.wallet.address)
+    expect(call?.variables).toMatchObject({
+      displayName: 'Edie Editor',
+      handle: 'edie-editor',
+      bio: 'Edits profiles.',
+      links: [{ label: 'Site', url: 'https://edie.example' }],
+      avatar: expect.stringMatching(/^attachment:\/\/v1:[0-9a-f]{64}$/) as unknown,
+    })
+    const v = call!.variables as Record<string, unknown> & { links: { id: string; label: string; url: string }[]; timestamp: string }
+    const expected = await profileMessage(
+      editor.wallet.address,
+      { displayName: 'Edie Editor', handle: 'edie-editor', bio: 'Edits profiles.', links: v.links, avatar: v.avatar as string },
+      v.timestamp,
+    )
+    expect(editor.wallet.personalSignRequests).toEqual([expected])
+    expect(await verifyMessage({ address: editor.wallet.address, message: expected, signature: v.signature as `0x${string}` })).toBe(true)
+  })
+
+  test('shows a taken handle inline, before and after saving', async ({ page }) => {
+    const editor = await openEditor(page, ['taken-live'])
+    await page.getByLabel('Handle').fill('taken-live')
+    await expect(page.getByRole('alert').filter({ hasText: 'This handle is taken.' })).toBeVisible()
+
+    // Taken between the check and the save: the switchboard's HANDLE_TAKEN lands on the field.
+    await page.getByLabel('Handle').fill('raced-handle')
+    await expect(page.getByText('renown.id/@raced-handle is available.')).toBeVisible()
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: editor.wallet.address,
+      response: graphqlError('The handle "raced-handle" is taken', 'HANDLE_TAKEN', { field: 'handle' }),
+    })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'The handle "raced-handle" is taken' })).toBeVisible()
+  })
+})
+
