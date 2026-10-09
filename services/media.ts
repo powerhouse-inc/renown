@@ -8,8 +8,8 @@ import { SWITCHBOARD_ENDPOINT } from './switchboard-endpoint'
 /** Package routes live under the switchboard's /api/<package name>. */
 const PACKAGE_PATH = '/api/@powerhousedao/renown-package'
 
-/** Image fields served publicly. App-profile `logo`/`cover` join in phase 2. */
-export const MEDIA_FIELDS = ['avatar'] as const
+/** Image fields served publicly: profile avatars, app-profile logos and covers. */
+export const MEDIA_FIELDS = ['avatar', 'logo', 'cover'] as const
 export type MediaField = (typeof MEDIA_FIELDS)[number]
 
 export function isMediaField(value: string): value is MediaField {

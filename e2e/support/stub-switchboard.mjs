@@ -21,7 +21,7 @@
 //   PUT  /__stub/s3/<sha256>   stores the bytes (checks the hash)
 //   GET  /__stub/s3/<sha256>   serves them
 //   GET  /api/@powerhousedao/renown-package/media/<doc>/<field>   302 to
-//        /__stub/s3/<STUB_AVATAR_SHA> for doc "stub-avatar-doc" + "avatar", else 404
+//        /__stub/s3/<STUB_AVATAR_SHA> for "stub-avatar-doc" + avatar and "stub-app-doc" + logo/cover, else 404
 //
 // Unscripted requests get empty read-model results, so pages rendered by other
 // specs keep working.
@@ -47,6 +47,8 @@ const DEFAULT_DATA = {
   renownUsers: [],
   renownUser: null,
   renownCredentials: [],
+  appProfile: null,
+  appProfilesByPublisher: [],
 }
 
 function send(res, status, body) {
@@ -88,7 +90,10 @@ async function packageRoute(req, res) {
   }
   const media = /^\/api\/@powerhousedao\/renown-package\/media\/([^/]+)\/([^/]+)$/.exec(url.pathname)
   if (media && req.method === 'GET') {
-    if (media[1] === 'stub-avatar-doc' && media[2] === 'avatar') {
+    const stored =
+      (media[1] === 'stub-avatar-doc' && media[2] === 'avatar') ||
+      (media[1] === 'stub-app-doc' && (media[2] === 'logo' || media[2] === 'cover'))
+    if (stored) {
       res.writeHead(302, {
         Location: `http://localhost:${port}/__stub/s3/${STUB_AVATAR_SHA}`,
         'Cache-Control': 'public, max-age=60, stale-while-revalidate=240',
