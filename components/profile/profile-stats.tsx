@@ -12,10 +12,10 @@ export function ProfileStats({ stats }: { stats: UserStatEntry[] }) {
       <h2 id="profile-stats" className="text-foreground px-1 text-lg font-semibold">
         Stats
       </h2>
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 gap-3">
         {groups.map((group) => (
-          <div key={group.appDid} data-app-did={group.appDid} className="bg-secondary/60 rounded-2xl p-4">
-            <Link href={`/app/${group.appDid}`} className="group inline-flex max-w-full items-center gap-3">
+          <div key={group.appDid} data-app-did={group.appDid} className="bg-secondary/60 min-w-0 rounded-2xl p-4">
+            <Link href={`/app/${group.appDid}`} className="group flex min-w-0 max-w-full items-center gap-3">
               <AppLogo
                 documentId={group.appDocumentId}
                 logoRef={group.appHasLogo ? group.appLogoRef : null}
