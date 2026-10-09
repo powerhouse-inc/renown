@@ -37,9 +37,53 @@ const EDGES: Edge[] = [
   { d: 'M498 204 C590 204 560 408 636 408', label: 'same identity', lx: 590, ly: 330, anchor: 'start', dashed: true },
 ]
 
+const STEPS = [
+  { label: 'You', text: 'Your wallet DID is your identity.' },
+  { label: 'Renown', text: 'You sign a credential that authorises an app key.', primary: true },
+  { label: 'Connect and apps', text: 'Act for you with that app key.' },
+  { label: 'Switchboard', text: 'Stores the signed changes.' },
+]
+
+const SIDE_NOTES = [
+  { label: 'Vetra', text: 'registers app identities on Renown.' },
+  { label: 'Achra', text: 'uses the same identity for listings and reviews.' },
+]
+
+/** Stacked version of the flow for narrow screens. */
+function IdentityFlowList() {
+  return (
+    <div className="md:hidden">
+      <ol className="rn-flow-list">
+        {STEPS.map((step) => (
+          <li key={step.label} className={step.primary ? 'rn-flow-step rn-flow-step-primary' : 'rn-flow-step'}>
+            <span className="text-ink block font-semibold">{step.label}</span>
+            <span className="text-ink-muted mt-0.5 block text-sm">{step.text}</span>
+          </li>
+        ))}
+      </ol>
+      <ul className="border-hairline mt-6 space-y-3 border-t pt-5">
+        {SIDE_NOTES.map((note) => (
+          <li key={note.label} className="text-ink-muted text-sm leading-6">
+            <span className="text-ink font-semibold">{note.label}</span> {note.text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function IdentityFlowDiagram() {
   return (
-    <svg viewBox="0 0 824 456" role="img" aria-labelledby="flow-title-svg flow-desc-svg" className="rn-flow h-auto w-full min-w-[720px]">
+    <>
+      <IdentityFlowList />
+      <IdentityFlowSvg />
+    </>
+  )
+}
+
+function IdentityFlowSvg() {
+  return (
+    <svg viewBox="0 0 824 456" role="img" aria-labelledby="flow-title-svg flow-desc-svg" className="rn-flow hidden h-auto w-full md:block">
       <title id="flow-title-svg">How a Renown identity flows through the Powerhouse network</title>
       <desc id="flow-desc-svg">
         You sign a credential on Renown that authorises an app key. Connect and other apps act with that key and send signed

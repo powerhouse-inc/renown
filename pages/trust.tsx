@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { PageMeta } from '../components/site/page-meta'
 import { Card, Container, Eyebrow, Heading, Lead, Section } from '../components/site/primitives'
 import { SiteLayout } from '../components/site/site-layout'
-import { NEVER_HELD, OPEN_SOURCE, STORAGE_SOURCE, STORED, TRUST_CLAIMS } from '../components/trust/trust-content'
+import { MEDIA_SOURCE, NEVER_HELD, OPEN_SOURCE, STORAGE_SOURCE, STORED, TRUST_CLAIMS } from '../components/trust/trust-content'
 
 const sourceLink = 'text-ink-muted hover:text-primary-ink mt-4 inline-flex items-center gap-1.5 font-mono text-xs transition-colors'
 
@@ -28,7 +28,7 @@ const TrustPage: NextPage = () => (
         Check how Renown works, not just what we say
       </Heading>
       <Lead>
-        Every statement on this page links to the open-source code that implements it.
+        Each claim below links to the public code that implements it.
       </Lead>
     </Container>
 
@@ -47,6 +47,13 @@ const TrustPage: NextPage = () => (
                 {claim.source.label}
                 <span className="sr-only"> (source code)</span>
               </a>
+              {claim.extra && (
+                <a href={claim.extra.href} target="_blank" rel="noopener noreferrer" className={`${sourceLink} ml-5`}>
+                  <SourceIcon />
+                  {claim.extra.label}
+                  <span className="sr-only"> (source code)</span>
+                </a>
+              )}
             </div>
           </li>
         ))}
@@ -80,6 +87,11 @@ const TrustPage: NextPage = () => (
             renown-user/migrations.ts
             <span className="sr-only"> (source code)</span>
           </a>
+          <a href={MEDIA_SOURCE} target="_blank" rel="noopener noreferrer" className={`${sourceLink} ml-5`}>
+            <SourceIcon />
+            services/media.ts
+            <span className="sr-only"> (source code)</span>
+          </a>
         </Card>
         <Card className="border-signal/30 p-6 md:p-8">
           <h3 className="text-ink text-h3">Never held</h3>
@@ -99,7 +111,7 @@ const TrustPage: NextPage = () => (
 
     <Section labelledBy="oss-title" spacing="sm" className="pb-24">
       <Heading level={2} id="oss-title">
-        Open source
+        Public code
       </Heading>
       <Lead>The Renown package and SDK are AGPL-3.0 licensed, and this website&apos;s code is public. Read it, run it, audit it.</Lead>
       <ul className="mt-10 grid gap-4 md:grid-cols-3">

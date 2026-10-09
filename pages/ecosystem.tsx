@@ -25,7 +25,7 @@ const EcosystemPage: NextPage = () => (
       <h2 id="flow-title" className="text-ink text-h3">
         How identity flows
       </h2>
-      <Card className="mt-6 overflow-x-auto p-4 md:p-8">
+      <Card className="mt-6 p-5 md:p-8">
         <IdentityFlowDiagram />
       </Card>
     </Section>

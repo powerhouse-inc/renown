@@ -8,7 +8,11 @@ test.describe('/trust', () => {
     const claims = page.locator('ol > li[id]')
     await expect(claims).toHaveCount(5)
     for (const claim of await claims.all()) {
-      await expect(claim.getByRole('link', { name: /source code/ })).toHaveAttribute('href', /^https:\/\/github\.com\/powerhouse-inc\//)
+      const links = claim.getByRole('link', { name: /source code/ })
+      expect(await links.count()).toBeGreaterThan(0)
+      for (const link of await links.all()) {
+        await expect(link).toHaveAttribute('href', /^https:\/\/github\.com\/powerhouse-inc\//)
+      }
     }
     await expect(page.getByRole('heading', { name: 'Never held' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open Your Renown' })).toHaveAttribute('href', '/me')

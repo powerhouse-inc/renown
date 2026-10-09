@@ -381,3 +381,41 @@ button:not(:disabled),
     stroke-width: 6px;
     stroke-linejoin: round;
 }
+
+/* /ecosystem identity flow, stacked for narrow screens. */
+.rn-flow-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.rn-flow-step {
+    position: relative;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--hairline-strong);
+    border-radius: 0.875rem;
+    background: var(--surface-2);
+}
+.rn-flow-step-primary {
+    border-color: var(--primary);
+    background: color-mix(in oklab, var(--primary) 14%, var(--background));
+}
+.rn-flow-step + .rn-flow-step {
+    margin-top: 1.5rem;
+}
+.rn-flow-step + .rn-flow-step::before {
+    content: '';
+    position: absolute;
+    left: 1.5rem;
+    top: -1.5rem;
+    height: 1.5rem;
+    border-left: 1.5px solid var(--primary-ink);
+}
+.rn-flow-step + .rn-flow-step::after {
+    content: '';
+    position: absolute;
+    left: calc(1.5rem - 4px);
+    top: -0.5rem;
+    border: 4px solid transparent;
+    border-top: 6px solid var(--primary-ink);
+    border-bottom: 0;
+}
