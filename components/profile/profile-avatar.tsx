@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { mediaUrl } from '../../services/media'
+import { avatarSources } from '../../utils/avatar-sources'
 import { Identicon } from './identicon'
 
 interface ProfileAvatarProps {
-  /** Profile document id; with `hasAvatar`, the uploaded avatar is served from /media. */
+  /** Profile document id; with `avatar`, the uploaded avatar is served from /media. */
   documentId?: string | null
-  hasAvatar?: boolean
+  /** attachment://v1:<sha256> of the uploaded avatar; its hash versions the /media URL. */
+  avatar?: string | null
   /** External image (ENS avatar or legacy URL); used when there is no upload. */
   userImage?: string | null
   /** A local preview (object URL) that wins over everything else. */
@@ -16,18 +17,13 @@ interface ProfileAvatarProps {
   className?: string
 }
 
-/** Only images a page can safely load: http(s) URLs and inline images. */
-function isSafeImageUrl(url: string): boolean {
-  return /^https?:\/\//i.test(url) || /^data:image\/(png|jpeg|webp|gif);/i.test(url)
-}
-
 /**
  * The profile picture: local preview → uploaded avatar → external image →
  * generated identicon. An image that fails to load falls through to the next.
  */
 export function ProfileAvatar({
   documentId,
-  hasAvatar,
+  avatar,
   userImage,
   previewUrl,
   seed,
@@ -35,13 +31,8 @@ export function ProfileAvatar({
   className = 'h-32 w-32',
 }: ProfileAvatarProps) {
   const sources = useMemo(
-    () =>
-      [
-        previewUrl,
-        hasAvatar && documentId ? mediaUrl(documentId, 'avatar') : null,
-        userImage && isSafeImageUrl(userImage) ? userImage : null,
-      ].filter((src): src is string => !!src),
-    [previewUrl, hasAvatar, documentId, userImage],
+    () => avatarSources({ documentId, avatar, userImage, previewUrl }),
+    [documentId, avatar, userImage, previewUrl],
   )
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set())
   const src = sources.find((candidate) => !failed.has(candidate))

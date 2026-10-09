@@ -10,7 +10,8 @@ export interface ProfileSummaryData {
   handle?: string | null
   bio?: string | null
   links?: RenownProfileLink[]
-  hasAvatar?: boolean
+  /** attachment://v1:<sha256> of the uploaded avatar. */
+  avatar?: string | null
   userImage?: string | null
   previewUrl?: string | null
   ensVerified?: boolean
@@ -32,7 +33,7 @@ export function ProfileSummary({ profile }: { profile: ProfileSummaryData }) {
     <div className="flex flex-col items-center gap-4 text-center">
       <ProfileAvatar
         documentId={profile.documentId}
-        hasAvatar={profile.hasAvatar}
+        avatar={profile.avatar}
         userImage={profile.userImage}
         previewUrl={profile.previewUrl}
         seed={profile.address}

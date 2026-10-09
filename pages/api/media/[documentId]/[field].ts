@@ -2,7 +2,8 @@
 // switchboard's media route and passes its answer on — a 302 to a short-lived
 // signed URL, or (on a switchboard storing files on disk) the bytes. The
 // redirect is cacheable for a minute; a missing image is a cacheable 404 so
-// <img> falls back quickly.
+// <img> falls back quickly. A `?v=<hash>` query is a cache-busting key for
+// the caller's URL only: it is not forwarded, the upstream route ignores it.
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { isMediaField, packageRoutesBase } from '../../../../services/media'
 
