@@ -1,45 +1,108 @@
-import type { NextPage } from "next";
-import Head from "next/head";
-import styles from "../styles/Home.module.css";
-import { useRouter } from "next/router";
-import {WebFlow} from "../components/auth/web-flow";
-import PageBackground from "../components/ui/page-background";
-import { useIsClient } from "../hooks/useIsClient";
-import { parseExpiresInDays } from "../utils/credential-validity";
-import { parseReturnUrl } from "../utils/return-url";
+import type { GetServerSideProps, NextPage } from 'next'
+import Head from 'next/head'
+import { useRouter } from 'next/router'
+import { WebFlow } from '../components/auth/web-flow'
+import { DevelopersTeaser, TEASER_CODE } from '../components/home/developers-teaser'
+import { EcosystemStrip } from '../components/home/ecosystem-strip'
+import { FeaturedApps } from '../components/home/featured-apps'
+import { FinalCta } from '../components/home/final-cta'
+import { Hero } from '../components/home/hero'
+import { HowItWorks } from '../components/home/how-it-works'
+import { NetworkPulseSection } from '../components/home/network-pulse'
+import { Pillars } from '../components/home/pillars'
+import type { HomePageData } from '../components/home/types'
+import { PageMeta } from '../components/site/page-meta'
+import { SiteLayout } from '../components/site/site-layout'
+import { useIsClient } from '../hooks/useIsClient'
+import { listAppProfiles } from '../services/app-profiles'
+import { parseExpiresInDays } from '../utils/credential-validity'
+import { parseReturnUrl } from '../utils/return-url'
+import { publicOrigin } from '../utils/seo'
+import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
+import styles from '../styles/Home.module.css'
 
-const Home: NextPage = () => {
-    const router = useRouter();
-    const connectId = router.query["connect"]?.toString();
-    const appId = router.query["app"]?.toString() || connectId;
-    const deeplink = router.query["deeplink"]?.toString();
-    const returnUrl = parseReturnUrl(router.query["returnUrl"]);
-    const expiresInDays = parseExpiresInDays(router.query["expiresInDays"]);
-    const isClient = useIsClient();
+type HomeProps = { mode: 'auth' } | ({ mode: 'site' } & HomePageData)
 
-    const inAuthFlow = Boolean(appId) && isClient;
+/** `/?app=` / `/?connect=`: the sign-in flow, exactly as before, in the minimal auth chrome. */
+function AuthHome() {
+  const router = useRouter()
+  const connectId = router.query['connect']?.toString()
+  const appId = router.query['app']?.toString() || connectId
+  const deeplink = router.query['deeplink']?.toString()
+  const returnUrl = parseReturnUrl(router.query['returnUrl'])
+  const expiresInDays = parseExpiresInDays(router.query['expiresInDays'])
+  const isClient = useIsClient()
 
-    return (
-        <PageBackground hideLoginButton={inAuthFlow}>
-            <div className={styles.container}>
-                <Head>
-                    <title>Renown</title>
-                    <meta content="Created by Powerhouse" name="description" />
-                </Head>
+  return (
+    <SiteLayout variant="auth">
+      <div className={styles.container}>
+        <Head>
+          <title>Renown</title>
+          <meta content="Created by Powerhouse" name="description" />
+        </Head>
+        <div className={styles.main}>
+          {appId && isClient && (
+            <WebFlow appId={appId} deeplink={deeplink} returnUrl={returnUrl} expiresInDays={expiresInDays} />
+          )}
+        </div>
+      </div>
+    </SiteLayout>
+  )
+}
 
-                <main className={styles.main}>
-                    {appId && isClient && (
-                        <WebFlow
-                            appId={appId}
-                            deeplink={deeplink}
-                            returnUrl={returnUrl}
-                            expiresInDays={expiresInDays}
-                        />
-                    )}
-                </main>
-            </div>
-        </PageBackground>
-    );
-};
+function jsonLd(origin: string): object[] {
+  return [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'Renown',
+      url: origin,
+      logo: `${origin}/favicon.ico`,
+      parentOrganization: { '@type': 'Organization', name: 'Powerhouse', url: 'https://www.powerhouse.inc' },
+      sameAs: ['https://github.com/powerhouse-inc', 'https://x.com/PowerhouseDAO'],
+    },
+    { '@context': 'https://schema.org', '@type': 'WebSite', name: 'Renown', url: origin },
+  ]
+}
 
-export default Home;
+function MarketingHome({ featuredApps, pulse, teaser }: HomePageData) {
+  return (
+    <SiteLayout>
+      <PageMeta path="/" jsonLd={jsonLd(publicOrigin())} />
+      <Hero apps={featuredApps} />
+      <Pillars />
+      <HowItWorks />
+      <FeaturedApps apps={featuredApps} />
+      <NetworkPulseSection pulse={pulse} />
+      <DevelopersTeaser code={teaser} />
+      <EcosystemStrip />
+      <FinalCta />
+    </SiteLayout>
+  )
+}
+
+const Home: NextPage<HomeProps> = (props) => {
+  const router = useRouter()
+  const inAuthFlow = Boolean(router.query['app'] || router.query['connect'])
+  if (inAuthFlow || props.mode === 'auth') return <AuthHome />
+  return <MarketingHome featuredApps={props.featuredApps} pulse={props.pulse} teaser={props.teaser} />
+}
+
+export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query, res }) => {
+  if (query['app'] || query['connect']) return { props: { mode: 'auth' } }
+  // Imported here so shiki stays server-only.
+  const { highlight } = await import('../lib/highlight')
+  const [featuredApps, teaser] = await Promise.all([
+    withTimeout(listAppProfiles({ limit: 6 }), SSR_DATA_TIMEOUT_MS)
+      .then((page) => page.items)
+      .catch((error: unknown) => {
+        console.error('Homepage: featured apps unavailable:', error)
+        return []
+      }),
+    highlight(TEASER_CODE, 'ts'),
+  ])
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+  return { props: { mode: 'site', featuredApps, pulse: null, teaser } }
+}
+
+export default Home

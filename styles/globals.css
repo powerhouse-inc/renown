@@ -211,3 +211,134 @@ button:not(:disabled),
         transform: translateX(0);
     }
 }
+
+/* Hero identity constellation (components/home/constellation.tsx). */
+.rn-constellation .rn-orbit {
+    fill: none;
+    stroke: var(--hairline-strong);
+    stroke-dasharray: 2 6;
+}
+.rn-constellation .rn-orbit-faint {
+    stroke: var(--hairline);
+}
+.rn-constellation .rn-edge {
+    stroke: var(--primary);
+    stroke-opacity: 0.28;
+    stroke-width: 1.25;
+}
+.rn-constellation .rn-pulse {
+    stroke: var(--signal);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 0 100;
+}
+.rn-constellation .rn-node-bg {
+    fill: var(--background);
+}
+.rn-constellation .rn-node-ring {
+    fill: none;
+    stroke: var(--hairline-strong);
+    stroke-width: 1.5;
+}
+.rn-constellation .rn-glyph {
+    fill: none;
+    stroke: var(--primary-ink);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.rn-constellation .rn-letter {
+    fill: var(--ink);
+    font-size: 22px;
+    font-weight: 600;
+}
+.rn-constellation .rn-core-halo {
+    fill: none;
+    stroke: var(--primary);
+    stroke-opacity: 0.35;
+}
+.rn-constellation .rn-ring {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+}
+.rn-constellation .rn-spin,
+.rn-constellation .rn-node {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+}
+.rn-constellation .rn-spark {
+    fill: var(--primary-foreground);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .rn-constellation .rn-ring[data-orbit="inner"] {
+        animation: rn-orbit 140s linear infinite;
+    }
+    .rn-constellation .rn-ring[data-orbit="outer"] {
+        animation: rn-orbit 220s linear infinite reverse;
+    }
+    .rn-constellation .rn-spin[data-orbit="inner"] {
+        animation: rn-orbit 140s linear infinite reverse;
+    }
+    .rn-constellation .rn-spin[data-orbit="outer"] {
+        animation: rn-orbit 220s linear infinite;
+    }
+    .rn-constellation .rn-pulse {
+        animation: rn-pulse 5.4s var(--ease-out-expo) infinite;
+    }
+    .rn-constellation .rn-node {
+        animation: rn-node-in 900ms var(--ease-out-expo) both;
+    }
+    .rn-constellation .rn-core-glow {
+        transform-box: fill-box;
+        transform-origin: 50% 50%;
+        animation: rn-breathe 6s ease-in-out infinite;
+    }
+}
+
+@keyframes rn-orbit {
+    to {
+        transform: rotate(360deg);
+    }
+}
+@keyframes rn-pulse {
+    0% {
+        stroke-dasharray: 0 100;
+        stroke-dashoffset: 0;
+        opacity: 0;
+    }
+    8% {
+        opacity: 1;
+    }
+    30% {
+        stroke-dasharray: 14 100;
+        stroke-dashoffset: -86;
+        opacity: 0;
+    }
+    100% {
+        stroke-dasharray: 14 100;
+        stroke-dashoffset: -86;
+        opacity: 0;
+    }
+}
+@keyframes rn-node-in {
+    from {
+        opacity: 0;
+        transform: scale(0.6);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+@keyframes rn-breathe {
+    0%,
+    100% {
+        opacity: 0.75;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+}
