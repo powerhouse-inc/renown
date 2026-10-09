@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { fixtureStub } from './support/stub-switchboard-client'
+import { fetchFont } from '../lib/og/og-font'
 
 // Fixtures use ids no other spec uses (they survive renown-writes.spec.ts's resets).
 // The OG route (pages/api/og.tsx) against the stub switchboard.
@@ -70,4 +71,32 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, '?variant=app&did=did:web:nope')).toBe('default')
     expect(await variantOf(request, '?variant=bogus')).toBe('default')
   })
+})
+
+test.describe('link-preview caching', () => {
+  const LONG = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
+  const cacheOf = async (request: import('@playwright/test').APIRequestContext, query: string) => {
+    const response = await request.get(`/api/og${query}`)
+    expect(response.status(), query).toBe(200)
+    return response.headers()['cache-control']
+  }
+
+  test('cache real cards, monograms and unknown ids at the edge', async ({ request }) => {
+    expect(await cacheOf(request, '')).toBe(LONG)
+    expect(await cacheOf(request, `?variant=profile&address=${ADDRESS}`)).toBe(LONG)
+    expect(await cacheOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe(LONG)
+    expect(await cacheOf(request, '?variant=profile&address=0x5e00000000000000000000000000000000000c99')).toBe(LONG)
+  })
+
+  test('cache a fallback forced by a failure only briefly, and not at the edge', async ({ request }) => {
+    for (const address of [BROKEN, TEXT]) {
+      expect(await cacheOf(request, `?variant=profile&address=${address}`), address).toBe('public, max-age=60')
+    }
+  })
+})
+
+test('a font that answers non-OK is a failure, so the card falls back to the default font', async () => {
+  const answer = (status: number) => (async () => new Response(status === 200 ? 'font' : 'nope', { status })) as typeof fetch
+  await expect(fetchFont(new URL('https://example.test/f.ttf'), answer(404))).rejects.toThrow('Font 404')
+  expect(new TextDecoder().decode(await fetchFont(new URL('https://example.test/f.ttf'), answer(200)))).toBe('font')
 })

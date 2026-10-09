@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og'
 import type { NextRequest } from 'next/server'
 import { publicOrigin } from '../../utils/seo'
 import { loadAppCard, loadProfileCard, type OgCard } from '../../lib/og/og-data'
+import { fetchFont } from '../../lib/og/og-font'
 
 // Link-preview images: /api/og?variant=default | profile&address=0x… | app&did=did:key:…
 // Any lookup or image failure answers with the default card (always 200).
@@ -18,8 +19,8 @@ const BLUE = '#0080FF'
 let fontsPromise: Promise<[ArrayBuffer, ArrayBuffer]> | null = null
 function loadFonts(): Promise<[ArrayBuffer, ArrayBuffer] | null> {
   fontsPromise ??= Promise.all([
-    fetch(new URL('../../assets/fonts/Inter-Regular.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
-    fetch(new URL('../../assets/fonts/Inter-SemiBold.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
+    fetchFont(new URL('../../assets/fonts/Inter-Regular.ttf', import.meta.url)),
+    fetchFont(new URL('../../assets/fonts/Inter-SemiBold.ttf', import.meta.url)),
   ])
   return fontsPromise.catch((error) => {
     console.error('og: font load failed, rendering with the default font:', error)
@@ -138,20 +139,27 @@ function render(card: OgCard) {
   )
 }
 
-async function loadCard(url: URL): Promise<OgCard> {
+/** The card to draw; `degraded` when a failure (not a missing profile or image) forced the fallback. */
+async function loadCard(url: URL): Promise<{ card: OgCard; degraded: boolean }> {
   const variant = url.searchParams.get('variant')
   try {
-    if (variant === 'profile') return (await loadProfileCard(url.searchParams.get('address') ?? '', publicOrigin())) ?? { variant: 'default' }
-    if (variant === 'app') return (await loadAppCard(url.searchParams.get('did') ?? '', publicOrigin())) ?? { variant: 'default' }
+    if (variant === 'profile') return { card: (await loadProfileCard(url.searchParams.get('address') ?? '', publicOrigin())) ?? { variant: 'default' }, degraded: false }
+    if (variant === 'app') return { card: (await loadAppCard(url.searchParams.get('did') ?? '', publicOrigin())) ?? { variant: 'default' }, degraded: false }
   } catch (error) {
     console.error('og: falling back to the default card:', error)
+    return { card: { variant: 'default' }, degraded: true }
   }
-  return { variant: 'default' }
+  return { card: { variant: 'default' }, degraded: false }
 }
+
+// A card drawn after a failure is cached briefly and only by the browser, so a
+// transient outage is not pinned at the edge for an hour.
+const CACHE_OK = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
+const CACHE_DEGRADED = 'public, max-age=60'
 
 export default async function handler(req: NextRequest) {
   const url = new URL(req.url)
-  const card = await loadCard(url)
+  const { card, degraded } = await loadCard(url)
   const loaded = await loadFonts()
   return new ImageResponse(render(card), {
     ...SIZE,
@@ -162,7 +170,7 @@ export default async function handler(req: NextRequest) {
       ],
     }),
     headers: {
-      'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+      'Cache-Control': degraded || !loaded ? CACHE_DEGRADED : CACHE_OK,
       'X-Og-Variant': card.variant,
     },
   })
