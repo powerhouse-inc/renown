@@ -36,13 +36,18 @@ function client(): GraphQLClient {
   return new GraphQLClient(`${switchboardOrigin()}/graphql/renown-stats`)
 }
 
+/** Like getAppProfile, but a failed read throws (null means the app does not exist). */
+export async function fetchAppProfile(appDid: string): Promise<RenownAppProfile | null> {
+  const data = await client().request<{ appProfile?: RenownAppProfile | null }>(
+    `query AppProfile($appDid: String!) { appProfile(appDid: $appDid) { ${FIELDS} } }`,
+    { appDid },
+  )
+  return data.appProfile ?? null
+}
+
 export async function getAppProfile(appDid: string): Promise<RenownAppProfile | null> {
   try {
-    const data = await client().request<{ appProfile?: RenownAppProfile | null }>(
-      `query AppProfile($appDid: String!) { appProfile(appDid: $appDid) { ${FIELDS} } }`,
-      { appDid },
-    )
-    return data.appProfile ?? null
+    return await fetchAppProfile(appDid)
   } catch (error) {
     console.error('Failed to fetch app profile:', error)
     return null

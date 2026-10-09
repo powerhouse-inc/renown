@@ -1,6 +1,7 @@
 import type { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
 import PageBackground from '../../components/ui/page-background'
+import { NotFoundPage } from '../../components/ui/not-found-page'
 import RenownCard from '../../components/ui/renown-card'
 import { CopyAddress } from '../../components/profile/copy-address'
 import { OwnProfileActions } from '../../components/profile/own-profile-actions'
@@ -10,6 +11,7 @@ import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
+import { siteOrigin } from '../../utils/site-origin'
 
 interface ProfilePageProps {
   profile: RenownProfile | null
@@ -23,31 +25,10 @@ interface ProfilePageProps {
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
-function siteOrigin(host: string | undefined): string {
-  const configured = process.env.NEXT_PUBLIC_RENOWN_URL
-  if (configured) return configured.replace(/\/+$/, '')
-  return host ? `https://${host}` : 'https://www.renown.id'
-}
-
-function NotFound({ title, message }: { title: string; message: string }) {
-  return (
-    <PageBackground>
-      <Head>
-        <title>{`${title} - Renown`}</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-      <main className="relative flex min-h-screen flex-col items-center justify-center px-4 text-center">
-        <h1 className="text-foreground mb-2 text-2xl font-bold">{title}</h1>
-        <p className="text-muted-foreground">{message}</p>
-      </main>
-    </PageBackground>
-  )
-}
-
 const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonicalUrl, ogImage, error }) => {
-  if (error) return <NotFound title="Something went wrong" message={error} />
+  if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!profile) {
-    return <NotFound title="Profile not found" message="The profile you're looking for doesn't exist or has been removed." />
+    return <NotFoundPage title="Profile not found" message="The profile you're looking for doesn't exist or has been removed." />
   }
 
   const address = profile.ethAddress ?? ''
