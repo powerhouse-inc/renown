@@ -30,6 +30,18 @@ export async function scriptStub(entry: ScriptEntry): Promise<void> {
   })
 }
 
+/**
+ * A standing answer for every matching request; survives resetStub(). For
+ * specs outside renown-writes.spec.ts — use variables no other test uses.
+ */
+export async function fixtureStub(entry: ScriptEntry): Promise<void> {
+  await fetch(`${STUB_SWITCHBOARD_URL}/__stub/fixture`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  })
+}
+
 /** Recorded requests whose query contains `match`. */
 export async function stubRequests(match: string): Promise<RecordedRequest[]> {
   const res = await fetch(`${STUB_SWITCHBOARD_URL}/__stub/requests`)
