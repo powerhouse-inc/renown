@@ -195,10 +195,13 @@ button:not(:disabled),
     box-sizing: border-box;
 }
 
-/* Focus ring for every interactive element on the site. */
-:focus-visible {
-    outline: 2px solid var(--primary-ink);
-    outline-offset: 2px;
+/* Focus ring for every interactive element on the site. In the base layer so a
+   component that draws its own focus style (outline-none + ring/border) wins. */
+@layer base {
+    :focus-visible {
+        outline: 2px solid var(--primary-ink);
+        outline-offset: 2px;
+    }
 }
 
 /* Shiki dual-theme output (lib/highlight.ts emits --shiki-light / --shiki-dark). */

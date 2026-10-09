@@ -78,7 +78,7 @@ export function AccountMenu({ address, displayName, avatarUrl, profile, onSignOu
           className="h-8 w-8"
         />
         <span className="text-ink max-w-[10rem] truncate text-sm font-medium">{name}</span>
-        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`}>
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-ink-muted motion-safe:transition-transform ${open ? 'rotate-180' : ''}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>

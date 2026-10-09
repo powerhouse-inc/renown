@@ -62,12 +62,12 @@ export function CodeBlock({ code, html, label, className }: CodeBlockProps) {
       </div>
       {html ? (
         <div
-          className="overflow-x-auto p-4 font-mono text-[13px] leading-6 [&_pre]:outline-none"
+          className="overflow-x-auto p-4 font-mono text-[13px] leading-6"
           // Trusted: produced at build/SSR time by lib/highlight.ts from literals in this repo.
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        <pre className="text-ink overflow-x-auto p-4 font-mono text-[13px] leading-6">
+        <pre tabIndex={0} className="text-ink overflow-x-auto p-4 font-mono text-[13px] leading-6">
           <code>{code}</code>
         </pre>
       )}

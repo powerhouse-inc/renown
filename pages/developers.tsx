@@ -171,8 +171,8 @@ const DevelopersPage: NextPage<DevelopersProps> = ({ code }) => (
 
         <DocSection id="oidc" title="Sign in with Renown (OIDC)">
           <p className={prose}>
-            Renown is also an OpenID Connect provider (authorization code flow with PKCE, RS256 ID tokens). Point any OIDC
-            client at the issuer:
+            Renown is also an OpenID Connect provider (authorization code flow with PKCE, RS256 ID tokens). Registered OIDC
+            clients use the issuer below:
           </p>
           <p className="bg-code border-hairline text-ink mt-4 rounded-[var(--radius-control)] border px-4 py-3 font-mono text-sm break-all">
             {DEFAULT_OIDC_ISSUER}

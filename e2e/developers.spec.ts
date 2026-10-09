@@ -20,6 +20,21 @@ test.describe('/developers', () => {
     await expect(page.locator('#sdk .shiki')).toHaveCount(5)
     await expect(page.getByText('https://switchboard.renown.vetra.io/api/@powerhousedao/renown-package/oidc', { exact: true })).toBeVisible()
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/developers$/)
+    await expect(page.locator('#oidc')).toContainText('Registered OIDC clients use the issuer below')
+    await expect(page.locator('#oidc')).not.toContainText('Point any OIDC client')
+  })
+
+  test('one focus indicator each: the global ring, or the field\'s own', async ({ page }) => {
+    await page.goto('/developers')
+    await expect(page.getByLabel('App DID')).toBeVisible()
+    const outline = () => page.evaluate(() => getComputedStyle(document.activeElement as Element).outlineStyle)
+    // The first Tab lands on a plain link: the site-wide ring.
+    await page.keyboard.press('Tab')
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('A')
+    expect(await outline()).toBe('solid')
+    // The builder field draws its own focus border: no second ring around it.
+    await page.getByLabel('App DID').focus()
+    expect(await outline()).toBe('none')
   })
 
   test('the connect link builder validates live and builds a working link', async ({ page }) => {
