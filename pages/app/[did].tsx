@@ -93,9 +93,9 @@ const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, can
         <article className="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white/80 shadow-2xl backdrop-blur-lg dark:border-white/20 dark:bg-white/10">
           <AppCover documentId={app.documentId} coverRef={app.coverRef} seed={app.appDid} />
           <div className="space-y-8 px-6 pb-8 sm:px-10">
-            <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-start">
               <AppLogo documentId={app.documentId} logoRef={app.logoRef} legacyLogo={app.logo} name={name} />
-              <div className="min-w-0 flex-1 space-y-1 sm:pb-1">
+              <div className="min-w-0 flex-1 space-y-1 sm:mt-14">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-foreground text-3xl font-bold break-words">{name}</h1>
                   {app.category && (
@@ -109,7 +109,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, can
                   href={app.website}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="bg-primary text-primary-foreground! hover:bg-primary/85 inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+                  className="bg-primary text-primary-foreground! hover:bg-primary/85 inline-flex shrink-0 items-center gap-2 self-start rounded-lg sm:mt-14 px-4 py-2 text-sm font-semibold transition-colors"
                 >
                   {website}
                   <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -124,7 +124,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, can
             {app.description && <MarkdownLite text={app.description} />}
 
             <div className="flex justify-start">
-              <ProfileLinks links={app.links} />
+              <ProfileLinks links={app.links} align="start" />
             </div>
 
             {/* Phase 3: public app stats (appStats) render here. */}

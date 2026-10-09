@@ -1,6 +1,8 @@
 import type { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
 import PageBackground from '../../components/ui/page-background'
+import { AppProfileCard } from '../../components/app/app-profile-card'
+import { getAppProfilesByPublisher, type RenownAppProfile } from '../../services/app-profiles'
 import { NotFoundPage } from '../../components/ui/not-found-page'
 import RenownCard from '../../components/ui/renown-card'
 import { CopyAddress } from '../../components/profile/copy-address'
@@ -16,6 +18,7 @@ import { siteOrigin } from '../../utils/site-origin'
 interface ProfilePageProps {
   profile: RenownProfile | null
   ensVerified: boolean
+  apps: RenownAppProfile[]
   /** Absolute canonical URL of this profile. */
   canonicalUrl: string | null
   /** Absolute image for link previews, if the profile has one. */
@@ -25,7 +28,7 @@ interface ProfilePageProps {
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonicalUrl, ogImage, error }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, canonicalUrl, ogImage, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!profile) {
     return <NotFoundPage title="Profile not found" message="The profile you're looking for doesn't exist or has been removed." />
@@ -70,8 +73,21 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonic
                   avatar: profile.avatar,
                   userImage: profile.userImage,
                   ensVerified,
+                  isPublisher: apps.length > 0,
                 }}
               />
+              {apps.length > 0 && (
+                <section aria-labelledby="apps-published" className="space-y-3">
+                  <h2 id="apps-published" className="text-foreground px-1 text-lg font-semibold">
+                    Apps published
+                  </h2>
+                  <div className="grid gap-3">
+                    {apps.map((app) => (
+                      <AppProfileCard key={app.appDid} app={app} />
+                    ))}
+                  </div>
+                </section>
+              )}
               <div className="space-y-3">
                 {ADDRESS_RE.test(address) && <CopyAddress address={address} />}
                 <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 px-1 text-sm">
@@ -98,7 +114,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonic
 export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (context) => {
   const id = String(context.params?.id ?? '')
   const byHandle = context.query.by === 'handle'
-  const empty = { profile: null, ensVerified: false, canonicalUrl: null, ogImage: null }
+  const empty = { profile: null, ensVerified: false, apps: [], canonicalUrl: null, ogImage: null }
   if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
   let profile: RenownProfile | null
@@ -137,10 +153,16 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
       ? profile.userImage
       : null
   context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
+  const address = profile.ethAddress ?? ''
+  const [ensVerified, apps] = await Promise.all([
+    isEnsVerified(profile.username, profile.ethAddress),
+    ADDRESS_RE.test(address) ? getAppProfilesByPublisher(address.toLowerCase()) : Promise.resolve([]),
+  ])
   return {
     props: {
       profile,
-      ensVerified: await isEnsVerified(profile.username, profile.ethAddress),
+      ensVerified,
+      apps,
       canonicalUrl: `${origin}${profilePath(profile)}`,
       ogImage,
     },

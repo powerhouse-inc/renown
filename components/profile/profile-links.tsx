@@ -10,14 +10,14 @@ function hostOf(url: string): string | null {
 }
 
 /** A profile's links as pills; anything that is not an http(s) URL is never rendered as a link. */
-export function ProfileLinks({ links }: { links: RenownProfileLink[] }) {
+export function ProfileLinks({ links, align = 'center' }: { links: RenownProfileLink[]; align?: 'center' | 'start' }) {
   const safe = links.flatMap((link) => {
     const host = hostOf(link.url)
     return host ? [{ ...link, host }] : []
   })
   if (safe.length === 0) return null
   return (
-    <ul className="flex flex-wrap justify-center gap-2" aria-label="Links">
+    <ul className={`flex flex-wrap gap-2 ${align === 'start' ? 'justify-start' : 'justify-center'}`} aria-label="Links">
       {safe.map((link) => (
         <li key={link.id}>
           <a

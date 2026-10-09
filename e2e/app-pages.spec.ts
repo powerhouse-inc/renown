@@ -90,6 +90,7 @@ test.describe('app page', () => {
     const response = await request.get(`/app/${OUTAGE_DID}`, { maxRedirects: 0 })
     expect(response.status()).toBe(503)
     expect(response.headers()['cache-control']).toMatch(/no-store|no-cache/)
+    expect(response.headers()['retry-after']).toBe('30')
   })
 
   test('/media serves app logos and covers', async ({ request }) => {

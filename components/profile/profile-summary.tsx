@@ -15,6 +15,8 @@ export interface ProfileSummaryData {
   userImage?: string | null
   previewUrl?: string | null
   ensVerified?: boolean
+  /** Publishes at least one app on Renown. */
+  isPublisher?: boolean
 }
 
 export function shortAddress(address: string): string {
@@ -44,16 +46,31 @@ export function ProfileSummary({ profile }: { profile: ProfileSummaryData }) {
         <h1 className="text-foreground text-3xl font-bold [overflow-wrap:anywhere]">{name}</h1>
         {profile.handle && <p className="text-muted-foreground font-medium">@{profile.handle}</p>}
       </div>
-      {profile.ensVerified && profile.username && (
-        <span
-          className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
-          title={`${profile.username} resolves to this address`}
-        >
-          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          ENS verified · {profile.username}
-        </span>
+      {((profile.ensVerified && profile.username) || profile.isPublisher) && (
+        <div className="flex flex-wrap justify-center gap-2">
+          {profile.ensVerified && profile.username && (
+            <span
+              className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+              title={`${profile.username} resolves to this address`}
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              ENS verified · {profile.username}
+            </span>
+          )}
+          {profile.isPublisher && (
+            <span
+              className="bg-secondary text-foreground inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
+              title="Publishes apps on Renown"
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2 15 9h7l-5.5 4.5 2 7.5L12 16.5 5.5 21l2-7.5L2 9h7z" />
+              </svg>
+              <span>Publisher</span>
+            </span>
+          )}
+        </div>
       )}
       {profile.bio && (
         <p className="text-foreground/90 max-w-prose whitespace-pre-line [overflow-wrap:anywhere]">{profile.bio}</p>
