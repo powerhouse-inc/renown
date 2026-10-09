@@ -10,6 +10,8 @@ export interface RecordedRequest {
 }
 
 interface ScriptEntry {
+  /** Fixtures only: a name for removeFixture(). */
+  id?: string
   /** Substring the GraphQL query must contain. */
   match: string
   /** Optional substring the JSON-encoded variables must contain. */
@@ -39,6 +41,15 @@ export async function fixtureStub(entry: ScriptEntry): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
+  })
+}
+
+/** Drops the fixtures added with `id` (fixtures otherwise live as long as the stub). */
+export async function removeFixture(id: string): Promise<void> {
+  await fetch(`${STUB_SWITCHBOARD_URL}/__stub/fixture/remove`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
   })
 }
 

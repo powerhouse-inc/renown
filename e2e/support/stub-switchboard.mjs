@@ -14,6 +14,7 @@
 //                            matching GraphQL request (after the script), and
 //                            survives /__stub/reset; for specs that run in
 //                            parallel with the scripting ones (unique variables!)
+//   POST /__stub/fixture/remove  { id } — drops the fixtures added with that id
 //
 // renown-package HTTP routes (stateless, safe in parallel):
 //   POST /api/@powerhousedao/renown-package/media/uploads   401 without a
@@ -49,6 +50,7 @@ const DEFAULT_DATA = {
   renownCredentials: [],
   appProfile: null,
   appProfilesByPublisher: [],
+  appProfiles: { items: [], next: null },
   appStats: null,
   userStats: [],
 }
@@ -166,6 +168,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.url === '/__stub/script' && req.method === 'POST') {
       script.push(await readBody(req))
+      return send(res, 200, { ok: true })
+    }
+    if (req.url === '/__stub/fixture/remove' && req.method === 'POST') {
+      const { id } = await readBody(req)
+      for (let i = fixtures.length - 1; i >= 0; i--) if (fixtures[i].id === id) fixtures.splice(i, 1)
       return send(res, 200, { ok: true })
     }
     if (req.url === '/__stub/fixture' && req.method === 'POST') {

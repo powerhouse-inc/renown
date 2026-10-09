@@ -54,6 +54,24 @@ export async function getAppProfile(appDid: string): Promise<RenownAppProfile | 
   }
 }
 
+export interface AppProfilePage {
+  items: RenownAppProfile[]
+  /** Cursor for the next page; null on the last page. */
+  next: string | null
+}
+
+/**
+ * One page of every app profile, newest first (`limit` 1-50). A failed read
+ * throws; callers decide whether that hides a section or shows an outage.
+ */
+export async function listAppProfiles({ limit, after }: { limit: number; after?: string | null }): Promise<AppProfilePage> {
+  const data = await client().request<{ appProfiles: AppProfilePage }>(
+    `query AppProfiles($limit: Int, $after: String) { appProfiles(limit: $limit, after: $after) { items { ${FIELDS} } next } }`,
+    { limit, after: after ?? null },
+  )
+  return data.appProfiles
+}
+
 /** The app profiles a wallet publishes (oldest first). */
 export async function getAppProfilesByPublisher(address: string): Promise<RenownAppProfile[]> {
   try {
