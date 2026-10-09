@@ -3,6 +3,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { AppCover } from '../../components/app/app-cover'
 import { AppLogo } from '../../components/app/app-logo'
+import { AppStatsSection } from '../../components/app/app-stats'
 import { MarkdownLite } from '../../components/app/markdown-lite'
 import { ProfileAvatar } from '../../components/profile/profile-avatar'
 import { ProfileLinks } from '../../components/profile/profile-links'
@@ -10,6 +11,7 @@ import { profileName, shortAddress } from '../../components/profile/profile-summ
 import { NotFoundPage } from '../../components/ui/not-found-page'
 import PageBackground from '../../components/ui/page-background'
 import { APP_DID_RE, fetchAppProfile, type RenownAppProfile } from '../../services/app-profiles'
+import { getAppStats, type AppStats } from '../../services/app-stats'
 import { mediaUrl } from '../../services/media'
 import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { profilePath } from '../../utils/profile-url'
@@ -17,6 +19,8 @@ import { siteOrigin } from '../../utils/site-origin'
 
 interface AppPageProps {
   app: RenownAppProfile | null
+  /** Public stats; null when none or when the stats read failed (never breaks the page). */
+  stats: AppStats | null
   /** The publisher's Renown profile, when it has one. */
   publisher: RenownProfile | null
   /** Lowercase wallet of the publisher, from publisherDid. */
@@ -63,7 +67,7 @@ function Publisher({ publisher, address }: { publisher: RenownProfile | null; ad
   )
 }
 
-const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, canonicalUrl, ogImage, error }) => {
+const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddress, canonicalUrl, ogImage, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!app) return <NotFoundPage title="App not found" message="No app on Renown has this identity." />
 
@@ -127,7 +131,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, can
               <ProfileLinks links={app.links} align="start" />
             </div>
 
-            {/* Phase 3: public app stats (appStats) render here. */}
+            {stats && <AppStatsSection stats={stats} />}
 
             <p className="text-muted-foreground border-t border-gray-200 pt-4 font-mono text-xs break-all dark:border-white/10" title="App identity">
               {app.appDid}
@@ -141,7 +145,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, publisher, publisherAddress, can
 
 export const getServerSideProps: GetServerSideProps<AppPageProps> = async (context) => {
   const did = String(context.params?.did ?? '')
-  const empty: AppPageProps = { app: null, publisher: null, publisherAddress: null, canonicalUrl: null, ogImage: null }
+  const empty: AppPageProps = { app: null, stats: null, publisher: null, publisherAddress: null, canonicalUrl: null, ogImage: null }
   let app: RenownAppProfile | null = null
   if (APP_DID_RE.test(did)) {
     try {
@@ -161,9 +165,10 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
   }
 
   const publisherAddress = PKH_RE.exec(app.publisherDid ?? '')?.[1]?.toLowerCase() ?? null
-  const publisher = publisherAddress
-    ? await getProfile({ driveId: `renown-${publisherAddress}`, ethAddress: publisherAddress })
-    : null
+  const [publisher, stats] = await Promise.all([
+    publisherAddress ? getProfile({ driveId: `renown-${publisherAddress}`, ethAddress: publisherAddress }) : Promise.resolve(null),
+    getAppStats(did),
+  ])
   const origin = siteOrigin(context.req.headers.host)
   const ogImage = app.coverRef
     ? mediaUrl(app.documentId, 'cover', origin, app.coverRef)
@@ -174,7 +179,7 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
         : null
   context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   return {
-    props: { app, publisher, publisherAddress, canonicalUrl: `${origin}/app/${did}`, ogImage },
+    props: { app, stats, publisher, publisherAddress, canonicalUrl: `${origin}/app/${did}`, ogImage },
   }
 }
 

@@ -49,6 +49,8 @@ const DEFAULT_DATA = {
   renownCredentials: [],
   appProfile: null,
   appProfilesByPublisher: [],
+  appStats: null,
+  userStats: [],
 }
 
 function send(res, status, body) {
