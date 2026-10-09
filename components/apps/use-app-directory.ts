@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listAppProfiles, type AppProfilePage, type RenownAppProfile } from '../../services/app-profiles'
 import { APPS_PAGE_SIZE, appendApps, sameCategory } from '../../utils/app-directory'
+import { CLIENT_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 
 export interface AppDirectoryState {
   /** The category `items` belong to (null = all apps). */
@@ -47,10 +48,12 @@ export function useAppDirectory(
   const [loaded, setLoaded] = useState<Loaded>(() => fromPage(initial.category, initial.page))
   const [retrying, setRetrying] = useState(false)
   const request = useRef(0)
+  /** The request a pending retry waits for: only its answer ends the retry. */
+  const retryRequest = useRef<number | null>(null)
 
-  const fetchFirst = useCallback((target: string | null) => {
+  const fetchFirst = useCallback((target: string | null): number => {
     const id = ++request.current
-    listAppProfiles({ limit: APPS_PAGE_SIZE, category: target })
+    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, category: target }), CLIENT_DATA_TIMEOUT_MS)
       .then((page) => {
         if (id === request.current) setLoaded(fromPage(target, page))
       })
@@ -59,9 +62,15 @@ export function useAppDirectory(
         if (id === request.current) setLoaded(fromPage(target, null))
       })
       .finally(() => {
-        // Unconditional: a superseding fetch keeps `busy` true via the category mismatch.
-        setRetrying(false)
+        // Only the retry's own answer, or a later one that superseded it, ends the
+        // retry: an older answer landing late must not. (A superseding fetch for
+        // another category keeps `busy` true via the category mismatch.)
+        if (retryRequest.current !== null && id >= retryRequest.current) {
+          retryRequest.current = null
+          setRetrying(false)
+        }
       })
+    return id
   }, [])
 
   useEffect(() => {
@@ -82,7 +91,7 @@ export function useAppDirectory(
     const id = request.current
     const { category: target, next } = loaded
     setLoaded((l) => ({ ...l, more: 'loading' }))
-    listAppProfiles({ limit: APPS_PAGE_SIZE, after: next, category: target })
+    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, after: next, category: target }), CLIENT_DATA_TIMEOUT_MS)
       .then((page) => {
         if (id !== request.current) return settleStale(target)
         setLoaded((l) => ({ ...l, items: appendApps(l.items, page.items), next: page.next, more: 'idle' }))
@@ -96,7 +105,7 @@ export function useAppDirectory(
 
   const retry = useCallback(() => {
     setRetrying(true)
-    fetchFirst(loaded.category)
+    retryRequest.current = fetchFirst(loaded.category)
   }, [fetchFirst, loaded.category])
 
   return {

@@ -25,7 +25,7 @@ export function AppCover({ documentId, coverRef, seed }: { documentId: string; c
   if (coverRef && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- /media 302s to signed storage URLs next/image can't allowlist
-      <img ref={imgRef} src={mediaUrl(documentId, 'cover', '', coverRef)} alt="" className="aspect-[3/1] w-full object-cover" onError={() => setFailedRef(coverRef ?? null)} />
+      <img ref={imgRef} src={mediaUrl(documentId, 'cover', '', coverRef)} alt="" loading="lazy" decoding="async" className="aspect-[3/1] w-full object-cover" onError={() => setFailedRef(coverRef ?? null)} />
     )
   }
   const hue = hueOf(seed)

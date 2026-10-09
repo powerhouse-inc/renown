@@ -49,6 +49,8 @@ export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-
       ref={imgRef}
       src={src}
       alt={`${name} logo`}
+      loading="lazy"
+      decoding="async"
       className={`bg-background object-cover ${shape}`}
       onError={() => setFailed((f) => new Set(f).add(src))}
     />

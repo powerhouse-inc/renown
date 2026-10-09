@@ -14,6 +14,7 @@ import {
   type AppProfilePage,
 } from '../services/app-profiles'
 import { APPS_PAGE_SIZE, parseCategory, sameCategory } from '../utils/app-directory'
+import { listingCacheControl } from '../utils/cache-control'
 import { cx } from '../utils/cx'
 import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
 
@@ -140,7 +141,7 @@ export const getServerSideProps: GetServerSideProps<AppsPageProps> = async ({ qu
     }),
   ])
   // An outage (or a page missing its chips) must not be cached at the edge: the next visitor retries.
-  res.setHeader('Cache-Control', page && !categoriesFailed ? 'public, s-maxage=60, stale-while-revalidate=300' : 'no-store')
+  res.setHeader('Cache-Control', listingCacheControl(page !== null && !categoriesFailed))
   return { props: { category, page, categories } }
 }
 

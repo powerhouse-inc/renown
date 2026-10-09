@@ -127,16 +127,18 @@ test('Load more appends the next page, and a failed page can be retried', async 
   await expect(p.getByRole('button', { name: 'Load more apps' })).toHaveCount(0)
 })
 
-test('Load more stays usable after a chip and back to all while its answer was in flight', async ({ page: p }) => {
+test('Load more stays usable after a chip and back to all, and the stale category answer is dropped', async ({ page: p }) => {
   await apps('dir-all', '"after":null,"category":null', { response: page([app('A1'), app('A2')], 'cursor-2') })
   await apps('dir-all-2', '"after":"cursor-2","category":null', { response: page([app('A4')], null) })
   await p.goto('/apps')
   await expect(grid(p).getByRole('listitem')).toHaveCount(2)
-  // Hold the next-page answer back until after the user has left and returned.
+  // Hold the next-page and the Games answers back until after the user has left and returned.
   let release: () => void = () => {}
   const gate = new Promise<void>((resolve) => (release = resolve))
+  const allFirstPages: string[] = []
   await p.route('**/graphql/**', async (route) => {
     const body = route.request().postData() ?? ''
+    if (body.includes('"after":null') && body.includes('"category":null')) allFirstPages.push(body)
     if (body.includes('"after":"cursor-2"') || body.includes('"category":"Games"')) await gate
     await route.continue()
   })
@@ -147,8 +149,83 @@ test('Load more stays usable after a chip and back to all while its answer was i
   // Back to the category already shown (a chip push keeps the page, unlike a dev-mode history pop).
   await p.getByRole('link', { name: 'All' }).click()
   await expect(p).toHaveURL(/\/apps$/)
+  const gamesAnswered = p.waitForResponse((r) => (r.request().postData() ?? '').includes('"category":"Games"'))
   release()
+  await gamesAnswered
   await expect(p.getByRole('button', { name: 'Load more apps' })).toBeEnabled()
+  await expect(grid(p)).toHaveAttribute('aria-label', 'All apps')
+  await p.getByRole('button', { name: 'Load more apps' }).click()
+  await expect(grid(p).getByRole('listitem')).toHaveCount(3)
+  // Had the late Games answer been applied, the list would have flipped to Games and refetched all apps.
+  expect(allFirstPages).toEqual([])
+})
+
+test('a retry is ended only by its own answer, not by a late answer from before it', async ({ page: p }) => {
+  test.setTimeout(60_000)
+  await apps('dir-all', '"after":null,"category":null', { status: 500, response: { error: 'boom' } })
+  await p.goto('/apps')
+  const outage = p.getByRole('main').getByRole('alert')
+  await expect(outage).toContainText('The app directory is unavailable')
+  // The first retry hangs; the second retry hangs until the end.
+  let releaseFirst: () => void = () => {}
+  let releaseLast: () => void = () => {}
+  const first = new Promise<void>((resolve) => (releaseFirst = resolve))
+  const last = new Promise<void>((resolve) => (releaseLast = resolve))
+  let allReads = 0
+  let firstAnswered = false
+  await p.route('**/graphql/**', async (route) => {
+    const body = route.request().postData() ?? ''
+    if (body.includes('"after":null') && body.includes('"category":null')) {
+      const read = ++allReads
+      if (read === 1) {
+        await first
+        await route.fulfill({ response: await route.fetch() })
+        firstAnswered = true
+        return
+      }
+      if (read === 3) await last
+    }
+    await route.continue()
+  })
+  await p.getByRole('button', { name: 'Try again' }).click()
+  await expect(outage).toHaveCount(0)
+  // Games loads while the retry is still out; back on All the read fails again.
+  await p.getByRole('link', { name: 'Games, 2 apps' }).click()
+  await expect(grid(p).getByRole('listitem')).toHaveCount(2)
+  await p.getByRole('link', { name: 'All' }).click()
+  await expect(outage).toContainText('The app directory is unavailable')
+  await p.getByRole('button', { name: 'Try again' }).click()
+  await expect(outage).toHaveCount(0)
+  // The first retry's answer lands now: the second retry is still out, so the page keeps loading.
+  expect(allReads).toBe(3)
+  releaseFirst()
+  await expect.poll(() => firstAnswered).toBe(true)
+  await p.waitForTimeout(500)
+  await expect(outage).toHaveCount(0)
+  await expect(p.getByRole('main').getByRole('status')).toHaveText('Loading apps…')
+  await apps('dir-all', '"after":null,"category":null', { response: page([app('A1')]) })
+  releaseLast()
+  await expect(grid(p).getByRole('listitem')).toHaveCount(1)
+})
+
+test('a category read that never answers ends in the outage notice', async ({ page: p }) => {
+  test.setTimeout(60_000)
+  await p.goto('/apps')
+  await expect(grid(p).getByRole('listitem')).toHaveCount(3)
+  await p.route('**/graphql/**', async (route) => {
+    if ((route.request().postData() ?? '').includes('"category":"Games"')) return // hangs
+    await route.continue()
+  })
+  await p.getByRole('link', { name: 'Games, 2 apps' }).click()
+  await expect(p.getByRole('main').getByRole('alert')).toContainText('The app directory is unavailable', { timeout: 20_000 })
+})
+
+test('app logos load lazily', async ({ page: p }) => {
+  await apps('dir-all', '"after":null,"category":null', { response: page([{ ...app('A1'), logoRef: `attachment://v1:${'3'.repeat(64)}` }]) })
+  await p.goto('/apps')
+  const logo = grid(p).getByRole('img', { name: 'Directory A1 logo' })
+  await expect(logo).toHaveAttribute('loading', 'lazy')
+  await expect(logo).toHaveAttribute('decoding', 'async')
 })
 
 test('an empty category invites listing an app on Vetra', async ({ page: p }) => {
