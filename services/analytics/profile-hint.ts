@@ -1,6 +1,7 @@
-// Wallet (public address) persisted on login so `_app.getInitialProps` can
-// seed `<OpenPanelComponent profileId>` and attribute a returning user's
-// first pageview. A cookie (not localStorage) so it's readable at SSR time.
+// Wallet (public address) persisted on login so `<Analytics />` can seed
+// `<OpenPanelComponent profileId>` and attribute a returning user's first
+// pageview. Read from document.cookie in the browser only: never put it in
+// server-rendered HTML, which is cached publicly.
 export const OP_PROFILE_COOKIE = 'op_profile'
 
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 365
@@ -16,13 +17,7 @@ export function clearProfileHint(): void {
   document.cookie = `${OP_PROFILE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
 }
 
-/**
- * Parses the profile hint out of a raw `Cookie` header string.
- *
- * The Pages Router has no `next/headers` `cookies()` helper, so
- * `_app.getInitialProps` passes `ctx.req.headers.cookie` on the server (and
- * may fall back to `document.cookie` on client-side transitions).
- */
+/** Parses the profile hint out of a cookie string (document.cookie). */
 export function readProfileHint(
   cookieHeader: string | undefined,
 ): string | undefined {

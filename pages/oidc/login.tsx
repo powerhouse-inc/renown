@@ -10,7 +10,8 @@ const OidcLoginPage: NextPage = () => {
     const router = useRouter();
     const requestId = router.query["request"]?.toString();
     const issuer = router.query["issuer"]?.toString();
-    const isClient = useIsClient();
+    // Statically optimised page: the query is only known once the router is ready.
+    const isClient = useIsClient() && router.isReady;
 
     return (
         <SiteLayout variant="auth">

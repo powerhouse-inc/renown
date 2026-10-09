@@ -12,7 +12,8 @@ const ConsolePage: NextPage = () => {
     const sessionId = router.query["session"]?.toString();
     const connectDid = router.query["connect"]?.toString(); // CLI's DID to authorize
     const expiresInDays = parseExpiresInDays(router.query["expiresInDays"]);
-    const isClient = useIsClient();
+    // Statically optimised page: the query is only known once the router is ready.
+    const isClient = useIsClient() && router.isReady;
 
     return (
         <SiteLayout variant="auth">
