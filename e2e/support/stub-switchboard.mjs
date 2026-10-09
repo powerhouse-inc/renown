@@ -95,6 +95,7 @@ async function packageRoute(req, res) {
       })
       return res.end()
     }
+    if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
   const object = /^\/__stub\/s3\/([0-9a-f]{64})$/.exec(url.pathname)

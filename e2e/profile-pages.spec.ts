@@ -97,6 +97,21 @@ test.describe('/media', () => {
   }
 })
 
+// Next/the router normalise dot segments before the handler runs (so these 404
+// without its cache header); the handler's regex is defence in depth.
+for (const path of ['/media/%2e%2e/avatar', '/media/%2e/avatar']) {
+  test(`${path} is never proxied to the switchboard`, async ({ request }) => {
+    const response = await request.get(path, { maxRedirects: 0 })
+    expect(response.status()).toBe(404)
+  })
+}
+
+test('/media passes a switchboard 5xx on as an uncached 502', async ({ request }) => {
+  const response = await request.get('/media/stub-broken-doc/avatar', { maxRedirects: 0 })
+  expect(response.status()).toBe(502)
+  expect(response.headers()['cache-control']).toBe('no-store')
+})
+
 test('identicons are deterministic per address and mirrored', () => {
   const a = identicon('0xAbC0000000000000000000000000000000000001')
   expect(identicon('0xabc0000000000000000000000000000000000001')).toEqual(a)

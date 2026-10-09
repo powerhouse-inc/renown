@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { isMediaField, packageRoutesBase } from '../../../../services/media'
 
 const CACHE_CONTROL = 'public, max-age=60, stale-while-revalidate=240'
-const DOCUMENT_ID_RE = /^[A-Za-z0-9._:-]{1,255}$/
+const DOCUMENT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,254}$/
 
 function notFound(res: NextApiResponse): void {
   res.setHeader('Cache-Control', 'public, max-age=60')
@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     )
   } catch (error) {
     console.error('Media lookup failed:', error)
+    res.setHeader('Cache-Control', 'no-store')
     res.status(502).json({ error: 'Media unavailable' })
     return
   }
@@ -46,6 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/octet-stream')
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.status(200).send(Buffer.from(await upstream.arrayBuffer()))
+    return
+  }
+  if (upstream.status >= 500) {
+    res.setHeader('Cache-Control', 'no-store')
+    res.status(upstream.status === 503 ? 503 : 502).json({ error: 'Media unavailable' })
     return
   }
   notFound(res)

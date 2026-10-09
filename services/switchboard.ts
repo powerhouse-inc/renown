@@ -1,8 +1,5 @@
 import { GraphQLClient } from 'graphql-request'
-
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'http://localhost:4001/graphql'
+import { SWITCHBOARD_ENDPOINT } from './switchboard-endpoint'
 
 const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 

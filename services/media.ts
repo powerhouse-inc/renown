@@ -3,8 +3,7 @@
 // switchboard's media route (renown-package media/media-route.ts), which
 // 302s to a short-lived signed URL or 404s when the field is unset.
 
-const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || 'http://localhost:4001/graphql'
+import { SWITCHBOARD_ENDPOINT } from './switchboard-endpoint'
 
 /** Package routes live under the switchboard's /api/<package name>. */
 const PACKAGE_PATH = '/api/@powerhousedao/renown-package'
