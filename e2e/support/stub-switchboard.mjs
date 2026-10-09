@@ -51,6 +51,7 @@ const DEFAULT_DATA = {
   appProfile: null,
   appProfilesByPublisher: [],
   appProfiles: { items: [], next: null },
+  appProfileCategories: [],
   appStats: null,
   userStats: [],
 }

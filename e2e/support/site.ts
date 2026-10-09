@@ -34,7 +34,29 @@ export async function attachScreenshots(page: Page, testInfo: TestInfo, name: st
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await page.waitForTimeout(200)
+    // No horizontal page scroll at any width.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
     const body = await page.screenshot({ fullPage: true })
     await testInfo.attach(`${name}-${width}.png`, { body, contentType: 'image/png' })
   }
+}
+
+/**
+ * Cumulative layout shift of the page so far (shifts right after user input
+ * excluded, as in CLS), measured over a further `settleMs`.
+ */
+export async function layoutShift(page: Page, settleMs = 1000): Promise<number> {
+  return page.evaluate(
+    (ms) =>
+      new Promise<number>((resolve) => {
+        let total = 0
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as (PerformanceEntry & { value: number; hadRecentInput: boolean })[]) {
+            if (!entry.hadRecentInput) total += entry.value
+          }
+        }).observe({ type: 'layout-shift', buffered: true })
+        setTimeout(() => resolve(total), ms)
+      }),
+    settleMs,
+  )
 }

@@ -61,15 +61,37 @@ export interface AppProfilePage {
 }
 
 /**
- * One page of every app profile, newest first (`limit` 1-50). A failed read
- * throws; callers decide whether that hides a section or shows an outage.
+ * One page of app profiles, newest first (`limit` 1-50), optionally only those
+ * in `category` (matched case-insensitively). A failed read throws; callers
+ * decide whether that hides a section or shows an outage.
  */
-export async function listAppProfiles({ limit, after }: { limit: number; after?: string | null }): Promise<AppProfilePage> {
+export async function listAppProfiles({
+  limit,
+  after,
+  category,
+}: {
+  limit: number
+  after?: string | null
+  category?: string | null
+}): Promise<AppProfilePage> {
   const data = await client().request<{ appProfiles: AppProfilePage }>(
-    `query AppProfiles($limit: Int, $after: String) { appProfiles(limit: $limit, after: $after) { items { ${FIELDS} } next } }`,
-    { limit, after: after ?? null },
+    `query AppProfiles($limit: Int, $after: String, $category: String) { appProfiles(limit: $limit, after: $after, category: $category) { items { ${FIELDS} } next } }`,
+    { limit, after: after ?? null, category: category ?? null },
   )
   return data.appProfiles
+}
+
+export interface AppProfileCategory {
+  category: string
+  count: number
+}
+
+/** The categories in use with how many apps each holds. A failed read throws. */
+export async function listAppCategories(): Promise<AppProfileCategory[]> {
+  const data = await client().request<{ appProfileCategories: AppProfileCategory[] }>(
+    `query AppProfileCategories { appProfileCategories { category count } }`,
+  )
+  return data.appProfileCategories
 }
 
 /** The app profiles a wallet publishes (oldest first). */

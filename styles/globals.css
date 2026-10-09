@@ -171,10 +171,13 @@ body {
     color: var(--foreground);
 }
 
-a {
-    color: inherit;
-    text-decoration: none;
-    cursor: pointer;
+/* In the base layer so text-* utilities on links (buttons, chips) win over it. */
+@layer base {
+    a {
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+    }
 }
 
 button:not(:disabled),
