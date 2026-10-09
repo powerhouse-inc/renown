@@ -8,6 +8,8 @@ export const OG_FETCH_TIMEOUT_MS = 2500
 const ADDRESS_RE = /^0x[0-9a-f]{40}$/
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif'])
+// Valid images Satori cannot draw: not a failure, the card draws its monogram instead.
+const UNDRAWABLE_IMAGE_TYPES = new Set(['image/webp', 'image/avif', 'image/svg+xml'])
 
 export type OgCard =
   | { variant: 'default' }
@@ -82,11 +84,12 @@ async function readCapped(response: Response): Promise<Uint8Array> {
 }
 
 /**
- * Fetches a media image as a data URL (PNG/JPEG/GIF, at most 4 MB); throws on
+ * Fetches a media image as a data URL (PNG/JPEG/GIF, at most 4 MB); null for a
+ * valid image in a format Satori cannot draw (WebP/AVIF/SVG); throws on
  * anything else. Redirects are followed by hand: at most two hops, each only to
  * an allowed host (see isAllowedTarget). `origin` is the site's public origin.
  */
-export async function fetchImageDataUrl(url: string, origin: string): Promise<string> {
+export async function fetchImageDataUrl(url: string, origin: string): Promise<string | null> {
   const signal = AbortSignal.timeout(OG_FETCH_TIMEOUT_MS)
   let target = new URL(url)
   for (let hop = 0; ; hop++) {
@@ -99,6 +102,10 @@ export async function fetchImageDataUrl(url: string, origin: string): Promise<st
       continue
     }
     const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    if (response.ok && UNDRAWABLE_IMAGE_TYPES.has(type)) {
+      await response.body?.cancel()
+      return null
+    }
     if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
     return `data:${type};base64,${toBase64(await readCapped(response))}`
   }

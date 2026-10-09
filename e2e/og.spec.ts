@@ -11,6 +11,8 @@ const TEXT = '0x5e00000000000000000000000000000000000c04'
 const HUGE = '0x5e00000000000000000000000000000000000c05'
 const EVIL = '0x5e00000000000000000000000000000000000c06'
 const LOOP = '0x5e00000000000000000000000000000000000c07'
+const WEBP = '0x5e00000000000000000000000000000000000c08'
+const WEBP_APP_DID = 'did:key:z6MkSeoWebpAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const APP_DID = 'did:key:z6MkSeoAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const profile = (documentId: string, avatar: string | null) => ({
   documentId,
@@ -33,6 +35,12 @@ test.beforeAll(async () => {
   for (const [address, doc] of [[TEXT, 'stub-text-doc'], [HUGE, 'stub-huge-doc'], [EVIL, 'stub-evil-doc'], [LOOP, 'stub-loop-doc']]) {
     await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'b'.repeat(64)}`)] } } })
   }
+  await fixtureStub({ match: 'OgProfile', variables: WEBP, response: { data: { renownUsers: [profile('stub-webp-doc', `attachment://v1:${'c'.repeat(64)}`)] } } })
+  await fixtureStub({
+    match: 'OgApp',
+    variables: WEBP_APP_DID,
+    response: { data: { appProfile: { documentId: 'stub-webp-doc', name: 'Webp App', tagline: 'Draws a monogram', category: 'Tools', logo: null, logoRef: `attachment://v1:${'2'.repeat(64)}` } } },
+  })
   await fixtureStub({
     match: 'OgApp',
     variables: APP_DID,
@@ -56,6 +64,11 @@ test.describe('link-preview images', () => {
 
   test('never fetch an external avatar URL: the profile card draws a monogram', async ({ request }) => {
     expect(await variantOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe('profile')
+  })
+
+  test('draw the intended card with a monogram when the image is WebP (Satori cannot draw it)', async ({ request }) => {
+    expect(await variantOf(request, `?variant=profile&address=${WEBP}`)).toBe('profile')
+    expect(await variantOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toBe('app')
   })
 
   test('fall back to the default card on a non-image, an oversized image, a foreign redirect or a redirect loop', async ({ request }) => {
@@ -85,6 +98,8 @@ test.describe('link-preview caching', () => {
     expect(await cacheOf(request, '')).toBe(LONG)
     expect(await cacheOf(request, `?variant=profile&address=${ADDRESS}`)).toBe(LONG)
     expect(await cacheOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe(LONG)
+    expect(await cacheOf(request, `?variant=profile&address=${WEBP}`)).toBe(LONG)
+    expect(await cacheOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toBe(LONG)
     expect(await cacheOf(request, '?variant=profile&address=0x5e00000000000000000000000000000000000c99')).toBe(LONG)
   })
 

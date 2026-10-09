@@ -107,7 +107,7 @@ async function packageRoute(req, res) {
       return res.end()
     }
     // Fixtures for the OG route's image guards (e2e/og.spec.ts).
-    const hostile = { 'stub-text-doc': `http://localhost:${port}/__stub/og/text`, 'stub-huge-doc': `http://localhost:${port}/__stub/og/huge`, 'stub-evil-doc': 'https://evil.example/avatar.png', 'stub-loop-doc': `http://localhost:${port}/__stub/og/loop1` }
+    const hostile = { 'stub-text-doc': `http://localhost:${port}/__stub/og/text`, 'stub-huge-doc': `http://localhost:${port}/__stub/og/huge`, 'stub-evil-doc': 'https://evil.example/avatar.png', 'stub-loop-doc': `http://localhost:${port}/__stub/og/loop1`, 'stub-webp-doc': `http://localhost:${port}/__stub/og/webp` }
     if (hostile[media[1]]) {
       res.writeHead(302, { Location: hostile[media[1]] })
       return res.end()
@@ -115,11 +115,15 @@ async function packageRoute(req, res) {
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
-  const og = /^\/__stub\/og\/(text|huge|loop1|loop2|loop3)$/.exec(url.pathname)
+  const og = /^\/__stub\/og\/(text|huge|webp|loop1|loop2|loop3)$/.exec(url.pathname)
   if (og && req.method === 'GET') {
     if (og[1] === 'text') {
       res.writeHead(200, { 'Content-Type': 'text/plain' })
       return res.end('not an image')
+    }
+    if (og[1] === 'webp') {
+      res.writeHead(200, { 'Content-Type': 'image/webp' })
+      return res.end(Buffer.from('UklGRhYAAABXRUJQVlA4TAoAAAAvAAAAAAfQ//73/6L/', 'base64'))
     }
     if (og[1] === 'huge') {
       res.writeHead(200, { 'Content-Type': 'image/png' })
@@ -181,7 +185,7 @@ const server = http.createServer(async (req, res) => {
       fixtures.push(await readBody(req))
       return send(res, 200, { ok: true })
     }
-    if (req.url?.startsWith(PACKAGE) || req.url?.startsWith('/__stub/s3/')) {
+    if (req.url?.startsWith(PACKAGE) || req.url?.startsWith('/__stub/s3/') || req.url?.startsWith('/__stub/og/')) {
       const handled = await packageRoute(req, res)
       if (handled !== false) return
     }
