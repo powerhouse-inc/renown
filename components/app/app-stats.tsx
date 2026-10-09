@@ -51,7 +51,7 @@ function StatTile({
 
 function Leaderboard({ metric }: { metric: AppMetricStat }) {
   return (
-    <div className="rounded-2xl border border-gray-200 p-4 dark:border-white/10">
+    <div className="min-w-0 rounded-2xl border border-gray-200 p-4 dark:border-white/10">
       <h4 className="text-foreground text-sm font-semibold">{metric.label}</h4>
       <ol className="mt-3 space-y-1">
         {metric.top.map((c, i) => {
@@ -122,7 +122,7 @@ export function AppStatsSection({ stats }: { stats: AppStats }) {
       {boards.length > 0 && (
         <div className="space-y-3">
           <h3 className="text-foreground text-sm font-semibold">Top contributors</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {boards.map((m) => (
               <Leaderboard key={m.key} metric={m} />
             ))}
