@@ -1,3 +1,19 @@
+## 1.20.0 (2026-10-09)
+
+* feat: identity hub phases 2+3 (app pages, app stats) and connect-link fix ([a3faaea](https://github.com/powerhouse-inc/renown/commit/a3faaea))
+* feat(apps): app profile reads, logo and cover media URLs, markdown subset ([03ac291](https://github.com/powerhouse-inc/renown/commit/03ac291))
+* feat(apps): public app pages at /app/<did> ([8f28247](https://github.com/powerhouse-inc/renown/commit/8f28247))
+* feat(apps): stat tiles, active users and top contributors on app pages ([dd53a69](https://github.com/powerhouse-inc/renown/commit/dd53a69))
+* feat(profile): apps published and the Publisher badge; app page header polish ([c6cf057](https://github.com/powerhouse-inc/renown/commit/c6cf057))
+* feat(profile): stats grouped by app on user profiles ([9489c13](https://github.com/powerhouse-inc/renown/commit/9489c13))
+* fix(apps): anchor colors beat the global a{color:inherit} reset on app page links ([68090c4](https://github.com/powerhouse-inc/renown/commit/68090c4))
+* fix(apps): fall back to the monogram when a server-rendered logo fails before hydration ([0c0a2e0](https://github.com/powerhouse-inc/renown/commit/0c0a2e0))
+* fix(apps): keep top-contributor cards inside the page on narrow screens ([671c2d6](https://github.com/powerhouse-inc/renown/commit/671c2d6))
+* fix(apps): versioned contributor avatars from the avatar ref; wrap metric labels and show descriptio ([c2535cc](https://github.com/powerhouse-inc/renown/commit/c2535cc))
+* fix(auth): finish a connect link without returnUrl instead of crashing ([d10166e](https://github.com/powerhouse-inc/renown/commit/d10166e))
+* fix(profile): keep stats cards inside the page on narrow screens ([dfdfc2c](https://github.com/powerhouse-inc/renown/commit/dfdfc2c))
+* fix(profile): show only declared stats; reset cover failure on ref change ([e42617b](https://github.com/powerhouse-inc/renown/commit/e42617b))
+
 ## <small>1.19.1 (2026-10-09)</small>
 
 * chore: merge identity hub phase 1 final fixes ([1816933](https://github.com/powerhouse-inc/renown/commit/1816933))
