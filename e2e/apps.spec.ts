@@ -127,6 +127,30 @@ test('Load more appends the next page, and a failed page can be retried', async 
   await expect(p.getByRole('button', { name: 'Load more apps' })).toHaveCount(0)
 })
 
+test('Load more stays usable after a chip and back to all while its answer was in flight', async ({ page: p }) => {
+  await apps('dir-all', '"after":null,"category":null', { response: page([app('A1'), app('A2')], 'cursor-2') })
+  await apps('dir-all-2', '"after":"cursor-2","category":null', { response: page([app('A4')], null) })
+  await p.goto('/apps')
+  await expect(grid(p).getByRole('listitem')).toHaveCount(2)
+  // Hold the next-page answer back until after the user has left and returned.
+  let release: () => void = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  await p.route('**/graphql/**', async (route) => {
+    const body = route.request().postData() ?? ''
+    if (body.includes('"after":"cursor-2"') || body.includes('"category":"Games"')) await gate
+    await route.continue()
+  })
+  await p.getByRole('button', { name: 'Load more apps' }).click()
+  await expect(p.getByRole('button', { name: 'Loading…' })).toBeDisabled()
+  await p.getByRole('link', { name: 'Games, 2 apps' }).click()
+  await expect(p).toHaveURL(/category=Games$/)
+  // Back to the category already shown (a chip push keeps the page, unlike a dev-mode history pop).
+  await p.getByRole('link', { name: 'All' }).click()
+  await expect(p).toHaveURL(/\/apps$/)
+  release()
+  await expect(p.getByRole('button', { name: 'Load more apps' })).toBeEnabled()
+})
+
 test('an empty category invites listing an app on Vetra', async ({ page: p }) => {
   await apps('dir-empty', '"after":null,"category":"Empty"', { response: page([]) })
   await p.goto('/apps?category=Empty')

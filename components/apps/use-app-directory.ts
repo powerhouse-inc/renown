@@ -59,7 +59,8 @@ export function useAppDirectory(
         if (id === request.current) setLoaded(fromPage(target, null))
       })
       .finally(() => {
-        if (id === request.current) setRetrying(false)
+        // Unconditional: a superseding fetch keeps `busy` true via the category mismatch.
+        setRetrying(false)
       })
   }, [])
 
@@ -71,6 +72,11 @@ export function useAppDirectory(
 
   const busy = retrying || !sameCategory(category, loaded.category)
 
+  /** A "Load more" answer was superseded: if its category is still the one shown, the button is usable again. */
+  const settleStale = useCallback((target: string | null) => {
+    setLoaded((l) => (sameCategory(l.category, target) && l.more === 'loading' ? { ...l, more: 'idle' } : l))
+  }, [])
+
   const loadMore = useCallback(() => {
     if (!loaded.next || loaded.more === 'loading' || busy) return
     const id = request.current
@@ -78,14 +84,15 @@ export function useAppDirectory(
     setLoaded((l) => ({ ...l, more: 'loading' }))
     listAppProfiles({ limit: APPS_PAGE_SIZE, after: next, category: target })
       .then((page) => {
-        if (id !== request.current) return
+        if (id !== request.current) return settleStale(target)
         setLoaded((l) => ({ ...l, items: appendApps(l.items, page.items), next: page.next, more: 'idle' }))
       })
       .catch((error: unknown) => {
         console.warn('Apps directory: next page unavailable:', error)
         if (id === request.current) setLoaded((l) => ({ ...l, more: 'error' }))
+        else settleStale(target)
       })
-  }, [loaded, busy])
+  }, [loaded, busy, settleStale])
 
   const retry = useCallback(() => {
     setRetrying(true)

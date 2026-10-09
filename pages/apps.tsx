@@ -88,9 +88,9 @@ const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, ca
           ) : (
             <ul
               aria-busy={busy}
-              aria-label={state.category ? `${state.category} apps` : 'All apps'}
+              aria-label={state.category ? `${categories.find((c) => sameCategory(c.category, state.category))?.category ?? state.category} apps` : 'All apps'}
               className={cx(
-                'grid gap-5 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-3',
+                'grid gap-5 motion-safe:transition-opacity motion-safe:duration-300 sm:grid-cols-2 lg:grid-cols-3',
                 busy && 'pointer-events-none opacity-50',
               )}
             >
@@ -127,6 +127,7 @@ const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, ca
 
 export const getServerSideProps: GetServerSideProps<AppsPageProps> = async ({ query, res }) => {
   const category = parseCategory(query['category'])
+  let categoriesFailed = false
   const [page, categories] = await Promise.all([
     withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, category }), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
       console.error('Apps directory unavailable:', error)
@@ -134,11 +135,12 @@ export const getServerSideProps: GetServerSideProps<AppsPageProps> = async ({ qu
     }),
     withTimeout(listAppCategories(), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
       console.error('Apps directory: categories unavailable:', error)
+      categoriesFailed = true
       return []
     }),
   ])
-  // An outage must not be cached at the edge: the next visitor retries.
-  res.setHeader('Cache-Control', page ? 'public, s-maxage=60, stale-while-revalidate=300' : 'no-store')
+  // An outage (or a page missing its chips) must not be cached at the edge: the next visitor retries.
+  res.setHeader('Cache-Control', page && !categoriesFailed ? 'public, s-maxage=60, stale-while-revalidate=300' : 'no-store')
   return { props: { category, page, categories } }
 }
 

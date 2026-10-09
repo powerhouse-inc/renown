@@ -25,7 +25,7 @@ export function AppTile({ app, headingLevel = 3 }: AppTileProps) {
         </div>
       </div>
       <div className="flex flex-1 flex-col px-5 pb-5">
-        <div className="bg-surface-1 ring-surface-1 relative z-10 -mt-7 w-fit rounded-2xl ring-4">
+        <div className="bg-background ring-background relative z-10 -mt-7 w-fit rounded-2xl ring-4">
           <AppLogo
             documentId={app.documentId}
             logoRef={app.logoRef}
