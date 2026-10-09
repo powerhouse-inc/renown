@@ -1,3 +1,8 @@
+## <small>1.19.1 (2026-10-09)</small>
+
+* chore: merge identity hub phase 1 final fixes ([1816933](https://github.com/powerhouse-inc/renown/commit/1816933))
+* fix(profile): versioned avatar URLs, header avoids /media without an avatar, 503 on switchboard outa ([ce34e85](https://github.com/powerhouse-inc/renown/commit/ce34e85))
+
 ## 1.19.0 (2026-10-09)
 
 * chore: merge identity hub phase 1 ([86a70df](https://github.com/powerhouse-inc/renown/commit/86a70df))
