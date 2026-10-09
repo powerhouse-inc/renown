@@ -7,8 +7,6 @@ interface ProfileAvatarProps {
   documentId?: string | null
   /** attachment://v1:<sha256> of the uploaded avatar; its hash versions the /media URL. */
   avatar?: string | null
-  /** Avatar exists but only the flag is known (no ref): serves the bare /media URL. */
-  hasAvatar?: boolean
   /** External image (ENS avatar or legacy URL); used when there is no upload. */
   userImage?: string | null
   /** A local preview (object URL) that wins over everything else. */
@@ -26,7 +24,6 @@ interface ProfileAvatarProps {
 export function ProfileAvatar({
   documentId,
   avatar,
-  hasAvatar,
   userImage,
   previewUrl,
   seed,
@@ -34,8 +31,8 @@ export function ProfileAvatar({
   className = 'h-32 w-32',
 }: ProfileAvatarProps) {
   const sources = useMemo(
-    () => avatarSources({ documentId, avatar, hasAvatar, userImage, previewUrl }),
-    [documentId, avatar, hasAvatar, userImage, previewUrl],
+    () => avatarSources({ documentId, avatar, userImage, previewUrl }),
+    [documentId, avatar, userImage, previewUrl],
   )
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set())
   const src = sources.find((candidate) => !failed.has(candidate))

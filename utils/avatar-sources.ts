@@ -9,8 +9,6 @@ interface AvatarSourceInput {
   documentId?: string | null
   /** attachment://v1:<sha256> of the uploaded avatar, if the profile has one. */
   avatar?: string | null
-  /** An avatar exists but its ref is unknown: the bare (unversioned) /media URL is used. */
-  hasAvatar?: boolean
   userImage?: string | null
   previewUrl?: string | null
 }
@@ -19,10 +17,10 @@ interface AvatarSourceInput {
  * Image candidates in order of preference: local preview → uploaded avatar
  * (versioned /media URL, only when an avatar is set) → external image.
  */
-export function avatarSources({ documentId, avatar, hasAvatar, userImage, previewUrl }: AvatarSourceInput): string[] {
+export function avatarSources({ documentId, avatar, userImage, previewUrl }: AvatarSourceInput): string[] {
   return [
     previewUrl,
-    (avatar || hasAvatar) && documentId ? mediaUrl(documentId, 'avatar', '', avatar) : null,
+    avatar && documentId ? mediaUrl(documentId, 'avatar', '', avatar) : null,
     userImage && isSafeImageUrl(userImage) ? userImage : null,
   ].filter((src): src is string => !!src)
 }

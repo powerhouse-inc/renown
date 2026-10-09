@@ -12,9 +12,11 @@ export interface MetricContributor {
   address: string | null
   handle: string | null
   displayName: string | null
-  /** Renown profile document (avatar at /media/<documentId>/avatar when hasAvatar). */
+  /** Renown profile document (avatar at /media/<documentId>/avatar when avatar is set). */
   documentId: string | null
   hasAvatar: boolean
+  /** attachment://v1:<sha256> of the avatar; versions the /media URL. */
+  avatar: string | null
   userImage: string | null
 }
 
@@ -51,7 +53,7 @@ export interface UserStatEntry {
   unit: string | null
 }
 
-const STATS_FIELDS = `appDid activeUsers30d totalUsers updatedAt metrics { key label unit description aggregation value users top { userDid value address handle displayName documentId hasAvatar userImage } }`
+const STATS_FIELDS = `appDid activeUsers30d totalUsers updatedAt metrics { key label unit description aggregation value users top { userDid value address handle displayName documentId hasAvatar avatar userImage } }`
 const USER_STAT_FIELDS = `appDid metric value updatedAt appName appDocumentId appHasLogo appLogo label unit`
 
 function client(): GraphQLClient {

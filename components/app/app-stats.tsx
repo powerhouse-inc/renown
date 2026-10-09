@@ -28,23 +28,30 @@ function StatTile({
   unit,
   label,
   metricKey,
-  title,
+  description,
 }: {
   caption: string
   value: number
   unit: string | null
   label: string
   metricKey?: string
-  title?: string
+  description?: string | null
 }) {
   return (
-    <div className="bg-secondary/60 min-w-0 rounded-2xl p-4" data-metric={metricKey} data-value={String(value)} title={title}>
+    <div
+      className="bg-secondary/60 min-w-0 rounded-2xl p-4"
+      data-metric={metricKey}
+      data-value={String(value)}
+    >
       <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{caption}</p>
       <p className="text-foreground mt-1 flex items-baseline gap-1.5">
         <span className="text-2xl font-bold tabular-nums">{formatStatValue(value)}</span>
         {unit && <span className="text-muted-foreground truncate text-sm">{unit}</span>}
       </p>
-      <p className="text-foreground/80 mt-0.5 truncate text-sm">{label}</p>
+      <p className="text-foreground/80 mt-0.5 line-clamp-2 text-sm break-words">{label}</p>
+      {description && (
+        <p className="text-muted-foreground mt-1 text-xs break-words">{description}</p>
+      )}
     </div>
   )
 }
@@ -58,23 +65,32 @@ function Leaderboard({ metric }: { metric: AppMetricStat }) {
           const href = contributorHref(c)
           const body: ReactNode = (
             <>
-              <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{i + 1}</span>
+              <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">
+                {i + 1}
+              </span>
               <ProfileAvatar
                 documentId={c.documentId}
-                hasAvatar={c.hasAvatar}
+                avatar={c.avatar}
                 userImage={c.userImage}
                 seed={c.address ?? c.userDid}
                 alt=""
                 className="h-7 w-7 shrink-0"
               />
-              <span className="text-foreground min-w-0 flex-1 truncate text-sm">{contributorName(c)}</span>
-              <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">{withUnit(c.value, metric.unit)}</span>
+              <span className="text-foreground min-w-0 flex-1 truncate text-sm">
+                {contributorName(c)}
+              </span>
+              <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
+                {withUnit(c.value, metric.unit)}
+              </span>
             </>
           )
           return (
             <li key={c.userDid}>
               {href ? (
-                <Link href={href} className="hover:bg-secondary/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-1 transition-colors">
+                <Link
+                  href={href}
+                  className="hover:bg-secondary/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-1 transition-colors"
+                >
                   {body}
                 </Link>
               ) : (
@@ -98,15 +114,21 @@ export function AppStatsSection({ stats }: { stats: AppStats }) {
         <h2 id="app-stats-heading" className="text-foreground text-lg font-semibold">
           Stats
         </h2>
-        {stats.updatedAt && <span className="text-muted-foreground text-xs">Updated {formatStatDate(stats.updatedAt)}</span>}
+        {stats.updatedAt && (
+          <span className="text-muted-foreground text-xs">
+            Updated {formatStatDate(stats.updatedAt)}
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatTile
-          caption="Active · 30 days"
-          value={stats.activeUsers30d}
-          unit={null}
-          label={`of ${formatStatValue(stats.totalUsers)} users`}
-        />
+        {stats.totalUsers > 0 && (
+          <StatTile
+            caption="Active · 30 days"
+            value={stats.activeUsers30d}
+            unit={null}
+            label={`of ${formatStatValue(stats.totalUsers)} users`}
+          />
+        )}
         {stats.metrics.map((m) => (
           <StatTile
             key={m.key}
@@ -115,7 +137,7 @@ export function AppStatsSection({ stats }: { stats: AppStats }) {
             value={m.value}
             unit={m.unit}
             label={m.label}
-            title={m.description ?? undefined}
+            description={m.description}
           />
         ))}
       </div>
