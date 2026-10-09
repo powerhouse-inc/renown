@@ -102,8 +102,28 @@ async function packageRoute(req, res) {
       })
       return res.end()
     }
+    // Fixtures for the OG route's image guards (e2e/og.spec.ts).
+    const hostile = { 'stub-text-doc': `http://localhost:${port}/__stub/og/text`, 'stub-huge-doc': `http://localhost:${port}/__stub/og/huge`, 'stub-evil-doc': 'https://evil.example/avatar.png', 'stub-loop-doc': `http://localhost:${port}/__stub/og/loop1` }
+    if (hostile[media[1]]) {
+      res.writeHead(302, { Location: hostile[media[1]] })
+      return res.end()
+    }
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
+  }
+  const og = /^\/__stub\/og\/(text|huge|loop1|loop2|loop3)$/.exec(url.pathname)
+  if (og && req.method === 'GET') {
+    if (og[1] === 'text') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      return res.end('not an image')
+    }
+    if (og[1] === 'huge') {
+      res.writeHead(200, { 'Content-Type': 'image/png' })
+      return res.end(Buffer.alloc(5 * 1024 * 1024))
+    }
+    const next = { loop1: 'loop2', loop2: 'loop3', loop3: 'loop1' }[og[1]]
+    res.writeHead(302, { Location: `http://localhost:${port}/__stub/og/${next}` })
+    return res.end()
   }
   const object = /^\/__stub\/s3\/([0-9a-f]{64})$/.exec(url.pathname)
   if (object && req.method === 'PUT') {

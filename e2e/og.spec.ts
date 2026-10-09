@@ -5,6 +5,11 @@ import { fixtureStub } from './support/stub-switchboard-client'
 // The OG route (pages/api/og.tsx) against the stub switchboard.
 const ADDRESS = '0x5e00000000000000000000000000000000000c01'
 const BROKEN = '0x5e00000000000000000000000000000000000c02'
+const EXTERNAL = '0x5e00000000000000000000000000000000000c03'
+const TEXT = '0x5e00000000000000000000000000000000000c04'
+const HUGE = '0x5e00000000000000000000000000000000000c05'
+const EVIL = '0x5e00000000000000000000000000000000000c06'
+const LOOP = '0x5e00000000000000000000000000000000000c07'
 const APP_DID = 'did:key:z6MkSeoAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const profile = (documentId: string, avatar: string | null) => ({
   documentId,
@@ -23,6 +28,10 @@ test.beforeAll(async () => {
     variables: BROKEN,
     response: { data: { renownUsers: [profile('seo-doc-broken', `attachment://v1:${'a'.repeat(64)}`)] } },
   })
+  await fixtureStub({ match: 'OgProfile', variables: EXTERNAL, response: { data: { renownUsers: [{ ...profile('seo-doc-ext', null), userImage: 'https://localhost:1/avatar.png' }] } } })
+  for (const [address, doc] of [[TEXT, 'stub-text-doc'], [HUGE, 'stub-huge-doc'], [EVIL, 'stub-evil-doc'], [LOOP, 'stub-loop-doc']]) {
+    await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'b'.repeat(64)}`)] } } })
+  }
   await fixtureStub({
     match: 'OgApp',
     variables: APP_DID,
@@ -42,6 +51,16 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, '')).toBe('default')
     expect(await variantOf(request, `?variant=profile&address=${ADDRESS}`)).toBe('profile')
     expect(await variantOf(request, `?variant=app&did=${APP_DID}`)).toBe('app')
+  })
+
+  test('never fetch an external avatar URL: the profile card draws a monogram', async ({ request }) => {
+    expect(await variantOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe('profile')
+  })
+
+  test('fall back to the default card on a non-image, an oversized image, a foreign redirect or a redirect loop', async ({ request }) => {
+    for (const address of [TEXT, HUGE, EVIL, LOOP]) {
+      expect(await variantOf(request, `?variant=profile&address=${address}`), address).toBe('default')
+    }
   })
 
   test('fall back to the default card on bad input, unknown ids and broken images', async ({ request }) => {

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import type { NextRequest } from 'next/server'
+import { publicOrigin } from '../../utils/seo'
 import { loadAppCard, loadProfileCard, type OgCard } from '../../lib/og/og-data'
 
 // Link-preview images: /api/og?variant=default | profile&address=0x… | app&did=did:key:…
@@ -13,10 +14,19 @@ const BG = '#050A1A'
 const SIGNAL = '#21FFB4'
 const BLUE = '#0080FF'
 
-const fonts = Promise.all([
-  fetch(new URL('../../assets/fonts/Inter-Regular.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
-  fetch(new URL('../../assets/fonts/Inter-SemiBold.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
-])
+// A failed font load is not cached (the next request retries) and never fails the route.
+let fontsPromise: Promise<[ArrayBuffer, ArrayBuffer]> | null = null
+function loadFonts(): Promise<[ArrayBuffer, ArrayBuffer] | null> {
+  fontsPromise ??= Promise.all([
+    fetch(new URL('../../assets/fonts/Inter-Regular.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
+    fetch(new URL('../../assets/fonts/Inter-SemiBold.ttf', import.meta.url)).then((r) => r.arrayBuffer()),
+  ])
+  return fontsPromise.catch((error) => {
+    console.error('og: font load failed, rendering with the default font:', error)
+    fontsPromise = null
+    return null
+  })
+}
 
 function Sparkle({ size }: { size: number }) {
   return (
@@ -131,8 +141,8 @@ function render(card: OgCard) {
 async function loadCard(url: URL): Promise<OgCard> {
   const variant = url.searchParams.get('variant')
   try {
-    if (variant === 'profile') return (await loadProfileCard(url.searchParams.get('address') ?? '', url.origin)) ?? { variant: 'default' }
-    if (variant === 'app') return (await loadAppCard(url.searchParams.get('did') ?? '', url.origin)) ?? { variant: 'default' }
+    if (variant === 'profile') return (await loadProfileCard(url.searchParams.get('address') ?? '', publicOrigin())) ?? { variant: 'default' }
+    if (variant === 'app') return (await loadAppCard(url.searchParams.get('did') ?? '', publicOrigin())) ?? { variant: 'default' }
   } catch (error) {
     console.error('og: falling back to the default card:', error)
   }
@@ -142,13 +152,15 @@ async function loadCard(url: URL): Promise<OgCard> {
 export default async function handler(req: NextRequest) {
   const url = new URL(req.url)
   const card = await loadCard(url)
-  const [regular, semibold] = await fonts
+  const loaded = await loadFonts()
   return new ImageResponse(render(card), {
     ...SIZE,
-    fonts: [
-      { name: 'Inter', data: regular, weight: 400, style: 'normal' },
-      { name: 'Inter', data: semibold, weight: 600, style: 'normal' },
-    ],
+    ...(loaded && {
+      fonts: [
+        { name: 'Inter', data: loaded[0], weight: 400 as const, style: 'normal' as const },
+        { name: 'Inter', data: loaded[1], weight: 600 as const, style: 'normal' as const },
+      ],
+    }),
     headers: {
       'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
       'X-Og-Variant': card.variant,

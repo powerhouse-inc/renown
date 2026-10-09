@@ -33,14 +33,75 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-/** Fetches an image as a data URL (PNG/JPEG/GIF, at most 4 MB); throws on anything else. */
-export async function fetchImageDataUrl(url: string): Promise<string> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(OG_FETCH_TIMEOUT_MS), redirect: 'follow' })
-  const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-  if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('Image too large')
-  return `data:${type};base64,${toBase64(bytes)}`
+const MAX_HOPS = 2
+
+/**
+ * Hosts an image fetch may be redirected to, besides the site's own origin and
+ * the switchboard: the attachment storage behind the /media route's signed
+ * redirect. Comma-separated hostnames in OG_MEDIA_HOSTS; the default is the
+ * production bucket host (nbg1.your-objectstorage.com, seen by curling a real
+ * /media URL). Storage hosts must be https.
+ */
+function storageHosts(): string[] {
+  return (process.env.OG_MEDIA_HOSTS || 'nbg1.your-objectstorage.com')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function isAllowedTarget(target: URL, origin: string): boolean {
+  if (target.origin === new URL(origin).origin || target.origin === new URL(switchboardOrigin()).origin) return true
+  return target.protocol === 'https:' && storageHosts().includes(target.hostname.toLowerCase())
+}
+
+/** Reads a body with a hard byte cap, cancelling the stream past it. */
+async function readCapped(response: Response): Promise<Uint8Array> {
+  const declared = Number(response.headers.get('content-length'))
+  if (declared > MAX_IMAGE_BYTES) throw new Error('Image too large')
+  if (!response.body) throw new Error('Empty image body')
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_IMAGE_BYTES) {
+      await reader.cancel()
+      throw new Error('Image too large')
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return bytes
+}
+
+/**
+ * Fetches a media image as a data URL (PNG/JPEG/GIF, at most 4 MB); throws on
+ * anything else. Redirects are followed by hand: at most two hops, each only to
+ * an allowed host (see isAllowedTarget). `origin` is the site's public origin.
+ */
+export async function fetchImageDataUrl(url: string, origin: string): Promise<string> {
+  const signal = AbortSignal.timeout(OG_FETCH_TIMEOUT_MS)
+  let target = new URL(url)
+  for (let hop = 0; ; hop++) {
+    if (!isAllowedTarget(target, origin)) throw new Error(`Image host not allowed: ${target.hostname}`)
+    const response = await fetch(target, { signal, redirect: 'manual' })
+    const location = response.headers.get('location')
+    if (response.status >= 300 && response.status < 400 && location) {
+      if (hop >= MAX_HOPS) throw new Error('Too many image redirects')
+      target = new URL(location, target)
+      continue
+    }
+    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+    if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
+    return `data:${type};base64,${toBase64(await readCapped(response))}`
+  }
 }
 
 interface ProfileRow {
@@ -63,17 +124,14 @@ export async function loadProfileCard(address: string, origin: string): Promise<
   )
   const profile = data.renownUsers[0]
   if (!profile) return null
-  const imageUrl = profile.avatar
-    ? mediaUrl(profile.documentId, 'avatar', origin, profile.avatar)
-    : profile.userImage && /^https:\/\//i.test(profile.userImage)
-      ? profile.userImage
-      : null
+  // Only images stored with Renown (the /media route); external avatar URLs are never fetched.
+  const imageUrl = profile.avatar ? mediaUrl(profile.documentId, 'avatar', origin, profile.avatar) : null
   return {
     variant: 'profile',
     name: profile.displayName || profile.username || `${lower.slice(0, 6)}…${lower.slice(-4)}`,
     handle: profile.handle,
     address: lower,
-    image: imageUrl ? await fetchImageDataUrl(imageUrl) : null,
+    image: imageUrl ? await fetchImageDataUrl(imageUrl, origin) : null,
   }
 }
 
@@ -96,16 +154,12 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
   )
   const app = data.appProfile
   if (!app) return null
-  const logoUrl = app.logoRef
-    ? mediaUrl(app.documentId, 'logo', origin, app.logoRef)
-    : app.logo && /^https:\/\//i.test(app.logo)
-      ? app.logo
-      : null
+  const logoUrl = app.logoRef ? mediaUrl(app.documentId, 'logo', origin, app.logoRef) : null
   return {
     variant: 'app',
     name: app.name || 'Untitled app',
     tagline: app.tagline,
     category: app.category,
-    logo: logoUrl ? await fetchImageDataUrl(logoUrl) : null,
+    logo: logoUrl ? await fetchImageDataUrl(logoUrl, origin) : null,
   }
 }

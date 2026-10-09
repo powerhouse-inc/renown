@@ -33,7 +33,7 @@ export default defineConfig({
       // credential API tests fail.
       // NEXT_PUBLIC_E2E_AUTH lets the profile editor take its upload bearer
       // from window.__renownE2eBearer (hooks/use-profile-editor-auth.ts).
-      env: { NEXT_PUBLIC_SWITCHBOARD_ENDPOINT: `${STUB_SWITCHBOARD_URL}/graphql`, NEXT_PUBLIC_E2E_AUTH: '1' },
+      env: { NEXT_PUBLIC_SWITCHBOARD_ENDPOINT: `${STUB_SWITCHBOARD_URL}/graphql`, NEXT_PUBLIC_E2E_AUTH: '1', NEXT_PUBLIC_RENOWN_URL: 'http://localhost:3000' },
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
