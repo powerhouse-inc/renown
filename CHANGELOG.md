@@ -1,3 +1,16 @@
+## 1.19.0 (2026-10-09)
+
+* chore: merge identity hub phase 1 ([86a70df](https://github.com/powerhouse-inc/renown/commit/86a70df))
+* fix(ci): bake per-environment NEXT_PUBLIC_* into images, never push on PRs, no localhost in prod bui ([73811c9](https://github.com/powerhouse-inc/renown/commit/73811c9))
+* fix(profile): editor read failures, modal crop dialog, save gating, field a11y and unsaved-changes g ([6bec365](https://github.com/powerhouse-inc/renown/commit/6bec365))
+* fix(profile): ENS fills empty profile fields instead of overwriting edits ([9b2d75e](https://github.com/powerhouse-inc/renown/commit/9b2d75e))
+* fix(profile): fall back to the identicon when a server-rendered avatar fails before hydration ([204ec1b](https://github.com/powerhouse-inc/renown/commit/204ec1b))
+* fix(profile): keep long unbroken names and bios inside the editor on narrow screens ([4ba8183](https://github.com/powerhouse-inc/renown/commit/4ba8183))
+* fix(profile): production switchboard fallback in one place, stricter media ids, uncached 5xx passthr ([1c60093](https://github.com/powerhouse-inc/renown/commit/1c60093))
+* feat(profile): forward signed identity fields and relay field errors ([2fc1a86](https://github.com/powerhouse-inc/renown/commit/2fc1a86))
+* feat(profile): profile editor with avatar upload, handle check and links ([58c188e](https://github.com/powerhouse-inc/renown/commit/58c188e))
+* feat(profile): public /@handle pages, stable /media URLs and link previews ([92a55e6](https://github.com/powerhouse-inc/renown/commit/92a55e6))
+
 ## <small>1.18.1 (2026-10-09)</small>
 
 * fix(deps): powerhouse 6.2.3 ([4f6ff5d](https://github.com/powerhouse-inc/renown/commit/4f6ff5d))
