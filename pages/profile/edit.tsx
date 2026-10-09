@@ -119,7 +119,7 @@ function Editor({ address, profileId, signMessage, getBearer }: {
   const viewHref = documentId ? profilePath({ handle: initial.handle || null, documentId }) : null
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
       <form
         className={`${glass} space-y-6 p-6 sm:p-8`}
         onSubmit={(e) => {
@@ -278,7 +278,7 @@ const EditProfilePage: NextPage = () => {
         <title>Edit profile - Renown</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <main className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pt-24 pb-16">
+      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pt-24 pb-16">
         {auth.status === 'loading' && <p className="text-muted-foreground py-24 text-center">Loading…</p>}
         {auth.status === 'signed-out' && (
           <div className={`${glass} mx-auto max-w-md space-y-4 p-8 text-center`}>
@@ -296,7 +296,7 @@ const EditProfilePage: NextPage = () => {
         {auth.status === 'ready' && (
           <Editor address={auth.address} profileId={auth.profileId} signMessage={auth.signMessage} getBearer={auth.getBearer} />
         )}
-      </main>
+      </div>
     </PageBackground>
   )
 }

@@ -40,7 +40,7 @@ export function ProfileSummary({ profile }: { profile: ProfileSummaryData }) {
         className="h-32 w-32 border-4 border-white shadow-lg dark:border-white/20"
       />
       <div className="space-y-1">
-        <h1 className="text-foreground text-3xl font-bold break-words">{name}</h1>
+        <h1 className="text-foreground text-3xl font-bold [overflow-wrap:anywhere]">{name}</h1>
         {profile.handle && <p className="text-muted-foreground font-medium">@{profile.handle}</p>}
       </div>
       {profile.ensVerified && profile.username && (
@@ -55,7 +55,7 @@ export function ProfileSummary({ profile }: { profile: ProfileSummaryData }) {
         </span>
       )}
       {profile.bio && (
-        <p className="text-foreground/90 max-w-prose whitespace-pre-line break-words">{profile.bio}</p>
+        <p className="text-foreground/90 max-w-prose whitespace-pre-line [overflow-wrap:anywhere]">{profile.bio}</p>
       )}
       <ProfileLinks links={profile.links ?? []} />
     </div>
