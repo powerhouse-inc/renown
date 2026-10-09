@@ -54,7 +54,12 @@ export const WebFlow: React.FC<IProps> = ({
 
                     <WebFlowViewBody view={view} appId={appId} returnUrl={returnUrl} expiresInDays={expiresInDays} />
 
-                    {view.kind === "authorized" && (
+                    {view.kind === "authorized" && view.redirectUrl === null && view.credentialReady && (
+                        <p className="mt-12 text-center text-muted-foreground-light">
+                            Authorization complete. You can close this tab.
+                        </p>
+                    )}
+                    {view.kind === "authorized" && view.redirectUrl !== null && (
                         <ReturnToAppButton
                             url={view.redirectUrl}
                             returnUrl={returnUrl}

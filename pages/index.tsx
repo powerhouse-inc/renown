@@ -6,13 +6,14 @@ import {WebFlow} from "../components/auth/web-flow";
 import PageBackground from "../components/ui/page-background";
 import { useIsClient } from "../hooks/useIsClient";
 import { parseExpiresInDays } from "../utils/credential-validity";
+import { parseReturnUrl } from "../utils/return-url";
 
 const Home: NextPage = () => {
     const router = useRouter();
     const connectId = router.query["connect"]?.toString();
     const appId = router.query["app"]?.toString() || connectId;
     const deeplink = router.query["deeplink"]?.toString();
-    const returnUrl = router.query["returnUrl"]?.toString();
+    const returnUrl = parseReturnUrl(router.query["returnUrl"]);
     const expiresInDays = parseExpiresInDays(router.query["expiresInDays"]);
     const isClient = useIsClient();
 

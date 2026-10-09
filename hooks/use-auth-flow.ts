@@ -19,7 +19,7 @@ export type AuthFlowView =
     | { kind: "loading" }
     | { kind: "pre-login" }
     | { kind: "needs-authorization"; ensName: string | null; ensAvatar: string | null }
-    | { kind: "authorized"; redirectUrl: string; credentialReady: boolean };
+    | { kind: "authorized"; redirectUrl: string | null; credentialReady: boolean };
 
 export interface AuthFlowResult {
     view: AuthFlowView;
@@ -46,11 +46,13 @@ function buildRedirectUrl(args: {
     chainId: number;
     deeplink?: string;
     returnUrl?: string;
-}): string {
+}): string | null {
     const { address, chainId, deeplink, returnUrl } = args;
     const user = encodeURIComponent(`did:pkh:eip155:${chainId}:${address.toLowerCase()}`);
     if (deeplink) return `${deeplink}://login/${user}`;
-    const url = new URL(returnUrl ?? "");
+    // No app to return to (e.g. a `?connect=<did>` link): the flow ends here.
+    if (!returnUrl) return null;
+    const url = new URL(returnUrl);
     url.searchParams.set("user", user);
     return url.toString();
 }
