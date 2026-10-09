@@ -16,3 +16,6 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 /** Per-request budget for optional SSR data on public pages (spec: 2.5 s). */
 export const SSR_DATA_TIMEOUT_MS = 2500
+
+/** Budget for the browser's own reads (directory, approvals): past it, the page shows its error state. */
+export const CLIENT_DATA_TIMEOUT_MS = 10_000

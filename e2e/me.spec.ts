@@ -27,6 +27,10 @@ interface MockSwitchboard {
   /** While set, revoke answers wait for it (to observe the optimistic state). */
   hold: Promise<void> | null
   failCredentialReads: boolean
+  /** While set, profile reads wait for it. */
+  holdProfile: Promise<void> | null
+  /** Credential reads never answer (a hung switchboard). */
+  hangCredentialReads: boolean
 }
 
 const appProfile = (did: string, name: string) => ({
@@ -66,7 +70,7 @@ async function mockSwitchboard(page: Page, address: string): Promise<MockSwitchb
   ]
   const profiles: Record<string, unknown> = { [ALPHA]: appProfile(ALPHA, 'Alpha Notes'), [BETA]: appProfile(BETA, 'Beta Board') }
   let reads = 0
-  const mock: MockSwitchboard = { revokes: [], credentialReads: () => reads, answers: [], hold: null, failCredentialReads: false }
+  const mock: MockSwitchboard = { revokes: [], credentialReads: () => reads, answers: [], hold: null, failCredentialReads: false, holdProfile: null, hangCredentialReads: false }
 
   await page.route(`${STUB_SWITCHBOARD_URL}/graphql**`, async (route: Route) => {
     const request = route.request()
@@ -74,6 +78,7 @@ async function mockSwitchboard(page: Page, address: string): Promise<MockSwitchb
     if (query.includes('renownCredentials')) {
       reads++
       if (mock.failCredentialReads) return route.fulfill({ status: 500, body: 'boom' })
+      if (mock.hangCredentialReads) return
       return route.fulfill({ json: { data: { renownCredentials: credentials } } })
     }
     if (query.includes('SubjectAppProfiles')) {
@@ -81,6 +86,7 @@ async function mockSwitchboard(page: Page, address: string): Promise<MockSwitchb
       return route.fulfill({ json: { data } })
     }
     if (query.includes('renownUsers')) {
+      if (mock.holdProfile) await mock.holdProfile
       return route.fulfill({
         json: {
           data: {
@@ -263,6 +269,18 @@ test('a failed list shows Try again, which recovers', async ({ page }) => {
   await expect(apps(page).getByRole('heading', { level: 3 })).toHaveCount(2)
 })
 
+test('a switchboard that never answers ends in the error state, not an endless skeleton', async ({ page }) => {
+  const wallet = await signInTestWallet(page)
+  const mock = await mockSwitchboard(page, wallet.address)
+  mock.hangCredentialReads = true
+  await page.goto('/me')
+  await expect(page.getByRole('heading', { level: 1, name: 'Your Renown' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('Your approvals did not load', { timeout: 20_000 })
+  mock.hangCredentialReads = false
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(apps(page).getByRole('heading', { level: 3 })).toHaveCount(2)
+})
+
 test('Download my data saves the profile and the approvals as JSON', async ({ page }) => {
   const { wallet } = await openMe(page)
   const [file] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download my data' }).click()])
@@ -279,6 +297,25 @@ test('Download my data saves the profile and the approvals as JSON', async ({ pa
     ['Alpha Notes', 'app', [['urn:uuid:alpha-new', false], ['urn:uuid:alpha-old', true]]],
     ['ph-cli', 'session', [['urn:uuid:cli', false]]],
   ])
+})
+
+test('Download my data waits for the profile as well as the approvals', async ({ page }) => {
+  const wallet = await signInTestWallet(page)
+  const mock = await mockSwitchboard(page, wallet.address)
+  let release: () => void = () => {}
+  mock.holdProfile = new Promise<void>((resolve) => (release = resolve))
+  await page.goto('/me')
+  await expect(page.getByRole('heading', { level: 2, name: 'Connected apps' })).toBeVisible({ timeout: 30_000 })
+  // Approvals are in, the profile is not: a download now would say "no profile".
+  await expect(page.getByRole('button', { name: 'Download my data' })).toBeDisabled()
+  release()
+  await expect(page.getByRole('heading', { level: 2, name: 'Edie Example' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download my data' })).toBeEnabled()
+  const [file] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download my data' }).click()])
+  const data = JSON.parse(await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'))) as {
+    profile: { handle: string } | null
+  }
+  expect(data.profile?.handle).toBe('edie')
 })
 
 for (const theme of ['light', 'dark'] as const) {

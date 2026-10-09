@@ -46,7 +46,7 @@ function ListSkeleton() {
 
 export function MeDashboard({ session }: { session: SignedIn }) {
   const { address } = session
-  const profile = useOwnProfile(address)
+  const { profile, loaded: profileLoaded } = useOwnProfile(address)
   const connections = useConnections(address, session)
   const now = useNow()
   const { toasts, show, dismiss } = useToasts()
@@ -81,7 +81,8 @@ export function MeDashboard({ session }: { session: SignedIn }) {
         </div>
         <button
           type="button"
-          disabled={connections.status !== 'ready'}
+          // Both reads must have answered, or the file would say "no profile" while it is still loading.
+          disabled={connections.status !== 'ready' || !profileLoaded}
           onClick={() =>
             download(myDataFileName(address), myDataJson({ address, did, profile, connections: connections.grouped, now: new Date() }))
           }

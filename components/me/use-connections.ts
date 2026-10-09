@@ -3,6 +3,7 @@ import { groupConnections, profileCandidates, type GroupedConnections, type Issu
 import { RevokeError, revokeConnection, type RevokeDeps, type RevokeFailure } from '../../lib/me/revoke'
 import type { RenownAppProfile } from '../../services/app-profiles'
 import { fetchAppProfilesFor, fetchIssuedCredentials, sendRevoke } from '../../services/renown-connections'
+import { CLIENT_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 
 interface Snapshot {
   address: string
@@ -20,10 +21,11 @@ export interface Connections {
   revoke: (credentialId: string) => Promise<{ ok: true } | { ok: false; reason: RevokeFailure }>
 }
 
+/** Each read is bounded, so a hung switchboard ends in the error state instead of loading forever. */
 async function load(address: string): Promise<Snapshot> {
-  const credentials = await fetchIssuedCredentials(address)
+  const credentials = await withTimeout(fetchIssuedCredentials(address), CLIENT_DATA_TIMEOUT_MS)
   // Without app profiles every subject still lists, as a session: degrade, don't fail.
-  const profiles = await fetchAppProfilesFor(profileCandidates(credentials)).catch((error: unknown) => {
+  const profiles = await withTimeout(fetchAppProfilesFor(profileCandidates(credentials)), CLIENT_DATA_TIMEOUT_MS).catch((error: unknown) => {
     console.warn('App profiles for /me unavailable:', error)
     return {}
   })

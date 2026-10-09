@@ -17,7 +17,7 @@ export type SiteAuth =
 /** The visitor's session as the site chrome needs it. */
 export function useSiteAuth(): SiteAuth {
   const { user, status, displayName, avatarUrl, login, logout } = useRenownAuth()
-  const profile = useOwnProfile(user?.address)
+  const { profile } = useOwnProfile(user?.address)
   if (status === undefined || status === 'loading' || status === 'checking') return { state: 'loading' }
   if (!user) return { state: 'signed-out', login: () => void login() }
   return {

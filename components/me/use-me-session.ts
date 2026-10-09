@@ -37,7 +37,8 @@ export function useMeSession(): MeSession {
     try {
       return await renown.getBearerToken({ expiresIn: 600 })
     } catch (error) {
-      console.warn('Renown bearer unavailable:', error)
+      // Only the name: the error can carry token material.
+      console.warn('Renown bearer unavailable:', error instanceof Error ? error.name : 'error')
       return null
     }
   }, [renown])
