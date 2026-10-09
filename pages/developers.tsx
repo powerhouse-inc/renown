@@ -47,8 +47,8 @@ const PARAMS: ParamRow[] = [
     value: 'Absolute http(s) URL',
     description: (
       <>
-        After approval the user is sent here with <Mono>user=did:pkh:eip155:&lt;chainId&gt;:&lt;address&gt;</Mono> added
-        (URL-encoded). Anything that is not an absolute http(s) URL is ignored and the flow ends on Renown.
+        After approval the user is sent here with <Mono>user=did:pkh:eip155:&lt;chainId&gt;:&lt;address&gt;</Mono> added.
+        The DID is URL-encoded twice: decode it once more after reading the parameter. Anything that is not an absolute http(s) URL is ignored and the flow ends on Renown.
       </>
     ),
   },
@@ -57,7 +57,7 @@ const PARAMS: ParamRow[] = [
     value: 'URL scheme',
     description: (
       <>
-        For native apps: after approval Renown opens <Mono>&lt;deeplink&gt;://login/&lt;did&gt;</Mono>. Takes precedence over
+        For native apps: after approval Renown opens <Mono>&lt;deeplink&gt;://login/&lt;did&gt;</Mono>, where the DID is URL-encoded once. Takes precedence over
         returnUrl.
       </>
     ),

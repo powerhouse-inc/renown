@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { buildConnectLink } from '../../utils/connect-link'
 import { DEFAULT_CREDENTIAL_VALIDITY_DAYS } from '../../utils/credential-validity'
 import { publicOrigin } from '../../utils/seo'
@@ -50,7 +50,15 @@ export function ConnectLinkBuilder() {
   const [appDid, setAppDid] = useState('')
   const [returnUrl, setReturnUrl] = useState('')
   const [days, setDays] = useState(String(DEFAULT_CREDENTIAL_VALIDITY_DAYS))
-  const [copied, setCopied] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+  const copied = status === 'copied'
   const result = useMemo(
     () => buildConnectLink({ origin: publicOrigin(), appDid, returnUrl, expiresInDays: days }),
     [appDid, returnUrl, days],
@@ -62,11 +70,12 @@ export function ConnectLinkBuilder() {
     if (!result.url) return
     try {
       await navigator.clipboard.writeText(result.url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setStatus('copied')
     } catch {
-      setCopied(false)
+      setStatus('failed')
     }
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setStatus('idle'), 2000)
   }
 
   const ids = { did: `${uid}-did`, ret: `${uid}-ret`, days: `${uid}-days` }
@@ -79,7 +88,7 @@ export function ConnectLinkBuilder() {
             className={inputClass}
             value={appDid}
             onChange={(event) => setAppDid(event.target.value)}
-            placeholder="did:key:z6Mk…"
+            placeholder="did:key:zDn…"
             spellCheck={false}
             autoComplete="off"
             aria-invalid={Boolean(didError)}
@@ -162,7 +171,6 @@ export function ConnectLinkBuilder() {
         </p>
         <output
           aria-labelledby={`${uid}-out-label`}
-          aria-live="polite"
           data-testid="connect-link-output"
           className={cx(
             'bg-code border-hairline block min-h-11 rounded-[var(--radius-control)] border px-3.5 py-3 font-mono text-sm break-all',
@@ -185,7 +193,7 @@ export function ConnectLinkBuilder() {
             </span>
           )}
           <span role="status" aria-live="polite" className="sr-only">
-            {copied ? 'Copied' : ''}
+            {copied ? 'Copied' : status === 'failed' ? "Couldn't copy. Select the link above." : ''}
           </span>
         </div>
       </div>

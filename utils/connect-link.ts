@@ -31,7 +31,7 @@ export function buildConnectLink(input: ConnectLinkInput): ConnectLinkResult {
   const days = input.expiresInDays.trim()
 
   if (!appDid) errors.appDid = 'Enter your app DID.'
-  else if (!APP_DID_RE.test(appDid)) errors.appDid = 'An app DID looks like did:key:z6Mk… (base58btc).'
+  else if (!APP_DID_RE.test(appDid)) errors.appDid = 'An app DID looks like did:key:zDn… (base58btc).'
 
   if (returnUrl && !parseReturnUrl(returnUrl)) {
     errors.returnUrl = 'Use an absolute http(s) URL; the sign-in flow ignores anything else.'

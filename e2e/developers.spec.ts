@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { attachScreenshots, expectNoSeriousA11yViolations, useTheme } from './support/site'
 
-const DID = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+const DID = 'did:key:zDnaed4wPy35wBBJVLZL1XPRQWKpQeeb3JRgMdmHQsLe7KJyi'
 
 test.describe('/developers', () => {
   test('renders the guide with a table of contents and highlighted code', async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe('/developers', () => {
     const did = page.getByLabel('App DID')
     await did.fill('did:web:example.com')
     await expect(did).toHaveAttribute('aria-invalid', 'true')
-    await expect(page.getByText('An app DID looks like did:key:z6Mk… (base58btc).')).toBeVisible()
+    await expect(page.getByText('An app DID looks like did:key:zDn… (base58btc).')).toBeVisible()
 
     await did.fill(DID)
     await expect(did).toHaveAttribute('aria-invalid', 'false')

@@ -3,7 +3,7 @@ import { buildConnectLink } from '../utils/connect-link'
 
 // Runs in the Playwright worker (Node), not the browser.
 const ORIGIN = 'https://www.renown.id'
-const DID = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+const DID = 'did:key:zDnaed4wPy35wBBJVLZL1XPRQWKpQeeb3JRgMdmHQsLe7KJyi'
 
 test.describe('buildConnectLink', () => {
   test('builds a minimal connect link', () => {

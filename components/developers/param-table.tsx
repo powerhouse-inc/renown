@@ -15,7 +15,7 @@ export function ParamTable({ rows }: { rows: ParamRow[] }) {
           <tr>
             <th scope="col" className="text-ink px-4 py-3 font-semibold">Parameter</th>
             <th scope="col" className="text-ink px-4 py-3 font-semibold">Value</th>
-            <th scope="col" className="text-ink px-4 py-3 font-semibold">Behavior</th>
+            <th scope="col" className="text-ink px-4 py-3 font-semibold">Behaviour</th>
           </tr>
         </thead>
         <tbody>
