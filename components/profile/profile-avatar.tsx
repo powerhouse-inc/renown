@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { mediaUrl } from '../../services/media'
 import { Identicon } from './identicon'
 
@@ -45,11 +45,19 @@ export function ProfileAvatar({
   )
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set())
   const src = sources.find((candidate) => !failed.has(candidate))
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // A server-rendered <img> can fail before hydration, so React never sees its
+  // error event: catch an already-broken image once mounted.
+  useEffect(() => {
+    const img = imgRef.current
+    if (src && img?.complete && img.naturalWidth === 0) setFailed((f) => new Set(f).add(src))
+  }, [src])
   const shape = `rounded-full object-cover ${className}`
 
   if (!src) return <Identicon seed={seed} className={shape} />
   return (
     // eslint-disable-next-line @next/next/no-img-element -- /media 302s to signed storage URLs next/image can't allowlist
-    <img src={src} alt={alt} className={shape} onError={() => setFailed((f) => new Set(f).add(src))} />
+    <img ref={imgRef} src={src} alt={alt} className={shape} onError={() => setFailed((f) => new Set(f).add(src))} />
   )
 }

@@ -42,7 +42,9 @@ test.describe('public profile', () => {
     await expect(page.getByRole('link', { name: /Site/ })).toHaveAttribute('href', 'https://pat.example')
     await expect(page.getByRole('link', { name: /Bad/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Copy address' })).toContainText(ADDRESS)
-    await expect(page.locator('img[alt="Pat Pages"]').first()).toHaveAttribute('src', '/media/doc-pages-1/avatar')
+    // Server-rendered markup points at /media; client-side the stub has no bytes for
+    // this doc, so the avatar then falls through to the identicon.
+    expect(await response?.text()).toContain('src="/media/doc-pages-1/avatar"')
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Pat Pages (@pat-pages)')
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/media\/doc-pages-1\/avatar$/)
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/@pat-pages$/)
