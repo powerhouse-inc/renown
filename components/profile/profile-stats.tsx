@@ -28,7 +28,7 @@ export function ProfileStats({ stats }: { stats: UserStatEntry[] }) {
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               {group.entries.map((entry) => (
                 <div key={entry.metric} className="min-w-0" data-metric={entry.metric} data-value={String(entry.value)}>
-                  <dt className="text-muted-foreground text-xs [overflow-wrap:anywhere]">{entry.label ?? entry.metric}</dt>
+                  <dt className="text-muted-foreground text-xs [overflow-wrap:anywhere]">{entry.label}</dt>
                   <dd className="text-foreground flex items-baseline gap-1">
                     <span className="text-xl font-bold tabular-nums">{formatStatValue(entry.value)}</span>
                     {entry.unit && <span className="text-muted-foreground truncate text-xs">{entry.unit}</span>}

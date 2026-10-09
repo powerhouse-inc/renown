@@ -30,11 +30,11 @@ export interface AppStatGroup {
   entries: UserStatEntry[]
 }
 
-/** What a profile shows: the server only sends public or undeclared metrics, grouped by app in first-seen order. Apps without a document are skipped. */
+/** What a profile shows: declared public metrics only (undeclared ones, label null, are dropped), grouped by app in first-seen order. Apps without a document are skipped. */
 export function groupUserStats(stats: UserStatEntry[]): AppStatGroup[] {
   const groups = new Map<string, AppStatGroup>()
   for (const stat of stats) {
-    if (stat.appDocumentId === null) continue
+    if (stat.appDocumentId === null || stat.label === null) continue
     let group = groups.get(stat.appDid)
     if (!group) {
       group = {

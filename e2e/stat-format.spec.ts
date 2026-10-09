@@ -28,7 +28,7 @@ test('formats stat values compactly and dates in UTC', () => {
   expect(formatStatDate('2026-10-09T23:30:00.000Z')).toBe('Oct 9, 2026')
 })
 
-test('groups stats (declared or not) by app, in first-seen order', () => {
+test('groups declared stats by app, in first-seen order, dropping undeclared metrics', () => {
   const groups = groupUserStats([
     entry('did:a', 'notes'),
     entry('did:b', 'streak', { appName: null }),
@@ -37,7 +37,9 @@ test('groups stats (declared or not) by app, in first-seen order', () => {
     entry('did:c', 'x', { appDocumentId: null }),
   ])
   expect(groups.map((g) => [g.appDid, g.appName, g.entries.map((e) => e.metric)])).toEqual([
-    ['did:a', 'Vault', ['notes', 'raw', 'score']],
+    ['did:a', 'Vault', ['notes', 'score']],
     ['did:b', 'Untitled app', ['streak']],
   ])
+  // An app whose stats are all undeclared shows no group.
+  expect(groupUserStats([entry('did:d', 'raw', { label: null })])).toEqual([])
 })

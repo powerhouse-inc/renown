@@ -68,10 +68,8 @@ test('a profile shows its stats grouped by app', async ({ page }) => {
   await expect(notes).toContainText('Notes written')
   await expect(notes).toContainText('1,234')
   await expect(notes).toContainText('notes')
-  // Undeclared metrics have no label: the key stands in for it.
-  const raw = page.locator(`[data-app-did="${ALPHA}"] [data-metric="raw"]`)
-  await expect(raw).toHaveAttribute('data-value', '5')
-  await expect(raw).toContainText('raw')
+  // Undeclared metrics (no label) are never shown.
+  await expect(page.locator(`[data-app-did="${ALPHA}"] [data-metric="raw"]`)).toHaveCount(0)
   await expect(page.locator(`[data-app-did="${BETA}"] [data-metric="streak"]`)).toContainText('Best streak')
   await expect(page.getByRole('link', { name: /Beta/ })).toHaveAttribute('href', `/app/${BETA}`)
   await expect(page.locator(`[data-app-did="${GAMMA}"]`)).toHaveCount(0)
