@@ -61,7 +61,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
   if (!user) {
     return (
       <button
-        onClick={login}
+        onClick={() => void login()}
         className={`flex h-10 items-center gap-2 rounded-lg border border-foreground/20 bg-transparent px-4 font-semibold text-foreground transition-colors hover:bg-foreground/10 ${className}`}
       >
         <svg

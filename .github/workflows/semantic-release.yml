@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - staging
   pull_request:
     branches:
       - main
@@ -46,6 +47,7 @@ jobs:
         run: pnpm run lint
 
       - name: Semantic Release
+        if: github.ref_name == 'main'
         run: |
           pnpx semantic-release@latest
         env:
@@ -54,6 +56,7 @@ jobs:
 
       - name: Get latest version tag
         id: get_version
+        if: github.ref_name == 'main'
         run: |
           git fetch --tags
           VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -82,18 +85,35 @@ jobs:
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
+      - name: Compute image tags
+        id: tags
+        run: |
+          {
+            echo "list<<EOF"
+            if [ "${GITHUB_REF_NAME}" = "staging" ]; then
+              echo "${GHCR_REGISTRY}/${GITHUB_REPOSITORY}:staging"
+              echo "${VETRA_IMAGE}:staging"
+              echo "${VETRA_IMAGE}:staging-${GITHUB_SHA::7}"
+            else
+              echo "${GHCR_REGISTRY}/${GITHUB_REPOSITORY}:latest"
+              echo "${GHCR_REGISTRY}/${GITHUB_REPOSITORY}:${GITHUB_REF_NAME}"
+              echo "${VETRA_IMAGE}:latest"
+              echo "${VETRA_IMAGE}:${GITHUB_REF_NAME}"
+              VERSION="${{ steps.get_version.outputs.version }}"
+              if [ -n "$VERSION" ]; then
+                echo "${GHCR_REGISTRY}/${GITHUB_REPOSITORY}:${VERSION}"
+                echo "${VETRA_IMAGE}:${VERSION}"
+              fi
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:latest
-            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:${{ github.ref_name }}
-            ${{ steps.get_version.outputs.version && format('{0}/{1}:{2}', env.GHCR_REGISTRY, github.repository, steps.get_version.outputs.version) || '' }}
-            ${{ env.VETRA_IMAGE }}:latest
-            ${{ env.VETRA_IMAGE }}:${{ github.ref_name }}
-            ${{ steps.get_version.outputs.version && format('{0}:{1}', env.VETRA_IMAGE, steps.get_version.outputs.version) || '' }}
+          tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
