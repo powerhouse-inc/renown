@@ -70,6 +70,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          # Docker Hub rate-limits and times out on shared runners; use Google's mirror.
+          driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
 
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push'
