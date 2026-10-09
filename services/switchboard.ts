@@ -74,22 +74,27 @@ export interface HandleAvailability {
   reason: 'INVALID' | 'RESERVED' | 'TAKEN' | null
 }
 
+/** Like getProfile, but a failed read throws (null means the profile does not exist). */
+export async function fetchProfile(input: GetProfileInput): Promise<RenownProfile | null> {
+  const renownUsersInput: RenownUsersInput = {
+    driveId: input.driveId,
+    ...(input.id && { phids: [input.id] }),
+    ...(input.ethAddress && { ethAddresses: [input.ethAddress] }),
+    ...(input.username && { usernames: [input.username] }),
+    ...(input.handle && { handles: [input.handle] }),
+  }
+
+  const data = await client.request<{ renownUsers: RenownProfile[] }>(GET_PROFILE_QUERY, {
+    input: renownUsersInput,
+  })
+
+  // Return first result or null
+  return data.renownUsers.length > 0 ? data.renownUsers[0] : null
+}
+
 export async function getProfile(input: GetProfileInput): Promise<RenownProfile | null> {
   try {
-    const renownUsersInput: RenownUsersInput = {
-      driveId: input.driveId,
-      ...(input.id && { phids: [input.id] }),
-      ...(input.ethAddress && { ethAddresses: [input.ethAddress] }),
-      ...(input.username && { usernames: [input.username] }),
-      ...(input.handle && { handles: [input.handle] }),
-    }
-
-    const data = await client.request<{ renownUsers: RenownProfile[] }>(GET_PROFILE_QUERY, {
-      input: renownUsersInput,
-    })
-
-    // Return first result or null
-    return data.renownUsers.length > 0 ? data.renownUsers[0] : null
+    return await fetchProfile(input)
   } catch (error) {
     console.error('Failed to fetch profile from switchboard:', error)
     return null

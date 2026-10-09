@@ -682,6 +682,54 @@ test.describe('profile editor', () => {
     expect(await verifyMessage({ address: editor.wallet.address, message: expected, signature: v.signature as `0x${string}` })).toBe(true)
   })
 
+  test('the crop dialog is a real modal: focus moves in, Escape closes, focus returns', async ({ page }) => {
+    await openEditor(page)
+    await page.getByTestId('avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG })
+    const dialog = page.getByRole('dialog', { name: 'Crop avatar' })
+    await expect(dialog).toBeVisible()
+    // Portalled out of the (backdrop-blurred) form.
+    expect(await page.evaluate(() => document.querySelector('[role=dialog]')?.parentElement === document.body)).toBe(true)
+    const canvas = dialog.getByRole('img', { name: /Crop position/ }).or(dialog.locator('canvas'))
+    await expect(canvas).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Shift+Tab')
+    await expect(dialog.getByRole('button', { name: 'Use this crop' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(canvas).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Upload avatar' })).toBeFocused()
+  })
+
+  test('a failed profile read shows Retry instead of an empty form, and Retry recovers', async ({ page }) => {
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eBearer?: string }).__renownE2eBearer = 'e2e-bearer'
+    })
+    const flow = await authorize(page)
+    let failing = true
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql`, async (route) => {
+      const { query } = route.request().postDataJSON() as { query: string }
+      if (!query.includes('renownUsers')) return route.continue()
+      if (failing) return route.fulfill({ status: 500, body: 'boom' })
+      return route.fulfill({
+        json: {
+          data: {
+            renownUsers: [
+              { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: 'Real Name', handle: null, bio: null, links: [{ id: 'l1', label: 'Site', url: 'https://real.example' }], avatar: null, createdAt: null, updatedAt: null },
+            ],
+          },
+        },
+      })
+    })
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('alert').filter({ hasText: "Couldn't load your profile" })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'Save profile' })).toHaveCount(0)
+    failing = false
+    await page.getByRole('button', { name: 'Retry' }).click()
+    await expect(page.getByLabel('Display name')).toHaveValue('Real Name', { timeout: 30_000 })
+    await expect(page.getByLabel('Link 1 URL')).toHaveValue('https://real.example')
+  })
+
   test('shows a taken handle inline, before and after saving', async ({ page }) => {
     const editor = await openEditor(page, ['taken-live'])
     await page.getByLabel('Handle').fill('taken-live')

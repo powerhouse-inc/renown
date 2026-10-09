@@ -1,7 +1,8 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/router'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Hex } from 'viem'
 import { useEnsAvatar, useEnsName } from 'wagmi'
 import { AvatarUploader } from '../../components/profile-edit/avatar-uploader'
@@ -13,7 +14,7 @@ import PageBackground from '../../components/ui/page-background'
 import RenownCard from '../../components/ui/renown-card'
 import { useProfileEditorAuth } from '../../hooks/use-profile-editor-auth'
 import { profileMessage } from '../../services/renown-signed-messages'
-import { getProfile, type RenownProfile } from '../../services/switchboard'
+import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import {
   changedFields,
   formFromProfile,
@@ -21,6 +22,7 @@ import {
   handleFromEns,
   hasChanges,
   LIMITS,
+  normalizeHandle,
   type FormField,
   type FormProblems,
   type ProfileForm,
@@ -28,6 +30,17 @@ import {
 import { profilePath } from '../../utils/profile-url'
 
 type Toast = { kind: 'success' | 'error'; text: string } | null
+
+/** The form as it is stored after a save: everything trimmed, handle lowercased. */
+function normalizedForm(form: ProfileForm): ProfileForm {
+  return {
+    ...form,
+    displayName: form.displayName.trim(),
+    handle: normalizeHandle(form.handle),
+    bio: form.bio.trim(),
+    links: form.links.map((l) => ({ id: l.id, label: l.label.trim(), url: l.url.trim() })),
+  }
+}
 
 const glass =
   'rounded-2xl border border-gray-200 bg-white/80 shadow-2xl backdrop-blur-lg dark:border-white/20 dark:bg-white/10'
@@ -38,7 +51,12 @@ function Editor({ address, profileId, signMessage, getBearer }: {
   signMessage: (message: string) => Promise<Hex>
   getBearer: () => Promise<string>
 }) {
+  const router = useRouter()
   const [loaded, setLoaded] = useState<RenownProfile | null | undefined>(undefined)
+  const [loadError, setLoadError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [handleBlocked, setHandleBlocked] = useState(false)
+  const previewRef = useRef<string | null>(null)
   const [initial, setInitial] = useState<ProfileForm>(formFromProfile(null))
   const [form, setForm] = useState<ProfileForm>(formFromProfile(null))
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -51,17 +69,36 @@ function Editor({ address, profileId, signMessage, getBearer }: {
 
   useEffect(() => {
     let cancelled = false
-    void getProfile({ driveId: `renown-${address.toLowerCase()}`, ethAddress: address.toLowerCase() }).then((profile) => {
-      if (cancelled) return
-      const start = formFromProfile(profile)
-      setLoaded(profile)
-      setInitial(start)
-      setForm(start)
-    })
+    // A failed read must never look like an empty profile: saving would send an
+    // empty links list over the real one.
+    fetchProfile({ driveId: `renown-${address.toLowerCase()}`, ethAddress: address.toLowerCase() })
+      .then((profile) => {
+        if (cancelled) return
+        const start = formFromProfile(profile)
+        setLoaded(profile)
+        setInitial(start)
+        setForm(start)
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true)
+      })
     return () => {
       cancelled = true
     }
-  }, [address])
+  }, [address, attempt])
+
+  // Object URLs for previews are released when replaced and on unmount.
+  const setPreview = useCallback((url: string | null) => {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current)
+    previewRef.current = url
+    setPreviewUrl(url)
+  }, [])
+  useEffect(
+    () => () => {
+      if (previewRef.current) URL.revokeObjectURL(previewRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!toast) return
@@ -71,16 +108,27 @@ function Editor({ address, profileId, signMessage, getBearer }: {
 
   const ensHandle = useMemo(() => handleFromEns(ensName), [ensName])
   const fields = changedFields(initial, form)
-  const problems = { ...formProblems(form), ...serverErrors }
+  const problems: FormProblems = { ...formProblems(form) }
+  for (const [key, message] of Object.entries(serverErrors)) {
+    if (message) problems[key as FormField] = message
+  }
+  const dirty = hasChanges(fields)
+  const guardActive = dirty && !saving
   const documentId = loaded?.documentId ?? profileId
 
   function set<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
     setForm((f) => ({ ...f, [key]: value }))
-    if (key in serverErrors) setServerErrors((e) => ({ ...e, [key as FormField]: undefined }))
+    if (key in serverErrors) {
+      setServerErrors((e) => {
+        const next = { ...e }
+        delete next[key as FormField]
+        return next
+      })
+    }
   }
 
   async function save() {
-    if (!hasChanges(fields) || Object.values(formProblems(form)).some(Boolean)) return
+    if (!hasChanges(fields) || handleBlocked || Object.values(formProblems(form)).some(Boolean)) return
     setSaving(true)
     setServerErrors({})
     try {
@@ -103,12 +151,57 @@ function Editor({ address, profileId, signMessage, getBearer }: {
         setToast({ kind: 'error', text: body.error ?? `Saving failed (${response.status}).` })
         return
       }
-      setInitial(form)
+      const stored = normalizedForm(form)
+      setInitial(stored)
+      setForm(stored)
       setLoaded((p) => ({ ...(p ?? { documentId: body.documentId ?? '' }), documentId: body.documentId ?? p?.documentId ?? '' }))
       setToast({ kind: 'success', text: 'Profile saved.' })
     } finally {
       setSaving(false)
     }
+  }
+
+  // Unsaved changes: warn on tab close and on in-app navigation.
+  useEffect(() => {
+    if (!guardActive) return
+    const message = 'You have unsaved changes. Leave without saving?'
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = message
+    }
+    const onRouteChange = () => {
+      if (!window.confirm(message)) {
+        router.events.emit('routeChangeError')
+        throw 'Route change aborted: unsaved profile changes'
+      }
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    router.events.on('routeChangeStart', onRouteChange)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      router.events.off('routeChangeStart', onRouteChange)
+    }
+  }, [guardActive, router])
+
+  if (loadError) {
+    return (
+      <div className={`${glass} mx-auto max-w-md space-y-4 p-8 text-center`} role="alert">
+        <h1 className="text-foreground text-2xl font-bold">Couldn&apos;t load your profile</h1>
+        <p className="text-muted-foreground text-sm">
+          Nothing was changed. Editing is paused so an unloaded profile is never overwritten.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoadError(false)
+            setAttempt((n) => n + 1)
+          }}
+          className="bg-primary text-primary-foreground hover:bg-primary/80 rounded-lg px-5 py-2 text-sm font-semibold transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   if (loaded === undefined) {
@@ -142,16 +235,16 @@ function Editor({ address, profileId, signMessage, getBearer }: {
             onBusyChange={setUploading}
             onUploaded={(ref, url) => {
               set('avatar', ref)
-              setPreviewUrl(url)
+              setPreview(url)
             }}
             onClear={() => {
               set('avatar', null)
-              setPreviewUrl(null)
+              setPreview(null)
             }}
             onUseEnsAvatar={(url) => {
               set('avatar', null)
               set('userImage', url)
-              setPreviewUrl(null)
+              setPreview(null)
             }}
             error={serverErrors.avatar}
           />
@@ -186,6 +279,7 @@ function Editor({ address, profileId, signMessage, getBearer }: {
           current={initial.handle}
           serverError={serverErrors.handle}
           ensSuggestion={!initial.handle ? ensHandle : null}
+          onBlockedChange={setHandleBlocked}
         />
 
         <Field id="bio" label="Bio" error={problems.bio} counter={`${form.bio.trim().length}/${LIMITS.bio}`}>
@@ -201,9 +295,9 @@ function Editor({ address, profileId, signMessage, getBearer }: {
 
         <LinksEditor links={form.links} onChange={(links) => set('links', links)} error={problems.links} />
 
-        <div className="border-border flex flex-wrap items-center justify-end gap-3 border-t pt-6">
+        <div className="border-border flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {viewHref && (
-            <Link href={viewHref} className="text-muted-foreground hover:text-foreground mr-auto text-sm underline underline-offset-4">
+            <Link href={viewHref} className="text-muted-foreground hover:text-foreground text-center text-sm underline underline-offset-4 sm:mr-auto">
               View profile
             </Link>
           )}
@@ -211,7 +305,7 @@ function Editor({ address, profileId, signMessage, getBearer }: {
             type="button"
             onClick={() => {
               setForm(initial)
-              setPreviewUrl(null)
+              setPreview(null)
               setServerErrors({})
             }}
             disabled={!hasChanges(fields) || saving}
@@ -221,8 +315,8 @@ function Editor({ address, profileId, signMessage, getBearer }: {
           </button>
           <button
             type="submit"
-            disabled={!hasChanges(fields) || saving || uploading || Object.values(formProblems(form)).some(Boolean)}
-            className="bg-primary text-primary-foreground hover:bg-primary/80 rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-40"
+            disabled={!dirty || saving || uploading || handleBlocked || Object.values(problems).some(Boolean)}
+            className="bg-primary text-primary-foreground hover:bg-primary/80 w-full rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-40 sm:w-auto"
           >
             {saving ? 'Saving…' : 'Save profile'}
           </button>

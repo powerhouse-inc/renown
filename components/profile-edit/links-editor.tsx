@@ -37,6 +37,8 @@ export function LinksEditor({ links, onChange, error }: LinksEditorProps) {
               maxLength={LIMITS.linkLabel}
               placeholder="Label"
               aria-label={`Link ${index + 1} label`}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'links-error' : undefined}
               onChange={(e) => update(index, { label: e.target.value })}
             />
             <input
@@ -46,6 +48,8 @@ export function LinksEditor({ links, onChange, error }: LinksEditorProps) {
               inputMode="url"
               placeholder="https://"
               aria-label={`Link ${index + 1} URL`}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'links-error' : undefined}
               onChange={(e) => update(index, { url: e.target.value })}
             />
             <div className="flex shrink-0 justify-end">

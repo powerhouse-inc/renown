@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 
 interface FieldProps {
   id: string
@@ -14,9 +14,18 @@ interface FieldProps {
 
 /** Label, control, then the error (or the hint) and an optional counter. */
 export function Field({ id, label, hint, error, counter, group, children }: FieldProps) {
+  const errorId = error ? `${id}-error` : undefined
+  // A bare input/textarea child gets its invalid state and error wired automatically.
+  const control =
+    !group && isValidElement(children) && (children.type === 'input' || children.type === 'textarea')
+      ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+          'aria-invalid': !!error,
+          'aria-describedby': errorId,
+        })
+      : children
   const labelClass = 'text-foreground block text-sm font-semibold'
   return (
-    <div className="space-y-1.5" role={group ? 'group' : undefined} aria-labelledby={group ? `${id}-label` : undefined}>
+    <div className="space-y-1.5" role={group ? 'group' : undefined} aria-labelledby={group ? `${id}-label` : undefined} aria-describedby={group ? errorId : undefined}>
       {group ? (
         <span id={`${id}-label`} className={labelClass}>
           {label}
@@ -26,7 +35,7 @@ export function Field({ id, label, hint, error, counter, group, children }: Fiel
           {label}
         </label>
       )}
-      {children}
+      {control}
       <div className="flex items-start justify-between gap-3 text-xs">
         {error ? (
           <p id={`${id}-error`} role="alert" className="text-destructive">

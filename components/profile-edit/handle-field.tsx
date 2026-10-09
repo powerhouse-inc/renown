@@ -20,27 +20,31 @@ interface HandleFieldProps {
   /** An error from the last save attempt (e.g. HANDLE_TAKEN), shown until the value changes. */
   serverError?: string
   ensSuggestion?: string | null
+  /** True while the handle is known to be unusable or its check is still running (saving must wait). */
+  onBlockedChange?: (blocked: boolean) => void
 }
 
 /** @handle input with a live availability check against the read model. */
-export function HandleField({ value, onChange, address, current, serverError, ensSuggestion }: HandleFieldProps) {
+export function HandleField({ value, onChange, address, current, serverError, ensSuggestion, onBlockedChange }: HandleFieldProps) {
   const handle = normalizeHandle(value)
   const needsCheck = !!handle && handle !== current && HANDLE_RE.test(handle)
   // The latest answer; it only counts while it is about the handle in the input.
-  const [answer, setAnswer] = useState<HandleAvailability | null>(null)
+  const [answer, setAnswer] = useState<(HandleAvailability & { failed?: false }) | { handle: string; failed: true } | null>(null)
 
   useEffect(() => {
     if (!needsCheck) return
     const timer = setTimeout(() => {
       getHandleAvailability(handle, address)
         .then(setAnswer)
-        .catch(() => setAnswer(null))
+        .catch(() => setAnswer({ handle, failed: true }))
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [needsCheck, handle, address])
 
-  const result = needsCheck && answer?.handle === handle ? answer : null
-  const check = !needsCheck
+  const current_ = needsCheck && answer?.handle === handle ? answer : null
+  const failed = current_?.failed === true
+  const result = current_ && !current_.failed ? current_ : null
+  const check = !needsCheck || failed
     ? null
     : result
       ? ({ state: 'done', result } as const)
@@ -50,8 +54,13 @@ export function HandleField({ value, onChange, address, current, serverError, en
   const availabilityError =
     check?.state === 'done' && !check.result.available && check.result.reason ? REASONS[check.result.reason] : undefined
   const error = formatError ?? availabilityError ?? serverError
-  const hint =
-    check?.state === 'checking'
+  const blocked = check?.state === 'checking' || !!availabilityError || !!formatError
+  useEffect(() => {
+    onBlockedChange?.(blocked)
+  }, [blocked, onBlockedChange])
+  const hint = failed
+    ? "Couldn't check availability. You can still save; the server will confirm."
+    : check?.state === 'checking'
       ? 'Checking…'
       : check?.state === 'done' && check.result.available
         ? `renown.id/@${handle} is available.`
