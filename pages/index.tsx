@@ -99,7 +99,10 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query,
         console.error('Homepage: featured apps unavailable:', error)
         return []
       }),
-    highlight(TEASER_CODE, 'ts'),
+    highlight(TEASER_CODE, 'ts').catch((error: unknown) => {
+      console.error('Homepage: highlighting failed, showing plain code:', error)
+      return { code: TEASER_CODE, html: '' }
+    }),
   ])
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
   return { props: { mode: 'site', featuredApps, pulse: null, teaser } }

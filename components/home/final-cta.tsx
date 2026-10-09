@@ -18,8 +18,14 @@ export function FinalCta() {
               className="absolute inset-x-0 -top-1/2 -z-10 h-full"
               style={{ background: 'radial-gradient(50% 60% at 50% 100%, color-mix(in oklab, var(--grad-to) 26%, transparent), transparent)' }}
             />
-            <PhMotif className="-right-56 -bottom-72 -z-10 hidden opacity-50 md:block dark:opacity-80" />
-            <PhMotif className="-top-80 -left-64 -z-10 hidden rotate-180 opacity-40 lg:block dark:opacity-60" />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 hidden md:block"
+              style={{ maskImage: 'radial-gradient(ellipse 58% 75% at 50% 50%, transparent 55%, black 100%)', WebkitMaskImage: 'radial-gradient(ellipse 58% 75% at 50% 50%, transparent 55%, black 100%)' }}
+            >
+              <PhMotif className="-right-72 -bottom-80 opacity-40 dark:opacity-70" />
+              <PhMotif className="-top-96 -left-72 rotate-180 opacity-30 dark:opacity-50" />
+            </div>
             <h2 id="final-cta-title" className="text-ink text-h1 mx-auto max-w-[18ch] text-balance">
               Bring your identity to every app
             </h2>

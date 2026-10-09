@@ -17,7 +17,7 @@ const STEPS = [
   },
   {
     title: 'Apps ask, you approve',
-    body: 'An app requests access and you sign one credential for it, valid for 7 days unless the app asks for longer. Revoke it any time.',
+    body: 'An app requests access and you sign one credential for it, valid for 7 days unless the app asks for a different period, up to a year. Revoke it any time.',
   },
 ]
 

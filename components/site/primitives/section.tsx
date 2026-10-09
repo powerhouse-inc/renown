@@ -10,7 +10,7 @@ export interface SectionProps {
   labelledBy?: string
   /** plain: transparent; raised: a faint surface band with hairlines. */
   tone?: 'plain' | 'raised'
-  /** Vertical rhythm: md = 80/112 px, sm = 56/72 px. */
+  /** Vertical rhythm: md = 64/80 px, sm = 48/56 px. */
   spacing?: 'sm' | 'md'
   className?: string
   /** Wrap children in a Container (default true). */
@@ -33,7 +33,7 @@ export function Section({
       aria-labelledby={labelledBy}
       className={cx(
         'relative scroll-mt-24',
-        spacing === 'md' ? 'py-20 md:py-28' : 'py-14 md:py-[72px]',
+        spacing === 'md' ? 'py-16 md:py-20' : 'py-12 md:py-14',
         tone === 'raised' && 'border-hairline bg-surface-1 border-y',
         className,
       )}

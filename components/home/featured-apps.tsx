@@ -20,9 +20,13 @@ export function FeaturedApps({ apps }: { apps: RenownAppProfile[] }) {
           Browse all apps
         </ButtonLink>
       </div>
-      <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul
+        tabIndex={0}
+        aria-label="Featured apps"
+        className="-mx-4 mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0 md:mt-12 md:grid md:snap-none md:grid-cols-2 md:gap-5 md:overflow-visible md:pb-0 lg:grid-cols-3"
+      >
         {apps.slice(0, 6).map((app) => (
-          <li key={app.appDid}>
+          <li key={app.appDid} className="w-[80%] shrink-0 snap-start sm:w-[46%] md:w-auto">
             <AppTile app={app} />
           </li>
         ))}

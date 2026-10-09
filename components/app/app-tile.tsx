@@ -25,13 +25,15 @@ export function AppTile({ app, headingLevel = 3 }: AppTileProps) {
         </div>
       </div>
       <div className="flex flex-1 flex-col px-5 pb-5">
-        <AppLogo
-          documentId={app.documentId}
-          logoRef={app.logoRef}
-          legacyLogo={app.logo}
-          name={name}
-          className="-mt-7 h-14 w-14 text-xl ring-4"
-        />
+        <div className="bg-surface-1 ring-surface-1 relative z-10 -mt-7 w-fit rounded-2xl ring-4">
+          <AppLogo
+            documentId={app.documentId}
+            logoRef={app.logoRef}
+            legacyLogo={app.logo}
+            name={name}
+            className="h-14 w-14 text-xl"
+          />
+        </div>
         <div className="mt-3 flex items-start justify-between gap-3">
           <Title className="text-ink text-h3 min-w-0 truncate">{name}</Title>
           {app.category && <Badge tone="primary" className="mt-0.5 shrink-0">{app.category}</Badge>}
