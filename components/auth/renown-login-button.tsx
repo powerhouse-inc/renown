@@ -2,7 +2,8 @@
 
 import { useRenownAuth } from "@powerhousedao/reactor-browser/renown";
 import { useState, useRef, useEffect } from "react";
-import Image from "next/image";
+import Link from "next/link";
+import { ProfileAvatar } from "../profile/profile-avatar";
 
 interface RenownLoginButtonProps {
   className?: string;
@@ -90,21 +91,14 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex h-10 items-center gap-2 rounded-lg bg-foreground/10 px-3 transition-colors hover:bg-foreground/20"
       >
-        {avatarUrl ? (
-          <Image
-            src={avatarUrl}
-            alt={displayName || user.address}
-            width={24}
-            height={24}
-            className="rounded-full"
-          />
-        ) : (
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-            <span className="text-xs font-bold text-white">
-              {(displayName || user.address)[0].toUpperCase()}
-            </span>
-          </div>
-        )}
+        <ProfileAvatar
+          documentId={profileId}
+          hasAvatar={!!profileId}
+          userImage={avatarUrl}
+          seed={user.address}
+          alt={displayName || user.address}
+          className="h-6 w-6"
+        />
         <span className="font-medium text-foreground">
           {displayName || truncateAddress(user.address)}
         </span>
@@ -135,6 +129,27 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
             </p>
           </div>
           <div className="py-1">
+            <Link
+              href="/profile/edit"
+              onClick={() => setIsDropdownOpen(false)}
+              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/10"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+              Edit profile
+            </Link>
             <button
               onClick={handleViewProfile}
               className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/10"

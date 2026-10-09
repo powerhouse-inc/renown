@@ -24,6 +24,14 @@ const nextConfig: NextConfig = {
         ];
         return config;
     },
+    async rewrites() {
+        return [
+            // Stable public image URLs (pages/api/media/[documentId]/[field].ts).
+            { source: "/media/:documentId/:field", destination: "/api/media/:documentId/:field" },
+            // renown.id/@handle is the canonical profile URL.
+            { source: "/@:handle", destination: "/profile/:handle?by=handle" },
+        ];
+    },
     async headers() {
         return [
             {

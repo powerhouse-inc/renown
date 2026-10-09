@@ -10,15 +10,38 @@
 //                            answered with `response`; one use per entry
 //   GET  /__stub/requests    every recorded GraphQL request
 //   POST /__stub/reset       clears script and recordings
+//   POST /__stub/fixture     { match, variables?, response } — answers every
+//                            matching GraphQL request (after the script), and
+//                            survives /__stub/reset; for specs that run in
+//                            parallel with the scripting ones (unique variables!)
+//
+// renown-package HTTP routes (stateless, safe in parallel):
+//   POST /api/@powerhousedao/renown-package/media/uploads   401 without a
+//        bearer; else 201 with an uploadTarget on this stub
+//   PUT  /__stub/s3/<sha256>   stores the bytes (checks the hash)
+//   GET  /__stub/s3/<sha256>   serves them
+//   GET  /api/@powerhousedao/renown-package/media/<doc>/<field>   302 to
+//        /__stub/s3/<STUB_AVATAR_SHA> for doc "stub-avatar-doc" + "avatar", else 404
 //
 // Unscripted requests get empty read-model results, so pages rendered by other
 // specs keep working.
+import { createHash } from 'node:crypto'
 import http from 'node:http'
 
 const port = Number(process.env.STUB_SWITCHBOARD_PORT || 4799)
 
 let script = []
 let requests = []
+const fixtures = []
+const objects = new Map()
+const PACKAGE = '/api/@powerhousedao/renown-package'
+// sha256 of the 1x1 PNG below, served for doc "stub-avatar-doc".
+const STUB_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+)
+const STUB_AVATAR_SHA = createHash('sha256').update(STUB_PNG).digest('hex')
+objects.set(STUB_AVATAR_SHA, { type: 'image/png', bytes: STUB_PNG })
 
 const DEFAULT_DATA = {
   renownUsers: [],
@@ -31,9 +54,64 @@ function send(res, status, body) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
   })
   res.end(JSON.stringify(body))
+}
+
+function readRaw(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    req.on('data', (chunk) => chunks.push(chunk))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
+
+async function packageRoute(req, res) {
+  const url = new URL(req.url, 'http://stub')
+  if (url.pathname === `${PACKAGE}/media/uploads` && req.method === 'POST') {
+    if (!/^Bearer \S+/.test(req.headers.authorization ?? '')) {
+      return send(res, 401, { code: 'UNAUTHENTICATED', error: 'A Renown bearer token is required' })
+    }
+    const body = JSON.parse((await readRaw(req)).toString() || '{}')
+    return send(res, 201, {
+      ref: `attachment://v1:${body.sha256}`,
+      reservationId: `res-${body.sha256.slice(0, 8)}`,
+      expiresAtUtc: new Date(Date.now() + 900_000).toISOString(),
+      uploadTarget: {
+        method: 'PUT',
+        url: `http://localhost:${port}/__stub/s3/${body.sha256}`,
+        headers: { 'content-type': body.mimeType },
+      },
+    })
+  }
+  const media = /^\/api\/@powerhousedao\/renown-package\/media\/([^/]+)\/([^/]+)$/.exec(url.pathname)
+  if (media && req.method === 'GET') {
+    if (media[1] === 'stub-avatar-doc' && media[2] === 'avatar') {
+      res.writeHead(302, {
+        Location: `http://localhost:${port}/__stub/s3/${STUB_AVATAR_SHA}`,
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=240',
+      })
+      return res.end()
+    }
+    if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
+    return send(res, 404, { error: 'Not found' })
+  }
+  const object = /^\/__stub\/s3\/([0-9a-f]{64})$/.exec(url.pathname)
+  if (object && req.method === 'PUT') {
+    const bytes = await readRaw(req)
+    if (createHash('sha256').update(bytes).digest('hex') !== object[1]) return send(res, 400, { error: 'BadDigest' })
+    objects.set(object[1], { type: req.headers['content-type'] ?? 'application/octet-stream', bytes })
+    return send(res, 200, {})
+  }
+  if (object && req.method === 'GET') {
+    const stored = objects.get(object[1])
+    if (!stored) return send(res, 404, { error: 'NoSuchKey' })
+    res.writeHead(200, { 'Content-Type': stored.type, 'Access-Control-Allow-Origin': '*' })
+    return res.end(stored.bytes)
+  }
+  return false
 }
 
 function readBody(req) {
@@ -63,6 +141,14 @@ const server = http.createServer(async (req, res) => {
       script.push(await readBody(req))
       return send(res, 200, { ok: true })
     }
+    if (req.url === '/__stub/fixture' && req.method === 'POST') {
+      fixtures.push(await readBody(req))
+      return send(res, 200, { ok: true })
+    }
+    if (req.url?.startsWith(PACKAGE) || req.url?.startsWith('/__stub/s3/')) {
+      const handled = await packageRoute(req, res)
+      if (handled !== false) return
+    }
     if (req.url === '/__stub/requests' && req.method === 'GET') {
       return send(res, 200, requests)
     }
@@ -78,6 +164,10 @@ const server = http.createServer(async (req, res) => {
         const [entry] = script.splice(index, 1)
         return send(res, entry.status ?? 200, entry.response)
       }
+      const fixture = fixtures.find(
+        (entry) => query.includes(entry.match) && (!entry.variables || variables.includes(entry.variables)),
+      )
+      if (fixture) return send(res, fixture.status ?? 200, fixture.response)
       return send(res, 200, { data: DEFAULT_DATA })
     }
     if (req.method === 'GET') return send(res, 200, { ok: true })

@@ -12,13 +12,18 @@ import {
   toWriteError,
 } from './renown-credential'
 import { legacyUpsertProfile } from './renown-credential-legacy'
-import { profileMessage } from './renown-signed-messages'
+import { profileMessage, type ProfileFields } from './renown-signed-messages'
 
 const UPSERT_PROFILE = gql`
   mutation UpsertProfile(
     $address: String!
     $username: String
     $userImage: String
+    $displayName: String
+    $handle: String
+    $bio: String
+    $links: [RenownProfileLinkInput!]
+    $avatar: String
     $signature: String
     $timestamp: String
   ) {
@@ -26,23 +31,28 @@ const UPSERT_PROFILE = gql`
       address: $address
       username: $username
       userImage: $userImage
+      displayName: $displayName
+      handle: $handle
+      bio: $bio
+      links: $links
+      avatar: $avatar
       signature: $signature
       timestamp: $timestamp
     )
   }
 `
 
+const IDENTITY_FIELDS = ['displayName', 'handle', 'bio', 'links', 'avatar'] as const
+
 /**
- * Create or update `address`'s profile; returns its document id.
+ * Create or update `address`'s profile; returns its document id. Identity
+ * fields left undefined are not sent at all (JSON drops them), so the
+ * switchboard sees exactly what was signed.
  * @throws {CredentialWriteError} when the switchboard refuses or fails the write.
  */
-export async function upsertProfile(params: {
-  address: string
-  username?: string | null
-  userImage?: string | null
-  signature: string
-  timestamp: string
-}): Promise<string> {
+export async function upsertProfile(
+  params: ProfileFields & { address: string; signature: string; timestamp: string },
+): Promise<string> {
   const { address, signature, timestamp } = params
   const username = params.username ?? null
   const userImage = params.userImage ?? null
@@ -53,12 +63,25 @@ export async function upsertProfile(params: {
       address,
       username,
       userImage,
+      displayName: params.displayName,
+      handle: params.handle,
+      bio: params.bio,
+      links: params.links,
+      avatar: params.avatar,
       signature,
       timestamp,
     })
     documentId = data.renown_upsertProfile
   } catch (error) {
     if (!isUnknownSchemaError(error)) throw toWriteError(error, 'Failed to update profile')
+    // The legacy document writes predate the identity fields.
+    if (IDENTITY_FIELDS.some((field) => params[field] != null)) {
+      throw new CredentialWriteError(
+        501,
+        'This Renown switchboard does not support profile identity fields yet',
+        'UNSUPPORTED',
+      )
+    }
     await assertSignedBy(
       address,
       await profileMessage(address, { username, userImage }, timestamp),

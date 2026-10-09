@@ -24,6 +24,47 @@ export function revokeMessage(credentialId: string, timestamp: string): string {
   return `Revoke Renown credential ${credentialId} at ${timestamp}`;
 }
 
+/** A profile link as signed and stored. */
+export interface ProfileLink {
+  id: string;
+  label: string;
+  url: string;
+}
+
+/** Every field a signed profile upsert may carry. Absent and null mean "unchanged". */
+export interface ProfileFields {
+  username?: string | null;
+  userImage?: string | null;
+  displayName?: string | null;
+  handle?: string | null;
+  bio?: string | null;
+  links?: readonly ProfileLink[] | null;
+  avatar?: string | null;
+}
+
+/**
+ * The JSON a profile signature hashes. Legacy writes (username/userImage
+ * only) keep the exact two-key payload older clients sign. As soon as any
+ * identity field is present, all seven keys are hashed in this fixed order,
+ * and each link is reduced to `{id, label, url}` in that key order, so the
+ * client and the server serialize the same bytes.
+ */
+export function profilePayload(profile: ProfileFields): string {
+  const legacy = { username: profile.username ?? null, userImage: profile.userImage ?? null };
+  const identity = [profile.displayName, profile.handle, profile.bio, profile.links, profile.avatar];
+  if (identity.every((value) => value === undefined || value === null)) {
+    return JSON.stringify(legacy);
+  }
+  return JSON.stringify({
+    ...legacy,
+    displayName: profile.displayName ?? null,
+    handle: profile.handle ?? null,
+    bio: profile.bio ?? null,
+    links: profile.links ? profile.links.map(({ id, label, url }) => ({ id, label, url })) : null,
+    avatar: profile.avatar ?? null,
+  });
+}
+
 /**
  * Canonical message a caller signs to authorize a profile upsert. The payload
  * is hashed (rather than embedded raw) so the signed message has a fixed
@@ -31,14 +72,10 @@ export function revokeMessage(credentialId: string, timestamp: string): string {
  */
 export async function profileMessage(
   address: string,
-  profile: { username?: string | null; userImage?: string | null },
+  profile: ProfileFields,
   timestamp: string,
 ): Promise<string> {
-  const payload = JSON.stringify({
-    username: profile.username ?? null,
-    userImage: profile.userImage ?? null,
-  });
-  const hash = await sha256hex(payload);
+  const hash = await sha256hex(profilePayload(profile));
   return `Update Renown profile ${address.toLowerCase()} ${hash} at ${timestamp}`;
 }
 

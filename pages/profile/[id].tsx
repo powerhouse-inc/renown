@@ -1,135 +1,111 @@
-import { GetServerSideProps, NextPage } from 'next'
+import type { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
-import Image from 'next/image'
-import { getProfile, RenownProfile } from '../../services/switchboard'
-import styles from '../../styles/Home.module.css'
-import RenownCard from '../../components/ui/renown-card'
 import PageBackground from '../../components/ui/page-background'
+import RenownCard from '../../components/ui/renown-card'
+import { CopyAddress } from '../../components/profile/copy-address'
+import { OwnProfileActions } from '../../components/profile/own-profile-actions'
+import { ProfileSummary, profileName } from '../../components/profile/profile-summary'
+import { mediaUrl } from '../../services/media'
+import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
+import { isEnsVerified } from '../../utils/ens'
+import { profilePath } from '../../utils/profile-url'
 
 interface ProfilePageProps {
   profile: RenownProfile | null
+  ensVerified: boolean
+  /** Absolute canonical URL of this profile. */
+  canonicalUrl: string | null
+  /** Absolute image for link previews, if the profile has one. */
+  ogImage: string | null
   error?: string
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
-  if (error) {
-    return (
-      <div className={styles.container}>
-        <Head>
-          <title>Profile Not Found - Renown</title>
-          <meta content="Profile not found" name="description" />
-        </Head>
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 
-        <main className={styles.main}>
-          <div className="flex min-h-screen flex-col items-center justify-center">
-            <h1 className="text-destructive mb-4 text-2xl font-bold">Error</h1>
-            <p className="text-gray-600 dark:text-gray-400">{error}</p>
-          </div>
-        </main>
-      </div>
-    )
-  }
+function siteOrigin(host: string | undefined): string {
+  const configured = process.env.NEXT_PUBLIC_RENOWN_URL
+  if (configured) return configured.replace(/\/+$/, '')
+  return host ? `https://${host}` : 'https://www.renown.id'
+}
 
+function NotFound({ title, message }: { title: string; message: string }) {
+  return (
+    <PageBackground>
+      <Head>
+        <title>{`${title} - Renown`}</title>
+        <meta name="robots" content="noindex" />
+      </Head>
+      <main className="relative flex min-h-screen flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-foreground mb-2 text-2xl font-bold">{title}</h1>
+        <p className="text-muted-foreground">{message}</p>
+      </main>
+    </PageBackground>
+  )
+}
+
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonicalUrl, ogImage, error }) => {
+  if (error) return <NotFound title="Something went wrong" message={error} />
   if (!profile) {
-    return (
-      <div className={styles.container}>
-        <Head>
-          <title>Profile Not Found - Renown</title>
-          <meta content="Profile not found" name="description" />
-        </Head>
-
-        <main className={styles.main}>
-          <div className="flex min-h-screen flex-col items-center justify-center">
-            <h1 className="mb-4 text-2xl font-bold text-gray-700 dark:text-gray-400">
-              Profile Not Found
-            </h1>
-            <p className="text-gray-600 dark:text-gray-500">
-              The profile you&apos;re looking for doesn&apos;t exist or has been removed.
-            </p>
-          </div>
-        </main>
-      </div>
-    )
+    return <NotFound title="Profile not found" message="The profile you're looking for doesn't exist or has been removed." />
   }
 
-  const displayName = profile.username || 'Anonymous'
+  const address = profile.ethAddress ?? ''
+  const name = profileName({ displayName: profile.displayName, username: profile.username, address: address || profile.documentId })
+  const title = profile.handle ? `${name} (@${profile.handle})` : name
+  const description = profile.bio || `${name} on Renown`
 
   return (
     <PageBackground>
       <Head>
-        <title>{`${displayName} - Renown Profile`}</title>
-        <meta content={`${displayName}'s Renown profile`} name="description" />
-        <link href="/favicon.ico" rel="icon" />
+        <title>{`${title} - Renown`}</title>
+        <meta name="description" content={description} />
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+        <meta property="og:type" content="profile" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+        {ogImage && <meta property="og:image" content={ogImage} />}
+        {profile.handle && <meta property="profile:username" content={profile.handle} />}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        {ogImage && <meta name="twitter:image" content={ogImage} />}
       </Head>
 
-      {/* Main Content */}
-      <main className="relative flex min-h-screen items-center justify-center px-4 pb-12 pt-24">
+      <main className="relative flex min-h-screen items-center justify-center px-4 pt-24 pb-12">
         <div className="w-full max-w-2xl">
           <RenownCard>
-            <div className="mt-4 p-8">
-              {/* Avatar */}
-              <div className="mb-4 flex justify-center">
-                {profile.userImage ? (
-                  <Image
-                    src={profile.userImage}
-                    alt={displayName}
-                    width={128}
-                    height={128}
-                    unoptimized
-                    className="h-32 w-32 rounded-full border-4 border-white object-cover shadow-lg"
-                  />
-                ) : (
-                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-4 border-white bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg">
-                    <span className="text-5xl font-bold text-white">
-                      {displayName[0].toUpperCase()}
+            <div className="space-y-8 p-8">
+              <ProfileSummary
+                profile={{
+                  documentId: profile.documentId,
+                  address: address || profile.documentId,
+                  displayName: profile.displayName,
+                  username: profile.username,
+                  handle: profile.handle,
+                  bio: profile.bio,
+                  links: profile.links,
+                  hasAvatar: !!profile.avatar,
+                  userImage: profile.userImage,
+                  ensVerified,
+                }}
+              />
+              <div className="space-y-3">
+                {ADDRESS_RE.test(address) && <CopyAddress address={address} />}
+                <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 px-1 text-sm">
+                  {profile.createdAt && (
+                    <span>
+                      Member since{' '}
+                      {new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
                     </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Username */}
-              <h1 className="mb-6 text-center text-3xl font-bold text-gray-900 dark:text-white">
-                {displayName}
-              </h1>
-
-              {/* Profile Details */}
-              <div className="mt-8 space-y-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">RenownID</span>
-                    <span className="break-all font-mono text-sm text-gray-900 dark:text-white">
-                      {profile.documentId}
-                    </span>
-                  </div>
+                  )}
+                  <span className="font-mono text-xs" title="RenownID">
+                    {profile.documentId}
+                  </span>
                 </div>
-
-                {profile.ethAddress && (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">ETH Address</span>
-                      <span className="break-all font-mono text-xs text-gray-900 dark:text-white">
-                        {profile.ethAddress}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {profile.createdAt && (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Member Since</span>
-                      <span className="text-sm text-gray-900 dark:text-white">
-                        {new Date(profile.createdAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
+              {ADDRESS_RE.test(address) && <OwnProfileActions address={address} />}
             </div>
           </RenownCard>
         </div>
@@ -139,56 +115,45 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, error }) => {
 }
 
 export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (context) => {
-  const { id } = context.params as { id: string }
+  const id = String(context.params?.id ?? '')
+  const byHandle = context.query.by === 'handle'
+  const empty = { profile: null, ensVerified: false, canonicalUrl: null, ogImage: null }
+  if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
-  if (!id) {
-    return {
-      props: {
-        profile: null,
-        error: 'No profile identifier provided',
-      },
-    }
+  let profile: RenownProfile | null
+  if (byHandle) {
+    profile = await getProfile({ driveId: DEFAULT_DRIVE_ID, handle: id.toLowerCase() })
+  } else if (ADDRESS_RE.test(id)) {
+    profile = await getProfile({ driveId: `renown-${id.toLowerCase()}`, ethAddress: id.toLowerCase() })
+  } else {
+    profile =
+      (await getProfile({ driveId: DEFAULT_DRIVE_ID, id })) ??
+      (await getProfile({ driveId: DEFAULT_DRIVE_ID, username: id }))
+  }
+  if (!profile) {
+    context.res.statusCode = 404
+    return { props: empty }
   }
 
-  try {
-    let profile = null
+  // One canonical URL per profile: /@handle once a handle exists.
+  if (profile.handle && !(byHandle && id === profile.handle)) {
+    return { redirect: { destination: `/@${profile.handle}`, permanent: false } }
+  }
 
-    // Check if it looks like an eth address
-    if (id.startsWith('0x')) {
-      // For eth addresses, query the user-specific drive
-      const userDriveId = `renown-${id.toLowerCase()}`
-      profile = await getProfile({
-        driveId: userDriveId,
-        ethAddress: id,
-      })
-    } else {
-      // For other IDs (documentId or username), try the default drive first
-      profile = await getProfile({
-        driveId: DEFAULT_DRIVE_ID,
-        id,
-      })
-
-      if (!profile) {
-        profile = await getProfile({
-          driveId: DEFAULT_DRIVE_ID,
-          username: id,
-        })
-      }
-    }
-
-    return {
-      props: {
-        profile,
-      },
-    }
-  } catch (error) {
-    console.error('Error fetching profile:', error)
-    return {
-      props: {
-        profile: null,
-        error: 'Failed to fetch profile',
-      },
-    }
+  const origin = siteOrigin(context.req.headers.host)
+  const ogImage = profile.avatar
+    ? mediaUrl(profile.documentId, 'avatar', origin)
+    : profile.userImage && /^https:\/\//i.test(profile.userImage)
+      ? profile.userImage
+      : null
+  context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
+  return {
+    props: {
+      profile,
+      ensVerified: await isEnsVerified(profile.username, profile.ethAddress),
+      canonicalUrl: `${origin}${profilePath(profile)}`,
+      ogImage,
+    },
   }
 }
 

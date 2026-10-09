@@ -31,7 +31,9 @@ export default defineConfig({
       url: 'http://localhost:3000',
       // A reused dev server must also point at the stub switchboard, or the
       // credential API tests fail.
-      env: { NEXT_PUBLIC_SWITCHBOARD_ENDPOINT: `${STUB_SWITCHBOARD_URL}/graphql` },
+      // NEXT_PUBLIC_E2E_AUTH lets the profile editor take its upload bearer
+      // from window.__renownE2eBearer (hooks/use-profile-editor-auth.ts).
+      env: { NEXT_PUBLIC_SWITCHBOARD_ENDPOINT: `${STUB_SWITCHBOARD_URL}/graphql`, NEXT_PUBLIC_E2E_AUTH: '1' },
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },

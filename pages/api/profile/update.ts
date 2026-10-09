@@ -4,6 +4,9 @@ import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../../../utils/allow-cors'
 import { CredentialWriteError } from '../../../services/renown-credential'
 import { upsertProfile } from '../../../services/renown-profile-write'
+import type { ProfileFields } from '../../../services/renown-signed-messages'
+
+type Body = ProfileFields & { address?: string; signature?: string; timestamp?: string }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -11,13 +14,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return
   }
 
-  const { address, username, userImage, signature, timestamp } = (req.body ?? {}) as {
-    address?: string
-    username?: string | null
-    userImage?: string | null
-    signature?: string
-    timestamp?: string
-  }
+  const body = (req.body ?? {}) as Body
+  const { address, signature, timestamp } = body
 
   if (!address) {
     res.status(400).json({ error: 'address is required' })
@@ -29,11 +27,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const documentId = await upsertProfile({ address, username, userImage, signature, timestamp })
+    const documentId = await upsertProfile({
+      address,
+      username: body.username,
+      userImage: body.userImage,
+      displayName: body.displayName,
+      handle: body.handle,
+      bio: body.bio,
+      links: body.links,
+      avatar: body.avatar,
+      signature,
+      timestamp,
+    })
     res.status(200).json({ result: true, documentId })
   } catch (e) {
     if (e instanceof CredentialWriteError) {
-      res.status(e.status).json({ error: e.message, code: e.code })
+      res.status(e.status).json({ error: e.message, code: e.code, field: e.field })
       return
     }
     console.error('Failed to update profile:', e)

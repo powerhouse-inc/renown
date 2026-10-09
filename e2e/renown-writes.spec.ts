@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { verifyMessage } from 'viem'
-import { profileMessage, revokeMessage } from '../services/renown-signed-messages'
+import { profileMessage, revokeMessage, type ProfileFields } from '../services/renown-signed-messages'
 import { installInjectedWallet, type InjectedWallet } from './support/injected-wallet'
-import { graphqlError, resetStub, scriptStub, stubRequests } from './support/stub-switchboard-client'
+import {
+  graphqlError,
+  resetStub,
+  scriptStub,
+  stubRequests,
+  STUB_SWITCHBOARD_URL,
+} from './support/stub-switchboard-client'
 
 // The write routes call the switchboard server-side, so these tests drive the
 // stub switchboard the dev server is pointed at (see playwright.config.ts) and
@@ -289,7 +295,7 @@ test.describe('POST /api/credential/renown', () => {
 })
 
 async function signedProfile(
-  profile: { username: string; userImage: string | null },
+  profile: ProfileFields,
   key = generatePrivateKey(),
 ) {
   const account = privateKeyToAccount(key)
@@ -351,6 +357,55 @@ test.describe('POST /api/profile/update', () => {
     })
   }
 
+  test('forwards the identity fields exactly as signed', async ({ request }) => {
+    const fields = {
+      displayName: 'Frank',
+      handle: 'frank',
+      bio: 'Hi',
+      links: [{ id: 'l1', label: 'Site', url: 'https://frank.example' }],
+      avatar: `attachment://v1:${'a'.repeat(64)}`,
+    }
+    const body = await signedProfile(fields)
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: { data: { renown_upsertProfile: 'doc-id' } } })
+
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(200)
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === body.address)
+    expect(call?.variables).toEqual({ address: body.address, username: null, userImage: null, ...fields, signature: body.signature, timestamp: body.timestamp })
+  })
+
+  test('relays HANDLE_TAKEN as 409 naming the field', async ({ request }) => {
+    const body = await signedProfile({ handle: 'taken' })
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: body.address,
+      response: graphqlError('The handle "taken" is taken', 'HANDLE_TAKEN', { field: 'handle' }),
+    })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'HANDLE_TAKEN', field: 'handle' })
+  })
+
+  test('relays INVALID_AVATAR as 400 naming the field', async ({ request }) => {
+    const body = await signedProfile({ avatar: `attachment://v1:${'b'.repeat(64)}` })
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: body.address,
+      response: graphqlError('Invalid avatar: not uploaded', 'INVALID_AVATAR', { field: 'avatar' }),
+    })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_AVATAR', field: 'avatar' })
+  })
+
+  test('refuses identity fields on a switchboard without renown_* mutations', async ({ request }) => {
+    const body = await signedProfile({ handle: 'frank' })
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: graphqlError(UNKNOWN_UPSERT) })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(501)
+    expect(await stubRequests('mutateDocument')).toHaveLength(0)
+  })
+
   test('falls back to the legacy profile write on a switchboard without renown_* mutations', async ({ request }) => {
     const body = await signedProfile({ username: 'frank.eth', userImage: null })
     const documentId = uniqueId('doc-profile-legacy')
@@ -385,66 +440,67 @@ test.describe('POST /api/profile/update', () => {
 // read (GET /api/auth/credential) is answered in the browser once the
 // credential was posted, since the stub has no read model; the writes go
 // through the real API routes to the stub switchboard.
+const APP_DID = 'did:web:test.example'
+const FLOW_URL = `/?app=${APP_DID}&returnUrl=${encodeURIComponent('http://localhost:3000/done')}`
+
+interface Flow {
+  wallet: InjectedWallet
+  /** DELETE requests the browser sent. */
+  deletes: string[]
+  /** Profile updates the browser sent. */
+  profileUpdates: string[]
+  credentialId: () => string
+}
+
+async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
+  // Nothing leaves localhost: ENS lookups fail fast, so the flow has no ENS name.
+  await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
+  const wallet = await installInjectedWallet(page)
+  let issued: { credential: { id: string; credentialSubject: unknown } } | null = null
+  let revoked = false
+  await page.route('**/api/credential/renown', async (route) => {
+    const method = route.request().method()
+    if (method === 'POST') issued = route.request().postDataJSON()
+    const response = await route.fetch()
+    if (method === 'DELETE' && response.ok()) revoked = true
+    await route.fulfill({ response })
+  })
+  // Like the real read (includeRevoked: false), a revoked credential is gone.
+  await page.route('**/api/auth/credential?*', (route) =>
+    issued && !revoked
+      ? route.fulfill({
+          json: { credential: { id: issued.credential.id, credentialSubject: issued.credential.credentialSubject } },
+        })
+      : route.fulfill({ status: 404, json: { error: 'Credential not found' } }),
+  )
+  const deletes: string[] = []
+  const profileUpdates: string[] = []
+  page.on('request', (r) => {
+    if (r.method() === 'DELETE') deletes.push(r.url())
+    if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
+  })
+  await scriptStub({
+    match: 'renown_issueCredential',
+    variables: wallet.address.toLowerCase(),
+    response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
+  })
+
+  await page.goto(FLOW_URL)
+  await page.getByRole('button', { name: 'Confirm Authorization' }).click({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
+  return {
+    wallet,
+    deletes,
+    profileUpdates,
+    credentialId: () => {
+      if (!issued) throw new Error('no credential was issued')
+      return issued.credential.id
+    },
+  }
+}
+
+
 test.describe('web flow credential revocation', () => {
-  const APP_DID = 'did:web:test.example'
-  const FLOW_URL = `/?app=${APP_DID}&returnUrl=${encodeURIComponent('http://localhost:3000/done')}`
-
-  interface Flow {
-    wallet: InjectedWallet
-    /** DELETE requests the browser sent. */
-    deletes: string[]
-    /** Profile updates the browser sent. */
-    profileUpdates: string[]
-    credentialId: () => string
-  }
-
-  async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
-    // Nothing leaves localhost: ENS lookups fail fast, so the flow has no ENS name.
-    await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
-    const wallet = await installInjectedWallet(page)
-    let issued: { credential: { id: string; credentialSubject: unknown } } | null = null
-    let revoked = false
-    await page.route('**/api/credential/renown', async (route) => {
-      const method = route.request().method()
-      if (method === 'POST') issued = route.request().postDataJSON()
-      const response = await route.fetch()
-      if (method === 'DELETE' && response.ok()) revoked = true
-      await route.fulfill({ response })
-    })
-    // Like the real read (includeRevoked: false), a revoked credential is gone.
-    await page.route('**/api/auth/credential?*', (route) =>
-      issued && !revoked
-        ? route.fulfill({
-            json: { credential: { id: issued.credential.id, credentialSubject: issued.credential.credentialSubject } },
-          })
-        : route.fulfill({ status: 404, json: { error: 'Credential not found' } }),
-    )
-    const deletes: string[] = []
-    const profileUpdates: string[] = []
-    page.on('request', (r) => {
-      if (r.method() === 'DELETE') deletes.push(r.url())
-      if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
-    })
-    await scriptStub({
-      match: 'renown_issueCredential',
-      variables: wallet.address.toLowerCase(),
-      response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
-    })
-
-    await page.goto(FLOW_URL)
-    await page.getByRole('button', { name: 'Confirm Authorization' }).click({ timeout: 30_000 })
-    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
-    return {
-      wallet,
-      deletes,
-      profileUpdates,
-      credentialId: () => {
-        if (!issued) throw new Error('no credential was issued')
-        return issued.credential.id
-      },
-    }
-  }
-
   test.beforeEach(() => {
     test.setTimeout(90_000)
   })
@@ -521,3 +577,174 @@ test.describe('web flow credential revocation', () => {
     expect(flow.deletes).toEqual([])
   })
 })
+
+// The profile editor in the browser: the wallet session comes from the web
+// flow (authorize), the upload bearer from window.__renownE2eBearer, uploads
+// go to the stub's media route and its fake S3, and the save goes through
+// /api/profile/update to the stub switchboard.
+test.describe('profile editor', () => {
+  // 1×1 PNG.
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+
+  test.beforeEach(() => {
+    test.setTimeout(120_000)
+  })
+
+  async function openEditor(page: import('@playwright/test').Page, taken: string[] = []) {
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eBearer?: string }).__renownE2eBearer = 'e2e-bearer'
+    })
+    const flow = await authorize(page)
+    const uploads: { authorization?: string; body: unknown }[] = []
+    page.on('request', (r) => {
+      if (r.url().endsWith('/media/uploads')) uploads.push({ authorization: r.headers().authorization, body: r.postDataJSON() })
+    })
+    // The editor reads the profile and checks handles from the browser.
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql`, async (route) => {
+      const { query, variables } = route.request().postDataJSON() as { query: string; variables: Record<string, unknown> }
+      if (query.includes('renownHandleAvailability')) {
+        const handle = String(variables.handle)
+        const isTaken = taken.includes(handle)
+        return route.fulfill({
+          json: { data: { renownHandleAvailability: { handle, available: !isTaken, reason: isTaken ? 'TAKEN' : null } } },
+        })
+      }
+      if (query.includes('renownUsers')) {
+        return route.fulfill({
+          json: {
+            data: {
+              renownUsers: [
+                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null },
+              ],
+            },
+          },
+        })
+      }
+      return route.continue()
+    })
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('heading', { name: 'Edit profile' })).toBeVisible({ timeout: 30_000 })
+    return { ...flow, uploads }
+  }
+
+  test('is gated behind sign-in', async ({ page }) => {
+    await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
+  })
+
+  test('uploads an avatar and saves the whole profile with one signature', async ({ page }) => {
+    const editor = await openEditor(page)
+
+    await page.getByTestId('avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG })
+    await page.getByRole('button', { name: 'Use this crop' }).click()
+    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible()
+    expect(editor.uploads).toHaveLength(1)
+    expect(editor.uploads[0].authorization).toBe('Bearer e2e-bearer')
+    expect(editor.uploads[0].body).toMatchObject({ purpose: 'avatar', sha256: expect.stringMatching(/^[0-9a-f]{64}$/) as unknown })
+
+    await page.getByLabel('Display name').fill('Edie Editor')
+    await page.getByLabel('Handle').fill('edie-editor')
+    await expect(page.getByText('renown.id/@edie-editor is available.')).toBeVisible()
+    await page.getByLabel('Bio').fill('Edits profiles.')
+    await page.getByRole('button', { name: '+ Add link' }).click()
+    await page.getByLabel('Link 1 label').fill('Site')
+    await page.getByLabel('Link 1 URL').fill('https://edie.example')
+    // The preview follows the form.
+    await expect(page.getByRole('complementary', { name: 'Preview' }).getByRole('heading', { name: 'Edie Editor' })).toBeVisible()
+
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: editor.wallet.address,
+      response: { data: { renown_upsertProfile: 'doc-edit' } },
+    })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('status')).toContainText('Profile saved.')
+
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === editor.wallet.address)
+    expect(call?.variables).toMatchObject({
+      displayName: 'Edie Editor',
+      handle: 'edie-editor',
+      bio: 'Edits profiles.',
+      links: [{ label: 'Site', url: 'https://edie.example' }],
+      avatar: expect.stringMatching(/^attachment:\/\/v1:[0-9a-f]{64}$/) as unknown,
+    })
+    const v = call!.variables as Record<string, unknown> & { links: { id: string; label: string; url: string }[]; timestamp: string }
+    const expected = await profileMessage(
+      editor.wallet.address,
+      { displayName: 'Edie Editor', handle: 'edie-editor', bio: 'Edits profiles.', links: v.links, avatar: v.avatar as string },
+      v.timestamp,
+    )
+    expect(editor.wallet.personalSignRequests).toEqual([expected])
+    expect(await verifyMessage({ address: editor.wallet.address, message: expected, signature: v.signature as `0x${string}` })).toBe(true)
+  })
+
+  test('the crop dialog is a real modal: focus moves in, Escape closes, focus returns', async ({ page }) => {
+    await openEditor(page)
+    await page.getByTestId('avatar-file').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: PNG })
+    const dialog = page.getByRole('dialog', { name: 'Crop avatar' })
+    await expect(dialog).toBeVisible()
+    // Portalled out of the (backdrop-blurred) form.
+    expect(await page.evaluate(() => document.querySelector('[role=dialog]')?.parentElement === document.body)).toBe(true)
+    const canvas = dialog.getByRole('img', { name: /Crop position/ }).or(dialog.locator('canvas'))
+    await expect(canvas).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Shift+Tab')
+    await expect(dialog.getByRole('button', { name: 'Use this crop' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(canvas).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Upload avatar' })).toBeFocused()
+  })
+
+  test('a failed profile read shows Retry instead of an empty form, and Retry recovers', async ({ page }) => {
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eBearer?: string }).__renownE2eBearer = 'e2e-bearer'
+    })
+    const flow = await authorize(page)
+    let failing = true
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql`, async (route) => {
+      const { query } = route.request().postDataJSON() as { query: string }
+      if (!query.includes('renownUsers')) return route.continue()
+      if (failing) return route.fulfill({ status: 500, body: 'boom' })
+      return route.fulfill({
+        json: {
+          data: {
+            renownUsers: [
+              { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: 'Real Name', handle: null, bio: null, links: [{ id: 'l1', label: 'Site', url: 'https://real.example' }], avatar: null, createdAt: null, updatedAt: null },
+            ],
+          },
+        },
+      })
+    })
+    await page.goto('/profile/edit')
+    await expect(page.getByRole('alert').filter({ hasText: "Couldn't load your profile" })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'Save profile' })).toHaveCount(0)
+    failing = false
+    await page.getByRole('button', { name: 'Retry' }).click()
+    await expect(page.getByLabel('Display name')).toHaveValue('Real Name', { timeout: 30_000 })
+    await expect(page.getByLabel('Link 1 URL')).toHaveValue('https://real.example')
+  })
+
+  test('shows a taken handle inline, before and after saving', async ({ page }) => {
+    const editor = await openEditor(page, ['taken-live'])
+    await page.getByLabel('Handle').fill('taken-live')
+    await expect(page.getByRole('alert').filter({ hasText: 'This handle is taken.' })).toBeVisible()
+
+    // Taken between the check and the save: the switchboard's HANDLE_TAKEN lands on the field.
+    await page.getByLabel('Handle').fill('raced-handle')
+    await expect(page.getByText('renown.id/@raced-handle is available.')).toBeVisible()
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: editor.wallet.address,
+      response: graphqlError('The handle "raced-handle" is taken', 'HANDLE_TAKEN', { field: 'handle' }),
+    })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'The handle "raced-handle" is taken' })).toBeVisible()
+  })
+})
+
