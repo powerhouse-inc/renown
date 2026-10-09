@@ -38,6 +38,6 @@ export async function stubRequests(match: string): Promise<RecordedRequest[]> {
 }
 
 /** A GraphQL error response as the switchboard sends it. */
-export function graphqlError(message: string, code?: string): unknown {
-  return { data: null, errors: [{ message, ...(code ? { extensions: { code } } : {}) }] }
+export function graphqlError(message: string, code?: string, extra: Record<string, unknown> = {}): unknown {
+  return { data: null, errors: [{ message, ...(code ? { extensions: { code, ...extra } } : {}) }] }
 }

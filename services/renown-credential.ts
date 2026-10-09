@@ -79,6 +79,8 @@ export class CredentialWriteError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    /** The profile field a validation error is about, for inline form errors. */
+    readonly field?: string,
   ) {
     super(message)
     this.name = 'CredentialWriteError'
@@ -89,12 +91,17 @@ const STATUS_BY_CODE: Record<string, number> = {
   BAD_USER_INPUT: 400,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
+  HANDLE_TAKEN: 409,
+  INVALID_AVATAR: 400,
   RATE_LIMITED: 429,
+  SERVICE_UNAVAILABLE: 503,
 }
 
-function graphqlErrors(error: unknown): { message: string; extensions?: { code?: unknown } }[] {
+type GraphqlError = { message: string; extensions?: { code?: unknown; field?: unknown } }
+
+function graphqlErrors(error: unknown): GraphqlError[] {
   if (!(error instanceof ClientError)) return []
-  return (error.response.errors ?? []) as { message: string; extensions?: { code?: unknown } }[]
+  return (error.response.errors ?? []) as GraphqlError[]
 }
 
 /**
@@ -147,7 +154,8 @@ export function toWriteError(error: unknown, fallbackMessage: string): Credentia
   const [first] = graphqlErrors(error)
   if (first) {
     const code = typeof first.extensions?.code === 'string' ? first.extensions.code : undefined
-    return new CredentialWriteError((code && STATUS_BY_CODE[code]) || 500, first.message, code)
+    const field = typeof first.extensions?.field === 'string' ? first.extensions.field : undefined
+    return new CredentialWriteError((code && STATUS_BY_CODE[code]) || 500, first.message, code, field)
   }
   return new CredentialWriteError(500, `${fallbackMessage}: ${String(error)}`)
 }

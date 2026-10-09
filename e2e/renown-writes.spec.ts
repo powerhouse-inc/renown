@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { verifyMessage } from 'viem'
-import { profileMessage, revokeMessage } from '../services/renown-signed-messages'
+import { profileMessage, revokeMessage, type ProfileFields } from '../services/renown-signed-messages'
 import { installInjectedWallet, type InjectedWallet } from './support/injected-wallet'
 import { graphqlError, resetStub, scriptStub, stubRequests } from './support/stub-switchboard-client'
 
@@ -289,7 +289,7 @@ test.describe('POST /api/credential/renown', () => {
 })
 
 async function signedProfile(
-  profile: { username: string; userImage: string | null },
+  profile: ProfileFields,
   key = generatePrivateKey(),
 ) {
   const account = privateKeyToAccount(key)
@@ -350,6 +350,55 @@ test.describe('POST /api/profile/update', () => {
       expect(await stubRequests('mutateDocument')).toHaveLength(0)
     })
   }
+
+  test('forwards the identity fields exactly as signed', async ({ request }) => {
+    const fields = {
+      displayName: 'Frank',
+      handle: 'frank',
+      bio: 'Hi',
+      links: [{ id: 'l1', label: 'Site', url: 'https://frank.example' }],
+      avatar: `attachment://v1:${'a'.repeat(64)}`,
+    }
+    const body = await signedProfile(fields)
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: { data: { renown_upsertProfile: 'doc-id' } } })
+
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(200)
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === body.address)
+    expect(call?.variables).toEqual({ address: body.address, username: null, userImage: null, ...fields, signature: body.signature, timestamp: body.timestamp })
+  })
+
+  test('relays HANDLE_TAKEN as 409 naming the field', async ({ request }) => {
+    const body = await signedProfile({ handle: 'taken' })
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: body.address,
+      response: graphqlError('The handle "taken" is taken', 'HANDLE_TAKEN', { field: 'handle' }),
+    })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'HANDLE_TAKEN', field: 'handle' })
+  })
+
+  test('relays INVALID_AVATAR as 400 naming the field', async ({ request }) => {
+    const body = await signedProfile({ avatar: `attachment://v1:${'b'.repeat(64)}` })
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: body.address,
+      response: graphqlError('Invalid avatar: not uploaded', 'INVALID_AVATAR', { field: 'avatar' }),
+    })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'INVALID_AVATAR', field: 'avatar' })
+  })
+
+  test('refuses identity fields on a switchboard without renown_* mutations', async ({ request }) => {
+    const body = await signedProfile({ handle: 'frank' })
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: graphqlError(UNKNOWN_UPSERT) })
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(501)
+    expect(await stubRequests('mutateDocument')).toHaveLength(0)
+  })
 
   test('falls back to the legacy profile write on a switchboard without renown_* mutations', async ({ request }) => {
     const body = await signedProfile({ username: 'frank.eth', userImage: null })
