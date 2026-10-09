@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - staging
+      - deploy/staging
   pull_request:
     branches:
       - main
@@ -88,9 +88,14 @@ jobs:
       - name: Compute image tags
         id: tags
         run: |
+          if [ "${GITHUB_REF_NAME}" = "deploy/staging" ]; then
+            echo "build_tag=staging-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_tag=${{ steps.get_version.outputs.version || github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
           {
             echo "list<<EOF"
-            if [ "${GITHUB_REF_NAME}" = "staging" ]; then
+            if [ "${GITHUB_REF_NAME}" = "deploy/staging" ]; then
               echo "${GHCR_REGISTRY}/${GITHUB_REPOSITORY}:staging"
               echo "${VETRA_IMAGE}:staging"
               echo "${VETRA_IMAGE}:staging-${GITHUB_SHA::7}"
@@ -117,6 +122,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            TAG=${{ steps.get_version.outputs.version || github.ref_name }}
+            TAG=${{ steps.tags.outputs.build_tag }}
             NEXT_PUBLIC_OPENPANEL_CLIENT_ID=7496b8b9-281d-40c7-af8e-541aaa228af8
             NEXT_PUBLIC_OPENPANEL_API_URL=https://openpanel.monitoring.vetra.io/api
