@@ -52,6 +52,7 @@ const DEFAULT_DATA = {
   appProfilesByPublisher: [],
   appProfiles: { items: [], next: null },
   appProfileCategories: [],
+  renownNetworkStats: null,
   appStats: null,
   userStats: [],
 }

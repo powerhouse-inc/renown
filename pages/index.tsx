@@ -15,6 +15,7 @@ import { PageMeta } from '../components/site/page-meta'
 import { SiteLayout } from '../components/site/site-layout'
 import { useIsClient } from '../hooks/useIsClient'
 import { listAppProfiles } from '../services/app-profiles'
+import { fetchNetworkStats } from '../services/network-stats'
 import { parseExpiresInDays } from '../utils/credential-validity'
 import { parseReturnUrl } from '../utils/return-url'
 import { publicOrigin } from '../utils/seo'
@@ -92,20 +93,24 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query,
   if (query['app'] || query['connect']) return { props: { mode: 'auth' } }
   // Imported here so shiki stays server-only.
   const { highlight } = await import('../lib/highlight')
-  const [featuredApps, teaser] = await Promise.all([
+  const [featuredApps, pulse, teaser] = await Promise.all([
     withTimeout(listAppProfiles({ limit: 6 }), SSR_DATA_TIMEOUT_MS)
       .then((page) => page.items)
       .catch((error: unknown) => {
         console.error('Homepage: featured apps unavailable:', error)
         return []
       }),
+    withTimeout(fetchNetworkStats(), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
+      console.error('Homepage: network stats unavailable:', error)
+      return null
+    }),
     highlight(TEASER_CODE, 'ts').catch((error: unknown) => {
       console.error('Homepage: highlighting failed, showing plain code:', error)
       return { code: TEASER_CODE, html: '' }
     }),
   ])
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
-  return { props: { mode: 'site', featuredApps, pulse: null, teaser } }
+  return { props: { mode: 'site', featuredApps, pulse, teaser } }
 }
 
 export default Home

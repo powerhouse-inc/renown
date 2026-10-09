@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fixtureStub, removeFixture } from './support/stub-switchboard-client'
-import { attachScreenshots, expectNoSeriousA11yViolations, useTheme } from './support/site'
+import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme } from './support/site'
+import { DEFAULT_PULSE_MIN, pulseMin, visibleMetrics } from '../utils/pulse'
 
 // Every homepage load in the suite lives in this file: its tests swap the
 // appProfiles fixture the SSR reads, so they run one at a time and no other
@@ -30,8 +31,19 @@ async function featured(entry: { status?: number; response: unknown }): Promise<
   await fixtureStub({ id: FIXTURE, match: 'appProfiles(', variables: '"limit":6', ...entry })
 }
 
+const PULSE = 'home-pulse'
+/** Prod on 2026-10-09: two counts reach the default threshold of 25. */
+const PROD_PULSE = { identities: 245, apps: 1, activeCredentials: 168, activeUsers30d: 0, updatedAt: '2026-10-09T10:00:00.000Z' }
+
+/** Makes the homepage's renownNetworkStats read answer with `entry`. */
+async function pulse(entry: { status?: number; response: unknown }): Promise<void> {
+  await removeFixture(PULSE)
+  await fixtureStub({ id: PULSE, match: 'renownNetworkStats', ...entry })
+}
+
 test.afterAll(async () => {
   await removeFixture(FIXTURE)
+  await removeFixture(PULSE)
 })
 
 test('renders the pitch, the CTAs and up to six featured apps', async ({ page }) => {
@@ -85,9 +97,83 @@ test('has canonical, Open Graph and JSON-LD metadata', async ({ page }) => {
   expect(types).toEqual(['Organization', 'WebSite'])
 })
 
+test.describe('network pulse', () => {
+  const region = (page: import('@playwright/test').Page) => page.getByRole('region', { name: 'The network right now' })
+
+  test('threshold and metric selection', () => {
+    expect(pulseMin(undefined)).toBe(DEFAULT_PULSE_MIN)
+    expect(pulseMin('')).toBe(DEFAULT_PULSE_MIN)
+    expect(pulseMin('-3')).toBe(DEFAULT_PULSE_MIN)
+    expect(pulseMin('ten')).toBe(DEFAULT_PULSE_MIN)
+    expect(pulseMin(' 0 ')).toBe(0)
+    expect(pulseMin('100')).toBe(100)
+    expect(visibleMetrics(PROD_PULSE, 25).map((m) => [m.key, m.value])).toEqual([
+      ['identities', 245],
+      ['activeCredentials', 168],
+    ])
+    expect(visibleMetrics(PROD_PULSE, 0)).toHaveLength(4)
+    expect(visibleMetrics(PROD_PULSE, 1000)).toEqual([])
+    expect(visibleMetrics(null, 0)).toEqual([])
+  })
+
+  test('shows only the counts at or above the threshold', async ({ page }) => {
+    await pulse({ response: { data: { renownNetworkStats: PROD_PULSE } } })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+    const pulseRegion = region(page)
+    await expect(pulseRegion.getByRole('term')).toHaveText(['people with a Renown ID', 'active app approvals'])
+    await expect(page.getByTestId('pulse-identities')).toHaveText('245')
+    await expect(page.getByTestId('pulse-activeCredentials')).toHaveText('168')
+    await expect(pulseRegion.getByText('apps with a Renown identity')).toHaveCount(0)
+  })
+
+  test('is hidden when no count reaches the threshold', async ({ page }) => {
+    await pulse({ response: { data: { renownNetworkStats: { ...PROD_PULSE, identities: 24, activeCredentials: 3 } } } })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(region(page)).toHaveCount(0)
+  })
+
+  test('is hidden when the stats are unavailable, and the page still answers 200', async ({ page }) => {
+    await pulse({ response: { data: null, errors: [{ message: 'Stats are temporarily unavailable', extensions: { code: 'SERVICE_UNAVAILABLE' } }] } })
+    const response = await page.goto('/')
+    expect(response?.status()).toBe(200)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(region(page)).toHaveCount(0)
+  })
+
+  test('counts up when scrolled into view, without shifting the layout', async ({ page }) => {
+    await pulse({ response: { data: { renownNetworkStats: PROD_PULSE } } })
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto('/')
+    const identities = page.getByTestId('pulse-identities')
+    await expect(identities).toHaveText('0')
+    const size = async () => {
+      const box = await region(page).boundingBox()
+      return box && { width: box.width, height: box.height }
+    }
+    const before = await size()
+    await identities.scrollIntoViewIfNeeded()
+    await expect(identities).toHaveText('245', { timeout: 5000 })
+    expect(await size()).toEqual(before)
+    expect(await layoutShift(page)).toBeLessThan(0.01)
+  })
+
+  test('shows the final numbers at once under reduced motion', async ({ page }) => {
+    await pulse({ response: { data: { renownNetworkStats: PROD_PULSE } } })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await page.waitForTimeout(300)
+    await expect(page.getByTestId('pulse-identities')).toHaveText('245')
+  })
+})
+
 for (const theme of ['light', 'dark'] as const) {
   test(`has no serious axe violations (${theme})`, async ({ page }, testInfo) => {
     await featured({ response: { data: { appProfiles: { items: [1, 2, 3, 4, 5, 6].map(app), next: null } } } })
+    await pulse({ response: { data: { renownNetworkStats: { ...PROD_PULSE, apps: 31, activeUsers30d: 1234 } } } })
     await useTheme(page, theme)
     await page.goto('/')
     await expect(page.getByRole('banner').getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
