@@ -342,3 +342,42 @@ button:not(:disabled),
         transform: scale(1.08);
     }
 }
+
+/* /ecosystem identity flow diagram. */
+.rn-flow .rn-flow-box {
+    fill: var(--surface-2);
+    stroke: var(--hairline-strong);
+}
+.rn-flow .rn-flow-primary {
+    fill: color-mix(in oklab, var(--primary) 14%, var(--background));
+    stroke: var(--primary);
+}
+.rn-flow .rn-flow-label {
+    fill: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+}
+.rn-flow .rn-flow-sub {
+    fill: var(--ink-muted);
+    font-size: 12px;
+}
+.rn-flow .rn-flow-edge {
+    fill: none;
+    stroke: var(--primary-ink);
+    stroke-width: 1.5;
+}
+.rn-flow .rn-flow-dashed {
+    stroke-dasharray: 5 6;
+    stroke: var(--ink-muted);
+}
+.rn-flow .rn-flow-arrow {
+    fill: var(--primary-ink);
+}
+.rn-flow .rn-flow-edge-label {
+    fill: var(--ink-muted);
+    font-size: 12px;
+    paint-order: stroke;
+    stroke: var(--background);
+    stroke-width: 6px;
+    stroke-linejoin: round;
+}
