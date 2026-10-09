@@ -11,7 +11,7 @@ const RenownLogo: React.FC<SVGProps<SVGSVGElement>> = (props) =>
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       {...props}
-      className="w-30 h-10 md:w-50 md:h-20"
+      className={props.className ?? "w-30 h-10 md:w-50 md:h-20"}
     >
       <path
         d="M395.15 132.635C395.563 132.635 395.933 132.888 396.082 133.272L403.379 152.041C403.634 152.696 403.15 153.403 402.447 153.403H399.435C399.018 153.403 398.645 153.145 398.498 152.756L397.236 149.405L395.679 145.2L393.342 139.021L391.34 144.316H393.661C394.353 144.316 394.836 145.001 394.604 145.652L393.694 148.196C393.552 148.594 393.175 148.859 392.753 148.859H389.65L389.448 149.405L388.187 152.756C388.04 153.145 387.666 153.403 387.25 153.403H384.21C383.507 153.403 383.024 152.697 383.277 152.042L390.551 133.273C390.7 132.889 391.071 132.635 391.484 132.635H395.15Z"
@@ -90,8 +90,8 @@ const RenownLogo: React.FC<SVGProps<SVGSVGElement>> = (props) =>
           y2="62.0814"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#21FFB4" />
-          <stop offset="1" stop-color="#0080FF" />
+          <stop stopColor="#21FFB4" />
+          <stop offset="1" stopColor="#0080FF" />
         </linearGradient>
       </defs>
     </svg>

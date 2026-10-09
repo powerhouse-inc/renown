@@ -46,7 +46,7 @@ const PageBackground: React.FC<PageBackgroundProps> = ({
 
       {/* Header with logo and theme toggle */}
       <div className="absolute left-8 top-3 z-10 flex items-center gap-4">
-        <RenownLogo aria-label="Renown" className="text-foreground" />
+        <RenownLogo aria-label="Renown" />
       </div>
       <div className="absolute right-8 top-3 z-10 flex items-center gap-3">
         {!hideLoginButton && <RenownLoginButton />}

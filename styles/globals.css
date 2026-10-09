@@ -27,6 +27,23 @@
     --shadow-modal: 0px 0px 24px 4px rgba(0, 0, 0, 0.05),
         0px 44px 48px -12px rgba(0, 0, 0, 0.15),
         0px 2px 8px 0px rgba(0, 0, 0, 0.05);
+    /* Site polish tokens (components/site). */
+    --surface-1: #FFFFFF;
+    --surface-2: #F1F5FA;
+    --surface-3: #E6EDF6;
+    --hairline: rgba(15, 30, 60, 0.10);
+    --hairline-strong: rgba(15, 30, 60, 0.18);
+    --ink: #0B1220;
+    --ink-muted: #5F6670;
+    --primary-strong: #0066D6;
+    --primary-ink: #0062C9;
+    --signal: #007A57;
+    --grad-from: #21FFB4;
+    --grad-to: #0080FF;
+    --glow-primary: 0 0 0 1px rgba(0, 132, 255, 0.18), 0 24px 60px -28px rgba(0, 102, 214, 0.45);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 1px 2px rgba(15, 30, 60, 0.06), 0 12px 32px -16px rgba(15, 30, 60, 0.18);
+    --header-bg: rgba(247, 249, 252, 0.72);
+    --code-bg: #F6F8FB;
 }
 
 .dark {
@@ -49,6 +66,22 @@
     --input: rgba(255, 255, 255, 0.10);
     --ring: #0084FF;
     --neutral-1: rgba(255, 255, 255, 0.05);
+    --surface-1: rgba(255, 255, 255, 0.035);
+    --surface-2: rgba(255, 255, 255, 0.06);
+    --surface-3: rgba(255, 255, 255, 0.10);
+    --hairline: rgba(255, 255, 255, 0.09);
+    --hairline-strong: rgba(255, 255, 255, 0.16);
+    --ink: #F4F7FF;
+    --ink-muted: #94A3B8;
+    --primary-strong: #0066D6;
+    --primary-ink: #5AB0FF;
+    --signal: #21FFB4;
+    --grad-from: #21FFB4;
+    --grad-to: #0080FF;
+    --glow-primary: 0 0 0 1px rgba(90, 176, 255, 0.22), 0 30px 80px -30px rgba(0, 132, 255, 0.65);
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 40px -24px rgba(0, 0, 0, 0.7);
+    --header-bg: rgba(5, 10, 26, 0.66);
+    --code-bg: #0A1226;
 }
 
 @theme inline {
@@ -74,6 +107,48 @@
 
     --shadow-button: var(--shadow-button);
     --shadow-modal: var(--shadow-modal);
+    --color-surface-1: var(--surface-1);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+    --color-hairline: var(--hairline);
+    --color-hairline-strong: var(--hairline-strong);
+    --color-ink: var(--ink);
+    --color-ink-muted: var(--ink-muted);
+    --color-primary-strong: var(--primary-strong);
+    --color-primary-ink: var(--primary-ink);
+    --color-signal: var(--signal);
+    --color-grad-from: var(--grad-from);
+    --color-grad-to: var(--grad-to);
+    --color-header: var(--header-bg);
+    --color-code: var(--code-bg);
+    --shadow-glow: var(--glow-primary);
+    --shadow-card: var(--shadow-card);
+
+    /* Type scale: fluid display sizes, fixed text sizes. */
+    --text-display: clamp(2.6rem, 1.55rem + 4.4vw, 4.75rem);
+    --text-display--line-height: 1.02;
+    --text-display--letter-spacing: -0.038em;
+    --text-display--font-weight: 650;
+    --text-h1: clamp(2.2rem, 1.6rem + 2.4vw, 3.4rem);
+    --text-h1--line-height: 1.06;
+    --text-h1--letter-spacing: -0.032em;
+    --text-h1--font-weight: 650;
+    --text-h2: clamp(1.7rem, 1.35rem + 1.4vw, 2.45rem);
+    --text-h2--line-height: 1.12;
+    --text-h2--letter-spacing: -0.026em;
+    --text-h2--font-weight: 640;
+    --text-h3: 1.1875rem;
+    --text-h3--line-height: 1.35;
+    --text-h3--letter-spacing: -0.012em;
+    --text-h3--font-weight: 600;
+    --text-lead: clamp(1.0625rem, 0.98rem + 0.35vw, 1.25rem);
+    --text-lead--line-height: 1.6;
+
+    --radius-control: 10px;
+    --radius-card: 18px;
+    --radius-panel: 28px;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -109,4 +184,21 @@ button:not(:disabled),
 
 * {
     box-sizing: border-box;
+}
+
+/* Focus ring for every interactive element on the site. */
+:focus-visible {
+    outline: 2px solid var(--primary-ink);
+    outline-offset: 2px;
+}
+
+/* Shiki dual-theme output (lib/highlight.ts emits --shiki-light / --shiki-dark). */
+.shiki,
+.shiki span {
+    color: var(--shiki-light);
+    background-color: transparent !important;
+}
+.dark .shiki,
+.dark .shiki span {
+    color: var(--shiki-dark);
 }

@@ -12,13 +12,13 @@ const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg border border-foreground/20 hover:bg-foreground/10 transition-colors text-foreground"
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-foreground/20 text-foreground transition-colors hover:bg-foreground/10"
       aria-label="Toggle theme"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
+        width="18"
+        height="18"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -39,8 +39,8 @@ const ThemeToggle: React.FC = () => {
       </svg>
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
+        width="18"
+        height="18"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
