@@ -3,7 +3,7 @@ import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
 import ConsoleFlow from "../components/auth/console-flow";
-import PageBackground from "../components/ui/page-background";
+import { SiteLayout } from "../components/site/site-layout";
 import { useIsClient } from "../hooks/useIsClient";
 import { parseExpiresInDays } from "../utils/credential-validity";
 
@@ -15,14 +15,14 @@ const ConsolePage: NextPage = () => {
     const isClient = useIsClient();
 
     return (
-        <PageBackground hideLoginButton={Boolean(sessionId) && isClient}>
+        <SiteLayout variant="auth">
             <div className={styles.container}>
                 <Head>
                     <title>Renown - Console Login</title>
                     <meta content="Authorize Powerhouse CLI" name="description" />
                 </Head>
 
-                <main className={styles.main}>
+                <div className={styles.main}>
                     {sessionId && isClient ? (
                         <ConsoleFlow sessionId={sessionId} connectDid={connectDid} expiresInDays={expiresInDays} />
                     ) : !sessionId && isClient ? (
@@ -31,9 +31,9 @@ const ConsolePage: NextPage = () => {
                             <p>No session ID provided. Please run <code className="bg-muted px-2 py-1 rounded-sm">ph login</code> from your terminal.</p>
                         </div>
                     ) : null}
-                </main>
+                </div>
             </div>
-        </PageBackground>
+        </SiteLayout>
     );
 };
 

@@ -22,7 +22,7 @@ type MyAppProps = AppProps & {
 function MyApp({ Component, pageProps, initialProfileId }: MyAppProps) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <main className={inter.className}>
+      <div className={inter.className}>
         <QueryClientProvider client={queryClient}>
           <AuthRootProvider>
             <Renown
@@ -38,7 +38,7 @@ function MyApp({ Component, pageProps, initialProfileId }: MyAppProps) {
             <Component {...pageProps} />
           </AuthRootProvider>
         </QueryClientProvider>
-      </main>
+      </div>
     </ThemeProvider>
   )
 }

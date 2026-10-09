@@ -3,7 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import styles from "../../styles/Home.module.css";
 import OidcLoginFlow from "../../components/auth/oidc-login-flow";
-import PageBackground from "../../components/ui/page-background";
+import { SiteLayout } from "../../components/site/site-layout";
 import { useIsClient } from "../../hooks/useIsClient";
 
 const OidcLoginPage: NextPage = () => {
@@ -13,14 +13,14 @@ const OidcLoginPage: NextPage = () => {
     const isClient = useIsClient();
 
     return (
-        <PageBackground hideLoginButton>
+        <SiteLayout variant="auth">
             <div className={styles.container}>
                 <Head>
                     <title>Renown - Sign in</title>
                     <meta content="Sign in to Renown" name="description" />
                 </Head>
 
-                <main className={styles.main}>
+                <div className={styles.main}>
                     {requestId && isClient ? (
                         <OidcLoginFlow requestId={requestId} issuer={issuer} />
                     ) : !requestId && isClient ? (
@@ -32,9 +32,9 @@ const OidcLoginPage: NextPage = () => {
                             </p>
                         </div>
                     ) : null}
-                </main>
+                </div>
             </div>
-        </PageBackground>
+        </SiteLayout>
     );
 };
 
