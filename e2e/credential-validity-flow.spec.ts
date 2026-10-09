@@ -101,6 +101,31 @@ test.describe('app flow credential validity', () => {
   })
 })
 
+test.describe('app flow without a usable returnUrl', () => {
+  const CONNECT_DID = 'did:key:z6MkNoReturnUrlTest'
+
+  for (const [name, extra] of [
+    ['absent', ''],
+    ['malformed', '&returnUrl=not%20a%20url'],
+  ] as const) {
+    test(`a ${name} returnUrl completes the authorization without crashing`, async ({ page }) => {
+      const pageErrors: string[] = []
+      page.on('pageerror', (error) => pageErrors.push(error.message))
+      const issued = await interceptCredentialApi(page)
+      await page.goto(`/?connect=${CONNECT_DID}&expiresInDays=365${extra}`)
+
+      const confirm = page.getByRole('button', { name: 'Confirm Authorization' })
+      await expect(confirm).toBeVisible({ timeout: 30_000 })
+      await confirm.click()
+      await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible({ timeout: 30_000 })
+      expect(validityDays(issued())).toBe(365)
+      await expect(page.getByText('You can close this tab.')).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByRole('link', { name: /Return to/ })).toHaveCount(0)
+      expect(pageErrors).toEqual([])
+    })
+  }
+})
+
 test.describe('console flow credential validity', () => {
   const CLI_DID = 'did:key:z6MkValidityTestCli'
 
