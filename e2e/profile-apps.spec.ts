@@ -32,12 +32,18 @@ const app = (appDid: string, name: string, extra: Record<string, unknown> = {}) 
   ...extra,
 })
 const ALPHA = 'did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG'
+const GAMMA = 'did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJH'
 const BETA = 'did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169'
 
 test.beforeAll(async () => {
   const users = (p: unknown) => ({ data: { renownUsers: [p] } })
   await fixtureStub({ match: 'renownUsers', variables: '"app-maker"', response: users(profile('app-maker', MAKER, 'Ada Maker')) })
   await fixtureStub({ match: 'renownUsers', variables: '"no-apps-maker"', response: users(profile('no-apps-maker', NOBODY, 'Nia None')) })
+  await fixtureStub({
+    match: 'appProfile(',
+    variables: GAMMA,
+    response: { data: { appProfile: app(GAMMA, 'Alpha', { logoRef: `attachment://v1:${'3'.repeat(64)}`, coverRef: `attachment://v1:${'4'.repeat(64)}`, category: 'Tools' }) } },
+  })
   await fixtureStub({
     match: 'appProfilesByPublisher(',
     variables: MAKER,
@@ -58,8 +64,10 @@ test('a publisher profile lists its apps and shows the Publisher badge', async (
   await expect(page.getByRole('heading', { name: 'Apps published' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Alpha/ })).toHaveAttribute('href', `/app/${ALPHA}`)
   await expect(page.getByRole('link', { name: /Beta/ })).toHaveAttribute('href', `/app/${BETA}`)
-  await expect(page.locator('img[alt="Alpha logo"]')).toHaveAttribute('src', `/media/doc-Alpha/logo?v=${'3'.repeat(12)}`)
-  await expect(page.locator('img[alt="Beta logo"]')).toHaveAttribute('src', 'https://cdn.example/beta.png')
+  // The server-rendered markup carries the versioned media URLs (the browser then drops images that fail to load).
+  const html = await (await page.request.get('/@app-maker')).text()
+  expect(html).toContain(`src="/media/doc-Alpha/logo?v=${'3'.repeat(12)}"`)
+  expect(html).toContain('src="https://cdn.example/beta.png"')
   await expect(page.getByText('Tools', { exact: true })).toBeVisible()
 })
 
@@ -68,4 +76,18 @@ test('a profile without apps shows neither', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Nia None' })).toBeVisible()
   await expect(page.getByText('Publisher', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Apps published' })).toHaveCount(0)
+})
+
+test('a logo that 404s falls back to the monogram on the card and the app page', async ({ page }) => {
+  // doc-Alpha has no media on the stub: /media/doc-Alpha/logo is a 404.
+  await page.goto('/@app-maker')
+  await expect(page.getByRole('link', { name: /Alpha/ })).toBeVisible()
+  await expect(page.locator('img[alt="Alpha logo"]')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /Alpha/ }).getByText('A', { exact: true })).toBeVisible()
+
+  await page.goto(`/app/${GAMMA}`)
+  await expect(page.getByRole('heading', { level: 1, name: 'Alpha' })).toBeVisible()
+  await expect(page.locator('img[alt="Alpha logo"]')).toHaveCount(0)
+  await expect(page.locator('article').getByText('A', { exact: true })).toBeVisible()
+  await expect(page.locator('article img')).toHaveCount(0)
 })

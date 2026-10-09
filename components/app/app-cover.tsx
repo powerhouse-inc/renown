@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { mediaUrl } from '../../services/media'
 
 /** A stable hue per seed (FNV-1a), for the gradient shown without a cover. */
@@ -14,10 +14,17 @@ function hueOf(seed: string): number {
 /** The 3:1 cover: the uploaded image, or a gradient derived from the app DID. */
 export function AppCover({ documentId, coverRef, seed }: { documentId: string; coverRef?: string | null; seed: string }) {
   const [failed, setFailed] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // A server-rendered <img> can fail before hydration (no React error event): catch it once mounted.
+  useEffect(() => {
+    const img = imgRef.current
+    if (img?.complete && img.naturalWidth === 0) setFailed(true)
+  }, [coverRef])
   if (coverRef && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- /media 302s to signed storage URLs next/image can't allowlist
-      <img src={mediaUrl(documentId, 'cover', '', coverRef)} alt="" className="aspect-[3/1] w-full object-cover" onError={() => setFailed(true)} />
+      <img ref={imgRef} src={mediaUrl(documentId, 'cover', '', coverRef)} alt="" className="aspect-[3/1] w-full object-cover" onError={() => setFailed(true)} />
     )
   }
   const hue = hueOf(seed)

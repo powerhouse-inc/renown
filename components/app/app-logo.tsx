@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { mediaUrl } from '../../services/media'
 
 /** Legacy logos: https URLs and raster data URLs only. */
@@ -27,6 +27,14 @@ export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-
   )
   const [failed, setFailed] = useState<ReadonlySet<string>>(new Set())
   const src = sources.find((candidate) => !failed.has(candidate))
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // A server-rendered <img> can fail before hydration, so React never sees its
+  // error event: catch an already-broken image once mounted.
+  useEffect(() => {
+    const img = imgRef.current
+    if (src && img?.complete && img.naturalWidth === 0) setFailed((f) => new Set(f).add(src))
+  }, [src])
   const shape = `shrink-0 rounded-2xl shadow-lg ring-white dark:ring-white/10 ${className}`
   if (!src) {
     return (
@@ -38,6 +46,7 @@ export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-
   return (
     // eslint-disable-next-line @next/next/no-img-element -- /media 302s to signed storage URLs next/image can't allowlist
     <img
+      ref={imgRef}
       src={src}
       alt={`${name} logo`}
       className={`bg-background object-cover ${shape}`}
