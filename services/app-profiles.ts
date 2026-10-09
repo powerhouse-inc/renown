@@ -30,7 +30,7 @@ export interface RenownAppProfile {
 /** An app's Renown identity: did:key with a base58btc multibase key. */
 export const APP_DID_RE = /^did:key:z[1-9A-HJ-NP-Za-km-z]{32,128}$/
 
-const FIELDS = `appDid documentId name tagline logo website publisherDid description category logoRef coverRef links { id label url }`
+export const APP_PROFILE_FIELDS = `appDid documentId name tagline logo website publisherDid description category logoRef coverRef links { id label url }`
 
 function client(): GraphQLClient {
   return new GraphQLClient(`${switchboardOrigin()}/graphql/renown-stats`)
@@ -39,7 +39,7 @@ function client(): GraphQLClient {
 /** Like getAppProfile, but a failed read throws (null means the app does not exist). */
 export async function fetchAppProfile(appDid: string): Promise<RenownAppProfile | null> {
   const data = await client().request<{ appProfile?: RenownAppProfile | null }>(
-    `query AppProfile($appDid: String!) { appProfile(appDid: $appDid) { ${FIELDS} } }`,
+    `query AppProfile($appDid: String!) { appProfile(appDid: $appDid) { ${APP_PROFILE_FIELDS} } }`,
     { appDid },
   )
   return data.appProfile ?? null
@@ -75,7 +75,7 @@ export async function listAppProfiles({
   category?: string | null
 }): Promise<AppProfilePage> {
   const data = await client().request<{ appProfiles: AppProfilePage }>(
-    `query AppProfiles($limit: Int, $after: String, $category: String) { appProfiles(limit: $limit, after: $after, category: $category) { items { ${FIELDS} } next } }`,
+    `query AppProfiles($limit: Int, $after: String, $category: String) { appProfiles(limit: $limit, after: $after, category: $category) { items { ${APP_PROFILE_FIELDS} } next } }`,
     { limit, after: after ?? null, category: category ?? null },
   )
   return data.appProfiles
@@ -98,7 +98,7 @@ export async function listAppCategories(): Promise<AppProfileCategory[]> {
 export async function getAppProfilesByPublisher(address: string): Promise<RenownAppProfile[]> {
   try {
     const data = await client().request<{ appProfilesByPublisher?: RenownAppProfile[] }>(
-      `query AppProfilesByPublisher($publisherDid: String!) { appProfilesByPublisher(publisherDid: $publisherDid) { ${FIELDS} } }`,
+      `query AppProfilesByPublisher($publisherDid: String!) { appProfilesByPublisher(publisherDid: $publisherDid) { ${APP_PROFILE_FIELDS} } }`,
       { publisherDid: address },
     )
     return data.appProfilesByPublisher ?? []
