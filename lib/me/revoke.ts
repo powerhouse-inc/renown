@@ -30,7 +30,11 @@ export interface RevokeDeps {
 
 /** Revokes `credentialId`; resolves with the proof that worked, rejects with RevokeError. */
 export async function revokeConnection(credentialId: string, deps: RevokeDeps): Promise<'bearer' | 'signature'> {
-  const bearer = await deps.getBearer().catch(() => null)
+  const bearer = await deps.getBearer().catch((error: unknown) => {
+    // Never log the token itself; only that fetching it failed.
+    console.warn('Renown bearer unavailable for revoke:', error instanceof Error ? error.name : 'error')
+    return null
+  })
   if (bearer) {
     try {
       await deps.send(credentialId, { bearer })

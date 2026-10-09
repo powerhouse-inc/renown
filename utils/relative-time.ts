@@ -19,7 +19,7 @@ export function formatRelative(iso: string, now: Date): string {
   return RELATIVE.format(Math.round(diff / (365 * DAY)), 'year')
 }
 
-/** "Oct 9, 2026, 2:03 PM" in the viewer's time zone (or `timeZone`). */
+/** "9 Oct 2026, 14:03" in the viewer's time zone (or `timeZone`). */
 export function formatAbsolute(iso: string, timeZone?: string): string {
-  return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone })
+  return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone })
 }

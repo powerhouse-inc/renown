@@ -41,7 +41,7 @@ test.describe('relative time', () => {
     expect(formatRelative('2026-08-01T12:00:00.000Z', NOW)).toBe('2 months ago')
     expect(formatRelative('2027-10-09T12:00:00.000Z', NOW)).toBe('next year')
     expect(formatRelative('not a date', NOW)).toBe('')
-    expect(formatAbsolute('2026-10-09T12:03:00.000Z', 'UTC')).toBe('Oct 9, 2026, 12:03 PM')
+    expect(formatAbsolute('2026-10-09T12:03:00.000Z', 'UTC')).toBe('9 Oct 2026, 12:03')
   })
 })
 
