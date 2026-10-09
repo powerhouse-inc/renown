@@ -11,6 +11,7 @@ const entry = (appDid: string, metric: string, extra: Partial<UserStatEntry> = {
   appName: 'Vault',
   appDocumentId: 'doc-vault',
   appHasLogo: false,
+  appLogoRef: null,
   appLogo: null,
   label: metric,
   unit: null,
@@ -27,16 +28,16 @@ test('formats stat values compactly and dates in UTC', () => {
   expect(formatStatDate('2026-10-09T23:30:00.000Z')).toBe('Oct 9, 2026')
 })
 
-test('groups only public (labelled) stats by app, in first-seen order', () => {
+test('groups stats (declared or not) by app, in first-seen order', () => {
   const groups = groupUserStats([
     entry('did:a', 'notes'),
     entry('did:b', 'streak', { appName: null }),
     entry('did:a', 'raw', { label: null }),
     entry('did:a', 'score'),
-    entry('did:c', 'x', { appDocumentId: null, label: null }),
+    entry('did:c', 'x', { appDocumentId: null }),
   ])
   expect(groups.map((g) => [g.appDid, g.appName, g.entries.map((e) => e.metric)])).toEqual([
-    ['did:a', 'Vault', ['notes', 'score']],
+    ['did:a', 'Vault', ['notes', 'raw', 'score']],
     ['did:b', 'Untitled app', ['streak']],
   ])
 })

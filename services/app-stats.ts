@@ -47,14 +47,16 @@ export interface UserStatEntry {
   appName: string | null
   appDocumentId: string | null
   appHasLogo: boolean
+  /** attachment://v1:<sha256> of the app logo; versions the /media URL. */
+  appLogoRef: string | null
   appLogo: string | null
-  /** Set when the app declares the metric public. */
+  /** Set when the app declares the metric; null for undeclared ones (show the key). */
   label: string | null
   unit: string | null
 }
 
 const STATS_FIELDS = `appDid activeUsers30d totalUsers updatedAt metrics { key label unit description aggregation value users top { userDid value address handle displayName documentId hasAvatar avatar userImage } }`
-const USER_STAT_FIELDS = `appDid metric value updatedAt appName appDocumentId appHasLogo appLogo label unit`
+const USER_STAT_FIELDS = `appDid metric value updatedAt appName appDocumentId appHasLogo appLogoRef appLogo label unit`
 
 function client(): GraphQLClient {
   return new GraphQLClient(`${switchboardOrigin()}/graphql/renown-stats`)
