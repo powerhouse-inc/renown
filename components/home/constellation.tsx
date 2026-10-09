@@ -38,9 +38,9 @@ function position(spec: NodeSpec): { x: number; y: number } {
   return { x: Math.round(C + r * Math.cos(rad)), y: Math.round(C + r * Math.sin(rad)) }
 }
 
+/** Only logos stored with Renown (/media): a legacy external URL would show every visitor to a third-party host. */
 function logoSrc(app: RenownAppProfile): string | null {
-  if (app.logoRef) return mediaUrl(app.documentId, 'logo', '', app.logoRef)
-  return app.logo && /^https:\/\//i.test(app.logo) ? app.logo : null
+  return app.logoRef ? mediaUrl(app.documentId, 'logo', '', app.logoRef) : null
 }
 
 function Node({ index, spec, app }: { index: number; spec: NodeSpec; app?: RenownAppProfile }) {

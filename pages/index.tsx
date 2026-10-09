@@ -16,6 +16,7 @@ import { SiteLayout } from '../components/site/site-layout'
 import { useIsClient } from '../hooks/useIsClient'
 import { listAppProfiles } from '../services/app-profiles'
 import { fetchNetworkStats } from '../services/network-stats'
+import { listingCacheControl } from '../utils/cache-control'
 import { parseExpiresInDays } from '../utils/credential-validity'
 import { parseReturnUrl } from '../utils/return-url'
 import { publicOrigin } from '../utils/seo'
@@ -91,25 +92,31 @@ const Home: NextPage<HomeProps> = (props) => {
 
 export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query, res }) => {
   if (query['app'] || query['connect']) return { props: { mode: 'auth' } }
-  // Imported here so shiki stays server-only.
-  const { highlight } = await import('../lib/highlight')
+  let featuredFailed = false
+  let pulseFailed = false
   const [featuredApps, pulse, teaser] = await Promise.all([
     withTimeout(listAppProfiles({ limit: 6 }), SSR_DATA_TIMEOUT_MS)
       .then((page) => page.items)
       .catch((error: unknown) => {
         console.error('Homepage: featured apps unavailable:', error)
+        featuredFailed = true
         return []
       }),
     withTimeout(fetchNetworkStats(), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
       console.error('Homepage: network stats unavailable:', error)
+      pulseFailed = true
       return null
     }),
-    highlight(TEASER_CODE, 'ts').catch((error: unknown) => {
-      console.error('Homepage: highlighting failed, showing plain code:', error)
-      return { code: TEASER_CODE, html: '' }
-    }),
+    // Imported here so shiki stays server-only; a failed import or highlight shows plain code.
+    import('../lib/highlight')
+      .then(({ highlight }) => highlight(TEASER_CODE, 'ts'))
+      .catch((error: unknown) => {
+        console.error('Homepage: highlighting failed, showing plain code:', error)
+        return { code: TEASER_CODE, html: '' }
+      }),
   ])
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
+  // An outage must not be cached at the edge: the next visitor retries.
+  res.setHeader('Cache-Control', listingCacheControl(!featuredFailed && !pulseFailed))
   return { props: { mode: 'site', featuredApps, pulse, teaser } }
 }
 

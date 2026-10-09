@@ -10,12 +10,12 @@ interface Pillar {
 const PILLARS: Pillar[] = [
   {
     title: 'Sign in everywhere',
-    body: 'Powerhouse apps like Connect accept the same Renown ID. You approve each app once, and there is no password to reuse or leak.',
+    body: 'Powerhouse apps like Connect accept the same Renown ID. You approve each app, and the approval lasts until it expires or you revoke it. There is no password to reuse or leak.',
     icon: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3',
   },
   {
     title: 'Provable authorship',
-    body: 'Every change you make to a Powerhouse document is signed by a key you authorised, so anyone can check it came from your DID.',
+    body: 'Each document operation an app submits for you carries a signature from a key you authorised, so anyone can check it came from your DID.',
     icon: 'M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6zM9 12l2 2 4-4',
   },
   {

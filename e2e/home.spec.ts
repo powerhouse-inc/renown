@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { fixtureStub, removeFixture } from './support/stub-switchboard-client'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme } from './support/site'
 import { DEFAULT_PULSE_MIN, pulseMin, visibleMetrics } from '../utils/pulse'
+import { listingCacheControl } from '../utils/cache-control'
 
 // Every homepage load in the suite lives in this file: its tests swap the
 // appProfiles fixture the SSR reads, so they run one at a time and no other
@@ -86,6 +87,11 @@ test('a backend outage drops the section and never fails the page', async ({ pag
   await expect(page.getByRole('region', { name: 'Bring your identity to every app' })).toBeVisible()
 })
 
+test('an outage is never cached at the edge; a full page is (policy; dev overrides the header)', () => {
+  expect(listingCacheControl(true)).toBe('public, s-maxage=60, stale-while-revalidate=300')
+  expect(listingCacheControl(false)).toBe('no-store')
+})
+
 test('has canonical, Open Graph and JSON-LD metadata', async ({ page }) => {
   await removeFixture(FIXTURE)
   await page.goto('/')
@@ -168,6 +174,39 @@ test.describe('network pulse', () => {
     await page.waitForTimeout(300)
     await expect(page.getByTestId('pulse-identities')).toHaveText('245')
   })
+})
+
+test('the hero only shows logos stored with Renown, never an external logo URL', async ({ page }) => {
+  const external = { ...app(1), logo: 'https://logos.example.com/one.png' }
+  const stored = { ...app(2), logoRef: `attachment://v1:${'2'.repeat(64)}` }
+  await featured({ response: { data: { appProfiles: { items: [external, stored, app(3)], next: null } } } })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  const images = page.locator('svg.rn-constellation image')
+  await expect(images).toHaveCount(1)
+  await expect(images.first()).toHaveAttribute('href', /^\/media\/stub-home-2\/logo/)
+  await expect(page.locator('svg.rn-constellation text')).toHaveCount(2) // monograms for app 1 (external logo) and app 3
+})
+
+test('the pillars say how long an approval lasts and what is signed', async ({ page }) => {
+  await removeFixture(FIXTURE)
+  await page.goto('/')
+  const pillars = page.getByRole('region', { name: 'An identity that travels with you' })
+  await expect(pillars).toContainText('the approval lasts until it expires or you revoke it')
+  await expect(pillars).toContainText('Each document operation an app submits for you carries a signature')
+  await expect(pillars).not.toContainText('approve each app once')
+})
+
+test('server-rendered pages never carry the analytics profile cookie', async ({ request }) => {
+  const wallet = '0x00000000000000000000000000000000c0011e57'
+  await featured({ response: { data: { appProfiles: { items: [1, 2, 3].map(app), next: null } } } })
+  for (const path of ['/', '/apps', '/trust']) {
+    const response = await request.get(path, { headers: { cookie: `op_profile=${wallet}` } })
+    expect(response.status(), path).toBe(200)
+    const html = await response.text()
+    expect(html, path).not.toContain(wallet)
+    expect(html, path).not.toContain('initialProfileId')
+  }
 })
 
 for (const theme of ['light', 'dark'] as const) {
