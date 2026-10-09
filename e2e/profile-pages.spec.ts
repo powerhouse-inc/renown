@@ -38,9 +38,11 @@ test.beforeAll(async () => {
 })
 
 test.describe('public profile', () => {
-  test('/@handle renders the identity, safe links only, and link-preview meta', async ({ page }) => {
+  test('/@handle renders the identity, safe links only, and link-preview meta', async ({ page, request }) => {
     const response = await page.goto('/@pat-pages')
     expect(response?.status()).toBe(200)
+    // The HTML is fetched with `request` so a dev-server reload cannot discard it.
+    const html = await (await request.get('/@pat-pages')).text()
     await expect(page.getByRole('heading', { name: 'Pat Pages' })).toBeVisible()
     await expect(page.getByText('@pat-pages')).toBeVisible()
     await expect(page.getByText('Line one')).toBeVisible()
@@ -49,7 +51,7 @@ test.describe('public profile', () => {
     await expect(page.getByRole('button', { name: 'Copy address' })).toContainText(ADDRESS)
     // Server-rendered markup points at /media; client-side the stub has no bytes for
     // this doc, so the avatar then falls through to the identicon.
-    expect(await response?.text()).toContain(`src="/media/doc-pages-1/avatar?v=${'f'.repeat(12)}"`)
+    expect(html).toContain(`src="/media/doc-pages-1/avatar?v=${'f'.repeat(12)}"`)
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Pat Pages (@pat-pages)')
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', new RegExp(`/api/og\\?variant=profile&address=${ADDRESS}$`))
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/@pat-pages$/)
@@ -63,11 +65,11 @@ test.describe('public profile', () => {
     }
   })
 
-  test('a profile without a handle stays on its document URL with a generated avatar', async ({ page }) => {
+  test('a profile without a handle stays on its document URL with a generated avatar', async ({ page, request }) => {
     const response = await page.goto('/profile/doc-pages-2')
     expect(response?.status()).toBe(200)
-    // Read the body first: a dev-server reload (another route compiling) discards it.
-    const html = await response?.text()
+    // The HTML is fetched with `request` so a dev-server reload cannot discard it.
+    const html = await (await request.get('/profile/doc-pages-2')).text()
     await expect(page.getByRole('heading', { name: 'plain-user' })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Generated avatar' })).toBeVisible()
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/api\/og\?variant=profile&address=0x5e00000000000000000000000000000000000002$/)
