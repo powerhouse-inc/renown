@@ -72,6 +72,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.GHCR_REGISTRY }}
@@ -79,6 +80,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Vetra Container Registry
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.VETRA_REGISTRY }}
@@ -113,15 +115,41 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Compute public build config
+        id: buildcfg
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "deploy/staging" ]; then
+            {
+              echo "switchboard=https://switchboard.renown-staging.vetra.io/graphql"
+              echo "renown_url=https://renown-staging.vetra.io"
+              echo "oidc_issuer=https://switchboard.renown-staging.vetra.io/api/@powerhousedao/renown-package/oidc"
+              echo "connect_url=https://connect.renown-staging.vetra.io"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "switchboard=https://switchboard.renown.vetra.io/graphql"
+              echo "renown_url=https://www.renown.id"
+              echo "oidc_issuer=https://switchboard.renown.vetra.io/api/@powerhousedao/renown-package/oidc"
+              echo "connect_url=https://connect.renown.vetra.io"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            TAG=${{ steps.tags.outputs.build_tag }}
             NEXT_PUBLIC_OPENPANEL_CLIENT_ID=7496b8b9-281d-40c7-af8e-541aaa228af8
             NEXT_PUBLIC_OPENPANEL_API_URL=https://openpanel.monitoring.vetra.io/api
+            NEXT_PUBLIC_SWITCHBOARD_ENDPOINT=${{ steps.buildcfg.outputs.switchboard }}
+            NEXT_PUBLIC_RENOWN_URL=${{ steps.buildcfg.outputs.renown_url }}
+            NEXT_PUBLIC_RENOWN_OIDC_ISSUER=${{ steps.buildcfg.outputs.oidc_issuer }}
+            NEXT_PUBLIC_CONNECT_URL=${{ steps.buildcfg.outputs.connect_url }}
+            NEXT_PUBLIC_PRIVY_APP_ID=${{ vars.NEXT_PUBLIC_PRIVY_APP_ID }}
+            NEXT_PUBLIC_PRIVY_CLIENT_ID=${{ vars.NEXT_PUBLIC_PRIVY_CLIENT_ID }}
+            NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID=${{ vars.NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID }}
+            NEXT_PUBLIC_VITE_INFURA_PROJECT_ID=${{ vars.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID }}

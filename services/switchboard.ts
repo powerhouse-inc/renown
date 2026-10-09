@@ -1,8 +1,12 @@
 import { GraphQLClient } from 'graphql-request'
 
+// Only `next dev` falls back to a local switchboard; a production build with
+// no env set must never point browsers at localhost.
 const SWITCHBOARD_ENDPOINT =
   process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'http://localhost:4001/graphql'
+  (process.env.NODE_ENV === 'development'
+    ? 'http://localhost:4001/graphql'
+    : 'https://switchboard.renown.vetra.io/graphql')
 
 const client = new GraphQLClient(SWITCHBOARD_ENDPOINT)
 
