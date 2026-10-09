@@ -29,7 +29,7 @@ function inline(nodes: Inline[]): ReactNode[] {
             href={node.href}
             target="_blank"
             rel="noopener noreferrer nofollow ugc"
-            className="text-primary underline underline-offset-2 hover:opacity-80"
+            className="text-primary! underline underline-offset-2 hover:opacity-80"
           >
             {inline(node.children)}
           </a>
