@@ -51,7 +51,7 @@ test.describe('public profile', () => {
     // this doc, so the avatar then falls through to the identicon.
     expect(await response?.text()).toContain(`src="/media/doc-pages-1/avatar?v=${'f'.repeat(12)}"`)
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Pat Pages (@pat-pages)')
-    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/media\/doc-pages-1\/avatar$/)
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', new RegExp(`/api/og\\?variant=profile&address=${ADDRESS}$`))
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/@pat-pages$/)
   })
 
@@ -66,10 +66,12 @@ test.describe('public profile', () => {
   test('a profile without a handle stays on its document URL with a generated avatar', async ({ page }) => {
     const response = await page.goto('/profile/doc-pages-2')
     expect(response?.status()).toBe(200)
+    // Read the body first: a dev-server reload (another route compiling) discards it.
+    const html = await response?.text()
     await expect(page.getByRole('heading', { name: 'plain-user' })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Generated avatar' })).toBeVisible()
-    await expect(page.locator('meta[property="og:image"]')).toHaveCount(0)
-    expect(await response?.text()).not.toContain('/media/doc-pages-2')
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/api\/og\?variant=profile&address=0x5e00000000000000000000000000000000000002$/)
+    expect(html).not.toContain('/media/doc-pages-2')
   })
 
   test('a switchboard outage is a 503, never a 404', async ({ request }) => {

@@ -2,7 +2,7 @@ import type { GetServerSideProps, NextPage } from 'next'
 import { ProfileStats } from '../../components/profile/profile-stats'
 import { getUserStats, type UserStatEntry } from '../../services/app-stats'
 import Head from 'next/head'
-import PageBackground from '../../components/ui/page-background'
+import { SiteLayout } from '../../components/site/site-layout'
 import { AppProfileCard } from '../../components/app/app-profile-card'
 import { getAppProfilesByPublisher, type RenownAppProfile } from '../../services/app-profiles'
 import { NotFoundPage } from '../../components/ui/not-found-page'
@@ -10,11 +10,11 @@ import RenownCard from '../../components/ui/renown-card'
 import { CopyAddress } from '../../components/profile/copy-address'
 import { OwnProfileActions } from '../../components/profile/own-profile-actions'
 import { ProfileSummary, profileName } from '../../components/profile/profile-summary'
-import { mediaUrl } from '../../services/media'
 import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
+import { ogImageUrl } from '../../utils/seo'
 import { siteOrigin } from '../../utils/site-origin'
 
 interface ProfilePageProps {
@@ -24,7 +24,7 @@ interface ProfilePageProps {
   stats: UserStatEntry[]
   /** Absolute canonical URL of this profile. */
   canonicalUrl: string | null
-  /** Absolute image for link previews, if the profile has one. */
+  /** Absolute link-preview image (the generated /api/og profile card). */
   ogImage: string | null
   error?: string
 }
@@ -43,7 +43,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, s
   const description = profile.bio || `${name} on Renown`
 
   return (
-    <PageBackground>
+    <SiteLayout>
       <Head>
         <title>{`${title} - Renown`}</title>
         <meta name="description" content={description} />
@@ -54,13 +54,13 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, s
         {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
         {ogImage && <meta property="og:image" content={ogImage} />}
         {profile.handle && <meta property="profile:username" content={profile.handle} />}
-        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
         {ogImage && <meta name="twitter:image" content={ogImage} />}
       </Head>
 
-      <main className="relative flex min-h-screen items-center justify-center px-4 pt-24 pb-12">
+      <div className="relative flex justify-center px-4 pt-12 pb-20 md:pt-16">
         <div className="w-full max-w-2xl">
           <RenownCard>
             <div className="space-y-8 p-8">
@@ -110,8 +110,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, s
             </div>
           </RenownCard>
         </div>
-      </main>
-    </PageBackground>
+      </div>
+    </SiteLayout>
   )
 }
 
@@ -151,11 +151,9 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   }
 
   const origin = siteOrigin(context.req.headers.host)
-  const ogImage = profile.avatar
-    ? mediaUrl(profile.documentId, 'avatar', origin)
-    : profile.userImage && /^https:\/\//i.test(profile.userImage)
-      ? profile.userImage
-      : null
+  const ogImage = ADDRESS_RE.test(profile.ethAddress ?? '')
+    ? ogImageUrl({ variant: 'profile', address: profile.ethAddress ?? '' }, origin)
+    : ogImageUrl({ variant: 'default' }, origin)
   context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   const address = profile.ethAddress ?? ''
   const wallet = ADDRESS_RE.test(address)

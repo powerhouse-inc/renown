@@ -10,7 +10,7 @@ import { Field, inputClass } from '../../components/profile-edit/field'
 import { HandleField } from '../../components/profile-edit/handle-field'
 import { LinksEditor } from '../../components/profile-edit/links-editor'
 import { ProfileSummary } from '../../components/profile/profile-summary'
-import PageBackground from '../../components/ui/page-background'
+import { SiteLayout } from '../../components/site/site-layout'
 import RenownCard from '../../components/ui/renown-card'
 import { useProfileEditorAuth } from '../../hooks/use-profile-editor-auth'
 import { profileMessage } from '../../services/renown-signed-messages'
@@ -367,12 +367,12 @@ function Editor({ address, profileId, signMessage, getBearer }: {
 const EditProfilePage: NextPage = () => {
   const auth = useProfileEditorAuth()
   return (
-    <PageBackground>
+    <SiteLayout>
       <Head>
         <title>Edit profile - Renown</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className="relative mx-auto min-h-screen w-full max-w-5xl px-4 pt-24 pb-16">
+      <div className="relative mx-auto w-full max-w-5xl px-4 pt-12 pb-20 md:pt-16">
         {auth.status === 'loading' && <p className="text-muted-foreground py-24 text-center">Loading…</p>}
         {auth.status === 'signed-out' && (
           <div className={`${glass} mx-auto max-w-md space-y-4 p-8 text-center`}>
@@ -391,7 +391,7 @@ const EditProfilePage: NextPage = () => {
           <Editor address={auth.address} profileId={auth.profileId} signMessage={auth.signMessage} getBearer={auth.getBearer} />
         )}
       </div>
-    </PageBackground>
+    </SiteLayout>
   )
 }
 

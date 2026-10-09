@@ -9,12 +9,12 @@ import { ProfileAvatar } from '../../components/profile/profile-avatar'
 import { ProfileLinks } from '../../components/profile/profile-links'
 import { profileName, shortAddress } from '../../components/profile/profile-summary'
 import { NotFoundPage } from '../../components/ui/not-found-page'
-import PageBackground from '../../components/ui/page-background'
+import { SiteLayout } from '../../components/site/site-layout'
 import { APP_DID_RE, fetchAppProfile, type RenownAppProfile } from '../../services/app-profiles'
 import { getAppStats, type AppStats } from '../../services/app-stats'
-import { mediaUrl } from '../../services/media'
 import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { profilePath } from '../../utils/profile-url'
+import { ogImageUrl } from '../../utils/seo'
 import { siteOrigin } from '../../utils/site-origin'
 
 interface AppPageProps {
@@ -77,7 +77,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
   const website = app.website ? hostOf(app.website) : null
 
   return (
-    <PageBackground>
+    <SiteLayout>
       <Head>
         <title>{`${title} - Renown`}</title>
         <meta name="description" content={description} />
@@ -87,13 +87,13 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
         <meta property="og:description" content={description} />
         {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
         {ogImage && <meta property="og:image" content={ogImage} />}
-        <meta name="twitter:card" content={app.coverRef ? 'summary_large_image' : 'summary'} />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={title} />
         <meta name="twitter:description" content={description} />
         {ogImage && <meta name="twitter:image" content={ogImage} />}
       </Head>
 
-      <main className="relative flex min-h-screen justify-center px-4 pt-24 pb-12">
+      <div className="relative flex justify-center px-4 pt-12 pb-20 md:pt-16">
         <article className="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white/80 shadow-2xl backdrop-blur-lg dark:border-white/20 dark:bg-white/10">
           <AppCover documentId={app.documentId} coverRef={app.coverRef} seed={app.appDid} />
           <div className="space-y-8 px-6 pb-8 sm:px-10">
@@ -138,8 +138,8 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
             </p>
           </div>
         </article>
-      </main>
-    </PageBackground>
+      </div>
+    </SiteLayout>
   )
 }
 
@@ -170,13 +170,7 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
     getAppStats(did),
   ])
   const origin = siteOrigin(context.req.headers.host)
-  const ogImage = app.coverRef
-    ? mediaUrl(app.documentId, 'cover', origin, app.coverRef)
-    : app.logoRef
-      ? mediaUrl(app.documentId, 'logo', origin, app.logoRef)
-      : app.logo && /^https:\/\//i.test(app.logo)
-        ? app.logo
-        : null
+  const ogImage = ogImageUrl({ variant: 'app', did }, origin)
   context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   return {
     props: { app, stats, publisher, publisherAddress, canonicalUrl: `${origin}/app/${did}`, ogImage },

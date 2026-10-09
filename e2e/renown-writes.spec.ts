@@ -633,7 +633,7 @@ test.describe('profile editor', () => {
   test('is gated behind sign-in', async ({ page }) => {
     await page.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => route.abort())
     await page.goto('/profile/edit')
-    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('main').getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
   })
 
   test('uploads an avatar and saves the whole profile with one signature', async ({ page }) => {
