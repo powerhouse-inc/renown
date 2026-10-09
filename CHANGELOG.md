@@ -1,3 +1,9 @@
+## <small>1.21.1 (2026-10-09)</small>
+
+* perf(apps): load the first row of app covers eagerly ([28fb7c4](https://github.com/powerhouse-inc/renown/commit/28fb7c4))
+* fix(og): draw the card with a monogram when the image is WebP instead of falling back to the default ([4f2dcc0](https://github.com/powerhouse-inc/renown/commit/4f2dcc0))
+* ci: pull buildkit from mirror.gcr.io to avoid Docker Hub rate limits ([0b9da0c](https://github.com/powerhouse-inc/renown/commit/0b9da0c))
+
 ## 1.21.0 (2026-10-09)
 
 * build: pull node:22-alpine from the ECR public mirror to avoid Docker Hub rate limits in CI ([0d4aa6c](https://github.com/powerhouse-inc/renown/commit/0d4aa6c))
