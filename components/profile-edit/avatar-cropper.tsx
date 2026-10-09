@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { cropRect, INITIAL_CROP, MAX_ZOOM, MIN_ZOOM, panBy, renderAvatar, type CropState } from '../../utils/image-crop'
+import { cancelsOnKey, cropRect, INITIAL_CROP, MAX_ZOOM, MIN_ZOOM, panBy, renderAvatar, type CropState } from '../../utils/image-crop'
 
 const VIEWPORT = 240
 const KEY_STEP = 12
@@ -50,7 +50,8 @@ export function AvatarCropper({ image, onCancel, onDone }: AvatarCropperProps) {
   function onDialogKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
       e.stopPropagation()
-      onCancel()
+      // Cancelling while the crop is being rendered would still start the upload afterwards.
+      if (cancelsOnKey(e.key, busy)) onCancel()
       return
     }
     if (e.key !== 'Tab' || !dialog.current) return
@@ -119,7 +120,7 @@ export function AvatarCropper({ image, onCancel, onDone }: AvatarCropperProps) {
           />
         </label>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="text-foreground hover:bg-foreground/10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors">
+          <button type="button" onClick={onCancel} disabled={busy} className="text-foreground hover:bg-foreground/10 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60">
             Cancel
           </button>
           <button

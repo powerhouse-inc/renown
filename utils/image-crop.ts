@@ -100,3 +100,8 @@ export async function sha256Hex(blob: Blob): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
 }
+
+/** Escape closes the crop dialog, except while the crop is being prepared for upload. */
+export function cancelsOnKey(key: string, busy: boolean): boolean {
+  return key === 'Escape' && !busy
+}

@@ -6,7 +6,7 @@ import { CopyAddress } from '../../components/profile/copy-address'
 import { OwnProfileActions } from '../../components/profile/own-profile-actions'
 import { ProfileSummary, profileName } from '../../components/profile/profile-summary'
 import { mediaUrl } from '../../services/media'
-import { getProfile, type RenownProfile } from '../../services/switchboard'
+import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
@@ -86,7 +86,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, canonic
                   handle: profile.handle,
                   bio: profile.bio,
                   links: profile.links,
-                  hasAvatar: !!profile.avatar,
+                  avatar: profile.avatar,
                   userImage: profile.userImage,
                   ensVerified,
                 }}
@@ -121,14 +121,23 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
   let profile: RenownProfile | null
-  if (byHandle) {
-    profile = await getProfile({ driveId: DEFAULT_DRIVE_ID, handle: id.toLowerCase() })
-  } else if (ADDRESS_RE.test(id)) {
-    profile = await getProfile({ driveId: `renown-${id.toLowerCase()}`, ethAddress: id.toLowerCase() })
-  } else {
-    profile =
-      (await getProfile({ driveId: DEFAULT_DRIVE_ID, id })) ??
-      (await getProfile({ driveId: DEFAULT_DRIVE_ID, username: id }))
+  try {
+    if (byHandle) {
+      profile = await fetchProfile({ driveId: DEFAULT_DRIVE_ID, handle: id.toLowerCase() })
+    } else if (ADDRESS_RE.test(id)) {
+      profile = await fetchProfile({ driveId: `renown-${id.toLowerCase()}`, ethAddress: id.toLowerCase() })
+    } else {
+      profile =
+        (await fetchProfile({ driveId: DEFAULT_DRIVE_ID, id })) ??
+        (await fetchProfile({ driveId: DEFAULT_DRIVE_ID, username: id }))
+    }
+  } catch (error) {
+    // An outage is not "no such profile": a 404 would make crawlers drop valid profiles.
+    console.error('Failed to fetch profile from switchboard:', error)
+    context.res.statusCode = 503
+    context.res.setHeader('Cache-Control', 'no-store')
+    context.res.setHeader('Retry-After', '30')
+    return { props: { ...empty, error: 'Profiles are temporarily unavailable. Please try again in a moment.' } }
   }
   if (!profile) {
     context.res.statusCode = 404

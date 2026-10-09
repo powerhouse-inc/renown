@@ -336,7 +336,7 @@ function Editor({ address, profileId, signMessage, getBearer }: {
                 handle: handle || null,
                 bio: form.bio.trim() || null,
                 links: form.links,
-                hasAvatar: !!form.avatar,
+                avatar: form.avatar,
                 userImage: form.userImage,
                 previewUrl,
               }}

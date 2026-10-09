@@ -3,6 +3,7 @@
 import { useRenownAuth } from "@powerhousedao/reactor-browser/renown";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { getProfile } from "../../services/switchboard";
 import { ProfileAvatar } from "../profile/profile-avatar";
 
 interface RenownLoginButtonProps {
@@ -16,6 +17,25 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
     useRenownAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [own, setOwn] = useState<{ address: string; avatar: string | null } | null>(null);
+  const address = user?.address;
+  const avatar = own && own.address === address ? own.avatar : null;
+
+  // Only a profile with an uploaded avatar may request /media; everyone else
+  // gets their external image or an identicon, without a doomed 404 request.
+  useEffect(() => {
+    if (!address) return;
+    let cancelled = false;
+    void getProfile({
+      driveId: `renown-${address.toLowerCase()}`,
+      ethAddress: address.toLowerCase(),
+    }).then((profile) => {
+      if (!cancelled) setOwn({ address, avatar: profile?.avatar ?? null });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -93,7 +113,7 @@ const RenownLoginButton: React.FC<RenownLoginButtonProps> = ({
       >
         <ProfileAvatar
           documentId={profileId}
-          hasAvatar={!!profileId}
+          avatar={avatar}
           userImage={avatarUrl}
           seed={user.address}
           alt={displayName || user.address}

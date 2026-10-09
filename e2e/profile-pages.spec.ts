@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { identicon } from '../utils/identicon'
+import { mediaUrl, mediaVersion } from '../services/media'
+import { avatarSources } from '../utils/avatar-sources'
+import { cancelsOnKey } from '../utils/image-crop'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 
 // Public profile pages and media URLs, server-rendered against the stub
@@ -30,6 +33,8 @@ test.beforeAll(async () => {
   await fixtureStub({ match: 'renownUsers', variables: '"doc-pages-1"', response: users(PROFILE) })
   await fixtureStub({ match: 'renownUsers', variables: ADDRESS, response: users(PROFILE) })
   await fixtureStub({ match: 'renownUsers', variables: '"doc-pages-2"', response: users(NO_HANDLE) })
+  await fixtureStub({ match: 'renownUsers', variables: '"outage-handle"', status: 500, response: { error: 'boom' } })
+  await fixtureStub({ match: 'renownUsers', variables: '"doc-pages-outage"', status: 500, response: { error: 'boom' } })
 })
 
 test.describe('public profile', () => {
@@ -44,7 +49,7 @@ test.describe('public profile', () => {
     await expect(page.getByRole('button', { name: 'Copy address' })).toContainText(ADDRESS)
     // Server-rendered markup points at /media; client-side the stub has no bytes for
     // this doc, so the avatar then falls through to the identicon.
-    expect(await response?.text()).toContain('src="/media/doc-pages-1/avatar"')
+    expect(await response?.text()).toContain(`src="/media/doc-pages-1/avatar?v=${'f'.repeat(12)}"`)
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Pat Pages (@pat-pages)')
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /\/media\/doc-pages-1\/avatar$/)
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/@pat-pages$/)
@@ -64,6 +69,15 @@ test.describe('public profile', () => {
     await expect(page.getByRole('heading', { name: 'plain-user' })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Generated avatar' })).toBeVisible()
     await expect(page.locator('meta[property="og:image"]')).toHaveCount(0)
+    expect(await response?.text()).not.toContain('/media/doc-pages-2')
+  })
+
+  test('a switchboard outage is a 503, never a 404', async ({ request }) => {
+    for (const path of ['/@outage-handle', '/profile/doc-pages-outage']) {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(503)
+      expect(response.headers()['cache-control']).toMatch(/no-store|no-cache/)
+    }
   })
 
   test('an unknown handle is a 404 page', async ({ page }) => {
@@ -82,6 +96,13 @@ test.describe('/media', () => {
     const image = await request.get('/media/stub-avatar-doc/avatar')
     expect(image.status()).toBe(200)
     expect(image.headers()['content-type']).toBe('image/png')
+  })
+
+  test('ignores a ?v= cache-busting query', async ({ request }) => {
+    const response = await request.get('/media/stub-avatar-doc/avatar?v=0123456789ab', { maxRedirects: 0 })
+    expect(response.status()).toBe(302)
+    expect(response.headers().location).toMatch(new RegExp(`^${STUB_SWITCHBOARD_URL}/__stub/s3/[0-9a-f]{64}$`))
+    expect(response.headers()['cache-control']).toBe('public, max-age=60, stale-while-revalidate=240')
   })
 
   for (const [label, path] of [
@@ -120,4 +141,29 @@ test('identicons are deterministic per address and mirrored', () => {
     expect(a.cells[row * 5]).toBe(a.cells[row * 5 + 4])
     expect(a.cells[row * 5 + 1]).toBe(a.cells[row * 5 + 3])
   }
+})
+
+test('versioned media URLs follow the attachment hash; no avatar means no /media source', () => {
+  const ref = `attachment://v1:${'ab12'.repeat(16)}`
+  expect(mediaVersion(ref)).toBe('ab12ab12ab12')
+  expect(mediaVersion('https://x.example/a.png')).toBeNull()
+  expect(mediaVersion(null)).toBeNull()
+  expect(mediaUrl('doc-1', 'avatar')).toBe('/media/doc-1/avatar')
+  expect(mediaUrl('doc-1', 'avatar', 'https://r.id')).toBe('https://r.id/media/doc-1/avatar')
+  expect(mediaUrl('doc-1', 'avatar', '', ref)).toBe('/media/doc-1/avatar?v=ab12ab12ab12')
+  expect(avatarSources({ documentId: 'doc-1', avatar: ref, userImage: 'https://ens.example/a.png' })).toEqual([
+    '/media/doc-1/avatar?v=ab12ab12ab12',
+    'https://ens.example/a.png',
+  ])
+  expect(avatarSources({ documentId: 'doc-1', avatar: null, userImage: 'https://ens.example/a.png' })).toEqual([
+    'https://ens.example/a.png',
+  ])
+  expect(avatarSources({ documentId: 'doc-1', avatar: null, userImage: null })).toEqual([])
+  expect(avatarSources({ documentId: 'doc-1', avatar: ref, previewUrl: 'blob:x' })[0]).toBe('blob:x')
+})
+
+test('Escape cancels the crop dialog, except while the crop is being prepared', () => {
+  expect(cancelsOnKey('Escape', false)).toBe(true)
+  expect(cancelsOnKey('Escape', true)).toBe(false)
+  expect(cancelsOnKey('Enter', false)).toBe(false)
 })

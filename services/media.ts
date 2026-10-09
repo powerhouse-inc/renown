@@ -26,7 +26,18 @@ export function packageRoutesBase(endpoint = SWITCHBOARD_ENDPOINT): string {
   return `${switchboardOrigin(endpoint)}${PACKAGE_PATH}`
 }
 
-/** Stable, embeddable URL of a document's image (same origin, or absolute with `origin`). */
-export function mediaUrl(documentId: string, field: MediaField, origin = ''): string {
-  return `${origin}/media/${encodeURIComponent(documentId)}/${field}`
+/** First 12 hex digits of an `attachment://v1:<sha256>` ref: a cache-busting key that changes with the image. */
+export function mediaVersion(ref: string | null | undefined): string | null {
+  return /^attachment:\/\/v1:([0-9a-f]{64})$/.exec(ref ?? '')?.[1].slice(0, 12) ?? null
+}
+
+/**
+ * Stable, embeddable URL of a document's image (same origin, or absolute with
+ * `origin`). Pass the attachment `ref` to append `?v=<12 hex>`, so a replaced
+ * image is fetched afresh instead of from a cached redirect; embeds that can't
+ * know the ref use the bare form.
+ */
+export function mediaUrl(documentId: string, field: MediaField, origin = '', ref?: string | null): string {
+  const version = mediaVersion(ref)
+  return `${origin}/media/${encodeURIComponent(documentId)}/${field}${version ? `?v=${version}` : ''}`
 }
