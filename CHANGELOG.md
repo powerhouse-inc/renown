@@ -1,3 +1,9 @@
+## <small>1.18.1 (2026-10-09)</small>
+
+* fix(deps): powerhouse 6.2.3 ([4f6ff5d](https://github.com/powerhouse-inc/renown/commit/4f6ff5d))
+* ci: build staging images from deploy/staging ([43572a9](https://github.com/powerhouse-inc/renown/commit/43572a9))
+* chore: powerhouse 6.2.3 and staging image ([18228df](https://github.com/powerhouse-inc/renown/commit/18228df))
+
 ## 1.18.0 (2026-10-02)
 
 * feat(auth): accept expiresInDays on the app and console flows ([d6d4375](https://github.com/powerhouse-inc/renown/commit/d6d4375))
