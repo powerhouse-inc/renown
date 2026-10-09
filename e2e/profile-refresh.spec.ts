@@ -47,17 +47,11 @@ test.describe('login profile refresh', () => {
     expect(s.updates).toEqual([])
   })
 
-  test('does not sign when the stored profile already matches', async () => {
-    const s = setup({ username: 'frank.eth', userImage: 'https://example.com/a.png' })
-    expect(await s.run({ ensName: 'frank.eth', ensAvatar: 'https://example.com/a.png' })).toBe('unchanged')
+  test('never overwrites a username or image the profile already has', async () => {
+    const s = setup({ username: 'chosen-name', userImage: 'https://example.com/mine.png' })
+    expect(await s.run({ ensName: 'frank.eth', ensAvatar: 'https://example.com/ens.png' })).toBe('unchanged')
     expect(s.signed).toEqual([])
     expect(s.updates).toEqual([])
-  })
-
-  test('treats a missing avatar and a null one as the same', async () => {
-    const s = setup({ username: 'frank.eth' })
-    expect(await s.run({ ensName: 'frank.eth', ensAvatar: null })).toBe('unchanged')
-    expect(s.signed).toEqual([])
   })
 
   test('does not sign for a profile the read model does not show yet', async () => {
@@ -66,25 +60,33 @@ test.describe('login profile refresh', () => {
     expect(s.signed).toEqual([])
   })
 
-  test('signs the canonical profile message and sends it when the ENS name changed', async () => {
-    const s = setup({ username: 'old.eth', userImage: null })
+  test('fills an empty username and image from ENS with one signed update', async () => {
+    const s = setup({ username: null, userImage: null })
     expect(await s.run({ ensName: 'frank.eth', ensAvatar: 'https://example.com/a.png' })).toBe('updated')
 
     expect(s.updates).toHaveLength(1)
     const [update] = s.updates
-    expect(update).toMatchObject({
-      address: s.account.address,
-      username: 'frank.eth',
-      userImage: 'https://example.com/a.png',
-    })
+    expect(update).toMatchObject({ address: s.account.address, username: 'frank.eth', userImage: 'https://example.com/a.png' })
     const expected = await profileMessage(
       s.account.address,
       { username: 'frank.eth', userImage: 'https://example.com/a.png' },
       update.timestamp,
     )
     expect(s.signed).toEqual([expected])
-    expect(await verifyMessage({ address: s.account.address, message: expected, signature: update.signature })).toBe(
-      true,
-    )
+    expect(await verifyMessage({ address: s.account.address, message: expected, signature: update.signature })).toBe(true)
+  })
+
+  test('replaces the short-address placeholder username but keeps an existing image', async () => {
+    const s = setup({ username: '0x1234...abcd', userImage: 'https://example.com/mine.png' })
+    expect(await s.run({ ensName: 'frank.eth', ensAvatar: 'https://example.com/ens.png' })).toBe('updated')
+    expect(s.updates[0]).toMatchObject({ username: 'frank.eth', userImage: null })
+  })
+
+  test('fills only the image when the username is set', async () => {
+    const s = setup({ username: 'frank.eth', userImage: null })
+    expect(await s.run({ ensName: 'frank.eth', ensAvatar: 'https://example.com/a.png' })).toBe('updated')
+    expect(s.updates[0]).toMatchObject({ username: null, userImage: 'https://example.com/a.png' })
+    const t = setup({ username: 'frank.eth', userImage: null })
+    expect(await t.run({ ensName: 'frank.eth', ensAvatar: null })).toBe('unchanged')
   })
 })
