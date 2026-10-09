@@ -14,10 +14,12 @@ interface AppLogoProps {
   legacyLogo?: string | null
   name: string
   className?: string
+  /** Above the fold: load eagerly at high priority instead of lazily. */
+  priority?: boolean
 }
 
 /** The app's logo: uploaded → legacy URL → a monogram tile. An image that fails to load falls through. */
-export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-24 w-24 text-4xl ring-4' }: AppLogoProps) {
+export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-24 w-24 text-4xl ring-4', priority = false }: AppLogoProps) {
   const sources = useMemo(
     () =>
       [logoRef ? mediaUrl(documentId, 'logo', '', logoRef) : null, safeLegacyLogo(legacyLogo)].filter(
@@ -49,7 +51,8 @@ export function AppLogo({ documentId, logoRef, legacyLogo, name, className = 'h-
       ref={imgRef}
       src={src}
       alt={`${name} logo`}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
       className={`bg-background object-cover ${shape}`}
       onError={() => setFailed((f) => new Set(f).add(src))}

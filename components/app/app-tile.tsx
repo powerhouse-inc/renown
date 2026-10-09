@@ -8,10 +8,12 @@ export interface AppTileProps {
   app: RenownAppProfile
   /** Heading level of the app name inside its list (default 3). */
   headingLevel?: 2 | 3
+  /** Above the fold (LCP candidate): load the cover and logo eagerly. */
+  priority?: boolean
 }
 
 /** A directory card for one app: cover, logo, name, tagline and category, linking to /app/[did]. */
-export function AppTile({ app, headingLevel = 3 }: AppTileProps) {
+export function AppTile({ app, headingLevel = 3, priority = false }: AppTileProps) {
   const name = app.name || 'Untitled app'
   const Title = `h${headingLevel}` as const
   return (
@@ -21,7 +23,7 @@ export function AppTile({ app, headingLevel = 3 }: AppTileProps) {
     >
       <div className="relative overflow-hidden">
         <div className="transition-transform duration-700 ease-out-expo group-hover:scale-[1.03] motion-reduce:group-hover:scale-100">
-          <AppCover documentId={app.documentId} coverRef={app.coverRef} seed={app.appDid} />
+          <AppCover documentId={app.documentId} coverRef={app.coverRef} seed={app.appDid} priority={priority} />
         </div>
       </div>
       <div className="flex flex-1 flex-col px-5 pb-5">
@@ -32,6 +34,7 @@ export function AppTile({ app, headingLevel = 3 }: AppTileProps) {
             legacyLogo={app.logo}
             name={name}
             className="h-14 w-14 text-xl"
+            priority={priority}
           />
         </div>
         <div className="mt-3 flex items-start justify-between gap-3">

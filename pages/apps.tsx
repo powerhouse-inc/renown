@@ -54,6 +54,9 @@ function TileSkeletons() {
   )
 }
 
+/** Tiles in the first row at desktop (and the first card on mobile): the LCP candidates, loaded eagerly. */
+const EAGER_TILES = 3
+
 const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, categories }) => {
   const router = useRouter()
   const category = parseCategory(router.query['category'])
@@ -95,9 +98,9 @@ const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, ca
                 busy && 'pointer-events-none opacity-50',
               )}
             >
-              {state.items.map((app) => (
+              {state.items.map((app, index) => (
                 <li key={app.appDid}>
-                  <AppTile app={app} headingLevel={2} />
+                  <AppTile app={app} headingLevel={2} priority={index < EAGER_TILES} />
                 </li>
               ))}
             </ul>

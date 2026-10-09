@@ -221,7 +221,7 @@ test('a category read that never answers ends in the outage notice', async ({ pa
 })
 
 test('app logos load lazily', async ({ page: p }) => {
-  await apps('dir-all', '"after":null,"category":null', { response: page([{ ...app('A1'), logoRef: `attachment://v1:${'3'.repeat(64)}` }]) })
+  await apps('dir-all', '"after":null,"category":null', { response: page([app('A0'), app('A00'), app('A000'), { ...app('A1'), logoRef: `attachment://v1:${'3'.repeat(64)}` }]) })
   // Serve the logo, or the broken image would fall back to a monogram.
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
   await p.route('**/media/**', (route) => route.fulfill({ contentType: 'image/png', body: png }))
@@ -229,6 +229,21 @@ test('app logos load lazily', async ({ page: p }) => {
   const logo = grid(p).getByRole('img', { name: 'Directory A1 logo' })
   await expect(logo).toHaveAttribute('loading', 'lazy')
   await expect(logo).toHaveAttribute('decoding', 'async')
+})
+
+test('the first row of app covers loads eagerly and later ones lazily', async ({ page: p }) => {
+  const withCover = (key: string) => ({ ...app(key), coverRef: `attachment://v1:${'4'.repeat(64)}` })
+  await apps('dir-all', '"after":null,"category":null', { response: page(['B1', 'B2', 'B3', 'B4'].map(withCover)) })
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
+  await p.route('**/media/**', (route) => route.fulfill({ contentType: 'image/png', body: png }))
+  await p.goto('/apps')
+  const covers = grid(p).locator('li img[alt=""]')
+  await expect(covers).toHaveCount(4)
+  for (const i of [0, 1, 2]) {
+    await expect(covers.nth(i)).toHaveAttribute('loading', 'eager')
+    await expect(covers.nth(i)).toHaveAttribute('fetchpriority', 'high')
+  }
+  await expect(covers.nth(3)).toHaveAttribute('loading', 'lazy')
 })
 
 test('an empty category invites listing an app on Vetra', async ({ page: p }) => {
