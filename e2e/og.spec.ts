@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test'
 import sharp from 'sharp'
 import { fixtureStub } from './support/stub-switchboard-client'
 import { profileFooter } from '../lib/og/og-footer'
+import { profileCardText } from '../lib/og/og-profile-text'
+import { fetchImageDataUrl } from '../lib/og/og-data'
+import { AVATAR_BOX, toPngDataUrl } from '../lib/og/og-image'
+import { drawWithFallback, STATIC_CARD_PNG } from '../lib/og/og-fallback'
 import { readFont } from '../lib/og/og-font'
 
 // Fixtures use ids no other spec uses (they survive renown-writes.spec.ts's resets).
@@ -149,6 +153,27 @@ test.describe('link-preview text', () => {
     expect(profileFooter('h'.repeat(120))).toBe(`renown.id/@${'h'.repeat(24)}…`)
     expect(profileFooter('alice')).toBe('renown.id/@alice')
     expect(profileFooter(null)).toBe('renown.id')
+  })
+
+  test('a legacy profile (username is a short address, handle set) is titled by its handle, as on its page', () => {
+    const address = '0x2BbEa0145d6fB9C6709A74C1179cA0bE71Bb3aC6'
+    expect(profileCardText({ displayName: null, username: '0x2BbE...3aC6', handle: 'frank' }, address)).toEqual({
+      name: 'frank',
+      handleLine: null,
+      addressLine: '0x2bbe…3ac6 on Renown',
+    })
+    expect(profileCardText({ displayName: null, username: '0x2bbe…3ac6', handle: null }, address)).toEqual({
+      name: '0x2bbe…3ac6',
+      handleLine: null,
+      addressLine: null,
+    })
+    expect(profileCardText({ displayName: 'Olga Graph', username: null, handle: 'olga' }, address)).toEqual({
+      name: 'Olga Graph',
+      handleLine: '@olga',
+      addressLine: '0x2bbe…3ac6 on Renown',
+    })
+    expect(profileCardText({ displayName: 'Frank', username: null, handle: 'frank' }, address).handleLine).toBeNull()
+    expect(profileCardText({ displayName: null, username: 'frank.eth', handle: null }, address).name).toBe('frank.eth')
   })
 
   for (const [label, query] of [
@@ -303,5 +328,79 @@ test.describe('link-preview cover legibility and failures', () => {
     expect(response.headers()['x-og-variant']).toBe('app')
     expect(response.headers()['x-og-background']).toBe('art')
     expect(response.headers()['cache-control']).toBe('public, max-age=60')
+  })
+})
+
+test.describe('link-preview image conversion is CPU-bounded', () => {
+  // An SVG under the byte and pixel caps that takes librsvg several seconds to render.
+  const heavySvg = () => {
+    let shapes = ''
+    for (let i = 0; i < 12000; i++) {
+      shapes += `<circle cx="${(i * 37) % 6000}" cy="${(i * 91) % 6000}" r="${200 + (i % 300)}" fill="rgba(${i % 255},100,200,0.3)" filter="url(#f)"/>`
+    }
+    return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="6000" height="6000"><filter id="f"><feGaussianBlur stdDeviation="30"/></filter>${shapes}</svg>`)
+  }
+
+  test('a conversion past the timeout fails, and the image fetch answers null (the card draws its monogram)', async () => {
+    test.setTimeout(60_000)
+    const svg = heavySvg()
+    expect(svg.byteLength).toBeLessThan(4 * 1024 * 1024)
+    await expect(toPngDataUrl(svg, AVATAR_BOX)).rejects.toThrow(/timeout/)
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+    try {
+      expect(await fetchImageDataUrl('http://og.test/media/doc/avatar', 'http://og.test', AVATAR_BOX)).toBeNull()
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+})
+
+test.describe('link-preview drawing failures never fail the route', () => {
+  const profileCard = { variant: 'profile', name: 'Olga', handle: null, handleLine: null, addressLine: null, address: ADDRESS, image: null, background: null } as const
+  const ok = Buffer.from('drawn')
+
+  test('a card that cannot be drawn falls back to the default card', async () => {
+    const calls: string[] = []
+    const drawn = await drawWithFallback(profileCard, 'fonts', async (card, fonts) => {
+      calls.push(`${card.variant}:${fonts}`)
+      if (card.variant === 'profile') throw new Error('satori')
+      return ok
+    })
+    expect(drawn).toEqual({ png: ok, card: { variant: 'default' }, degraded: true, static: false })
+    expect(calls).toEqual(['profile:fonts', 'default:fonts'])
+  })
+
+  test('a default card that fails with the custom fonts is retried once without them', async () => {
+    const calls: string[] = []
+    const drawn = await drawWithFallback(profileCard, 'fonts', async (card, fonts) => {
+      calls.push(`${card.variant}:${fonts}`)
+      if (fonts) throw new Error('font')
+      return ok
+    })
+    expect(drawn).toEqual({ png: ok, card: { variant: 'default' }, degraded: true, static: false })
+    expect(calls).toEqual(['profile:fonts', 'default:fonts', 'default:null'])
+  })
+
+  test('when nothing can be drawn the answer is the static card-sized PNG', async () => {
+    const calls: string[] = []
+    const drawn = await drawWithFallback(profileCard, 'fonts', async (card, fonts) => {
+      calls.push(`${card.variant}:${fonts}`)
+      throw new Error('broken')
+    })
+    expect(drawn).toEqual({ png: STATIC_CARD_PNG, card: { variant: 'default' }, degraded: true, static: true })
+    expect(calls).toEqual(['profile:fonts', 'default:fonts', 'default:null'])
+    expect(await sharp(STATIC_CARD_PNG).metadata()).toMatchObject({ format: 'png', width: 1200, height: 630 })
+  })
+
+  test('without custom fonts the default card is tried once, and a good card is drawn as is', async () => {
+    let calls = 0
+    const failing = await drawWithFallback(profileCard, null, async () => {
+      calls++
+      throw new Error('broken')
+    })
+    expect(failing.static).toBe(true)
+    expect(calls).toBe(2)
+    expect(await drawWithFallback(profileCard, null, async () => ok)).toEqual({ png: ok, card: profileCard, degraded: false, static: false })
   })
 })

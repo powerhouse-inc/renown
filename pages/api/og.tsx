@@ -3,10 +3,12 @@ import { ImageResponse } from 'next/og'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { publicOrigin } from '../../utils/seo'
 import { loadAppCard, loadProfileCard, type OgBackground, type OgCard } from '../../lib/og/og-data'
+import { drawWithFallback } from '../../lib/og/og-fallback'
 import { readFont } from '../../lib/og/og-font'
 
 // Link-preview images: /api/og?variant=default | profile&address=0x… | app&did=did:key:…
-// Any lookup or image failure answers with the default card (always 200).
+// Any lookup, image or drawing failure answers with the default card, or failing
+// that a plain static image (lib/og/og-fallback.ts): always 200.
 // Node runtime (the pages-router default): images are converted with sharp
 // (lib/og/og-image.ts), which the edge runtime cannot load.
 
@@ -144,8 +146,8 @@ function render(card: OgCard) {
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minWidth: 0 }}>
             <span style={{ ...clamp(2), fontSize: 72, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>{card.name}</span>
-            {card.handle && <span style={{ ...clamp(1), fontSize: 34, color: SIGNAL }}>@{card.handle}</span>}
-            <span style={{ fontSize: 26, color: MUTED }}>{`${card.address.slice(0, 6)}…${card.address.slice(-4)} on Renown`}</span>
+            {card.handleLine && <span style={{ ...clamp(1), fontSize: 34, color: SIGNAL }}>{card.handleLine}</span>}
+            {card.addressLine && <span style={{ fontSize: 26, color: MUTED }}>{card.addressLine}</span>}
           </div>
         </div>
       </Frame>
@@ -224,22 +226,15 @@ async function drawPng(card: OgCard, fonts: [ArrayBuffer, ArrayBuffer] | null): 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only the query matters; the base is a placeholder.
   const url = new URL(req.url ?? '/', 'http://og.invalid')
-  let { card, degraded } = await loadCard(url)
+  const loaded = await loadCard(url)
   const fonts = await loadFonts()
-  let png: Buffer
-  try {
-    png = await drawPng(card, fonts)
-  } catch (error) {
-    // Satori refused this card (e.g. an image it cannot lay out): draw the default card instead.
-    console.error('og: drawing failed, falling back to the default card:', error)
-    card = { variant: 'default' }
-    degraded = true
-    png = await drawPng(card, fonts)
-  }
+  const drawn = await drawWithFallback(loaded.card, fonts, drawPng)
+  const card = drawn.card
+  const degraded = loaded.degraded || drawn.degraded
   res.setHeader('Content-Type', 'image/png')
   res.setHeader('Cache-Control', degraded || !fonts ? CACHE_DEGRADED : CACHE_OK)
   res.setHeader('X-Og-Variant', card.variant)
   res.setHeader('X-Og-Image', imageState(card))
   res.setHeader('X-Og-Background', card.variant === 'default' ? 'none' : (card.background?.kind ?? 'none'))
-  res.status(200).send(png)
+  res.status(200).send(drawn.png)
 }

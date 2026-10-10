@@ -4,6 +4,8 @@ import sharp from 'sharp'
 
 /** Larger inputs are refused before decoding (decompression bombs). 40 MP ~ 6300 x 6300. */
 export const MAX_INPUT_PIXELS = 40_000_000
+/** Longest a conversion may keep the CPU busy; past it the conversion fails (the card draws its monogram). */
+export const SHARP_TIMEOUT_SECONDS = 2
 
 export interface ImageBox {
   width: number
@@ -18,10 +20,12 @@ export const LOGO_BOX: ImageBox = { width: 256, height: 256 }
  * `bytes` (PNG, JPEG, GIF, WebP, AVIF or SVG) as a PNG data URL, cropped to
  * fill `box` like the card's `objectFit: cover` and never enlarged. Only the
  * first frame of an animation is used; EXIF orientation is applied. Throws on
- * bytes sharp cannot decode and on images over MAX_INPUT_PIXELS.
+ * bytes sharp cannot decode, on images over MAX_INPUT_PIXELS and on a
+ * conversion that runs past SHARP_TIMEOUT_SECONDS.
  */
 export async function toPngDataUrl(bytes: Uint8Array, box: ImageBox): Promise<string> {
   const png = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    .timeout({ seconds: SHARP_TIMEOUT_SECONDS })
     .rotate()
     .resize({ width: box.width, height: box.height, fit: 'cover', withoutEnlargement: true })
     .png()

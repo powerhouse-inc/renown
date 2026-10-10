@@ -6,6 +6,7 @@ import { mediaUrl, switchboardOrigin } from '../../services/media'
 import { SWITCHBOARD_ENDPOINT } from '../../services/switchboard-endpoint'
 import { CARD_BOX, identityArtDataUrl } from './og-art'
 import { AVATAR_BOX, LOGO_BOX, toPngDataUrl, type ImageBox } from './og-image'
+import { profileCardText } from './og-profile-text'
 
 export const OG_FETCH_TIMEOUT_MS = 2500
 const ADDRESS_RE = /^0x[0-9a-f]{40}$/
@@ -22,7 +23,18 @@ export interface OgBackground {
 
 export type OgCard =
   | { variant: 'default' }
-  | { variant: 'profile'; name: string; handle: string | null; address: string; image: string | null; background: OgBackground | null }
+  | {
+      variant: 'profile'
+      name: string
+      handle: string | null
+      /** "@handle" under the name, or null when the name already is the handle. */
+      handleLine: string | null
+      /** "0x…… on Renown", or null when the name already is the short address. */
+      addressLine: string | null
+      address: string
+      image: string | null
+      background: OgBackground | null
+    }
   | { variant: 'app'; name: string; tagline: string | null; category: string | null; logo: string | null; background: OgBackground | null; degraded?: boolean }
 
 async function artBackground(seed: string): Promise<OgBackground | null> {
@@ -155,7 +167,8 @@ export async function loadProfileCard(address: string, origin: string): Promise<
   ])
   return {
     variant: 'profile',
-    name: profile.displayName || profile.username || `${lower.slice(0, 6)}…${lower.slice(-4)}`,
+    // Named like the profile page: a legacy username that is just a short address never wins over the handle.
+    ...profileCardText(profile, lower),
     handle: profile.handle,
     address: lower,
     image,
