@@ -45,20 +45,31 @@ function prng(seed: number): () => number {
   }
 }
 
-/** Olive and mustard (OKLCH hue 70-125) read as dirty on light backgrounds: such hues move to the nearer edge (amber or green). */
-function clean(hue: number): number {
-  const h = ((hue % 360) + 360) % 360
-  if (h < 70 || h >= 125) return h
-  return h < 97 ? 66 : 128
+/**
+ * Olive, mustard and brown (OKLCH hue ~50-150) read as dirty at the palette's
+ * lightness and chroma, and mixing two glows across the gap turns grey-brown.
+ * So hues live on one continuous arc of 237 degrees (158 up through 360 to 35)
+ * and a position `t` on that arc maps to a hue without clustering anywhere.
+ */
+const ARC_START = 158
+const ARC_LENGTH = 237
+/** Smallest hue distance between a and b (in arc degrees). */
+const MIN_AB = 25
+
+function arcHue(t: number): number {
+  return Math.floor((ARC_START + (((t % ARC_LENGTH) + ARC_LENGTH) % ARC_LENGTH)) % 360)
 }
 
-/** The seed's three hues. */
+/** The seed's three hues. a is the main hue, b a neighbour (never across the excluded gap), c a far accent. */
 export function identityHues(seed: string): IdentityHues {
   const rand = prng(seedHash(seed))
-  const a = clean(Math.floor(rand() * 360))
-  const b = clean(a + (rand() < 0.5 ? -1 : 1) * (35 + Math.floor(rand() * 50)))
-  const c = clean(a + 150 + Math.floor(rand() * 60))
-  return { a, b, c }
+  const ta = rand() * ARC_LENGTH
+  const offset = MIN_AB + rand() * 45
+  // b stays on the same side of the gap as a: flip the direction instead of wrapping.
+  const dir = rand() < 0.5 ? -1 : 1
+  const tb = ta + dir * offset >= 0 && ta + dir * offset < ARC_LENGTH ? ta + dir * offset : ta - dir * offset
+  const tc = ta + 100 + rand() * 60
+  return { a: arcHue(ta), b: arcHue(tb), c: arcHue(tc) }
 }
 
 /** OKLCH (l 0-1, c ~0-0.37, h degrees) to #rrggbb, gamut-clipped. Perceptually even lightness across hues. */
