@@ -432,3 +432,30 @@ button:not(:disabled),
     border-top: 6px solid var(--primary-ink);
     border-bottom: 0;
 }
+
+/* Identity art (lib/identity-art.ts, components/identity/identity-art.tsx). */
+.rn-art svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .rn-art .rn-art-twinkle {
+        animation: rn-twinkle 4.8s ease-in-out infinite;
+    }
+    .rn-art .rn-art-twinkle:nth-of-type(2n) {
+        animation-delay: -1.6s;
+    }
+    .rn-art .rn-art-twinkle:nth-of-type(3n) {
+        animation-delay: -3.2s;
+    }
+}
+@keyframes rn-twinkle {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
