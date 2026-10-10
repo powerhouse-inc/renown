@@ -318,6 +318,23 @@ test('Download my data waits for the profile as well as the approvals', async ({
   expect(data.profile?.handle).toBe('edie')
 })
 
+test('a profile read that never answers times out: Download enables, the page says the profile is missing', async ({ page }) => {
+  const wallet = await signInTestWallet(page)
+  const mock = await mockSwitchboard(page, wallet.address)
+  mock.holdProfile = new Promise<void>(() => {})
+  await page.goto('/me')
+  await expect(page.getByRole('heading', { level: 2, name: 'Connected apps' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Download my data' })).toBeDisabled()
+  // CLIENT_DATA_TIMEOUT_MS (10 s) after the read started.
+  await expect(page.getByRole('button', { name: 'Download my data' })).toBeEnabled({ timeout: 20_000 })
+  await expect(page.getByText('Your profile did not load')).toBeVisible()
+  const [file] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download my data' }).click()])
+  const data = JSON.parse(await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString('utf8'))) as {
+    profile: unknown
+  }
+  expect(data.profile).toBeNull()
+})
+
 for (const theme of ['light', 'dark'] as const) {
   test(`has no serious axe violations, signed in and with the dialog open (${theme})`, async ({ page }, testInfo) => {
     await useTheme(page, theme)

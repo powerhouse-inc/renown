@@ -46,7 +46,7 @@ function ListSkeleton() {
 
 export function MeDashboard({ session }: { session: SignedIn }) {
   const { address } = session
-  const { profile, loaded: profileLoaded } = useOwnProfile(address)
+  const { profile, loaded: profileLoaded, timedOut: profileTimedOut } = useOwnProfile(address)
   const connections = useConnections(address, session)
   const now = useNow()
   const { toasts, show, dismiss } = useToasts()
@@ -91,6 +91,12 @@ export function MeDashboard({ session }: { session: SignedIn }) {
           Download my data
         </button>
       </div>
+
+      {profileTimedOut && (
+        <p role="status" className="text-ink-muted mt-4 text-sm">
+          Your profile did not load, so it is not shown here and a download leaves it out. Reload the page to try again.
+        </p>
+      )}
 
       <div className="mt-10 grid grid-cols-[minmax(0,1fr)] items-start gap-8 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-12">
         <div className="space-y-5 lg:sticky lg:top-24">
