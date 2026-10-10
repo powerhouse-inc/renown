@@ -13,6 +13,7 @@ import {
   type AppProfileCategory,
   type AppProfilePage,
 } from '../services/app-profiles'
+import { coverImageUrl } from '../services/media'
 import { APPS_PAGE_SIZE, parseCategory, sameCategory } from '../utils/app-directory'
 import { listingCacheControl } from '../utils/cache-control'
 import { cx } from '../utils/cx'
@@ -66,7 +67,7 @@ const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, ca
 
   return (
     <SiteLayout>
-      <PageMeta title="Apps" description={DESCRIPTION} path="/apps" />
+      <PageMeta title="Apps" description={DESCRIPTION} path="/apps" preloadImage={coverImageUrl(page?.items[0])} />
       <section aria-labelledby="apps-title">
         <Container className="pt-14 pb-10 md:pt-20 md:pb-12">
           <Heading level={1} id="apps-title">

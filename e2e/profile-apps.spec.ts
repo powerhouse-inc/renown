@@ -50,7 +50,7 @@ test.beforeAll(async () => {
     response: {
       data: {
         appProfilesByPublisher: [
-          app(ALPHA, 'Alpha', { logoRef: `attachment://v1:${'3'.repeat(64)}`, category: 'Tools' }),
+          app(ALPHA, 'Alpha', { logoRef: `attachment://v1:${'3'.repeat(64)}`, coverRef: `attachment://v1:${'5'.repeat(64)}`, category: 'Tools' }),
           app(BETA, 'Beta', { logo: 'https://cdn.example/beta.png' }),
         ],
       },
@@ -69,6 +69,20 @@ test('a publisher profile lists its apps and counts them', async ({ page }) => {
   expect(html).toContain(`src="/media/doc-Alpha/logo?v=${'3'.repeat(12)}"`)
   expect(html).toContain('src="https://cdn.example/beta.png"')
   await expect(page.getByText('Tools', { exact: true })).toBeVisible()
+})
+
+test('the first published app is the LCP candidate: eager, high priority, preloaded from <head>', async ({ request }) => {
+  const html = await (await request.get('/@app-maker')).text()
+  const head = html.slice(0, html.indexOf('</head>'))
+  const cover = `/media/doc-Alpha/cover?v=${'5'.repeat(12)}`
+  expect(head).toContain(`<link rel="preload" as="image" href="${cover}" fetchPriority="high"`)
+  const coverImg = new RegExp(`<img[^>]*src="${cover.replace(/[?]/g, '\\?')}"[^>]*>`).exec(html)?.[0] ?? ''
+  expect(coverImg).toContain('loading="eager"')
+  expect(coverImg).toMatch(/fetchPriority="high"/i)
+  // The second tile (Beta, an external logo) stays lazy.
+  expect(/<img[^>]*src="https:\/\/cdn\.example\/beta\.png"[^>]*>/.exec(html)?.[0]).toContain('loading="lazy"')
+  const empty = await (await request.get('/@no-apps-maker')).text()
+  expect(empty.slice(0, empty.indexOf('</head>'))).not.toContain('as="image"')
 })
 
 test('a profile without apps shows neither', async ({ page }) => {

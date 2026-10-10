@@ -41,3 +41,8 @@ export function mediaUrl(documentId: string, field: MediaField, origin = '', ref
   const version = mediaVersion(ref)
   return `${origin}/media/${encodeURIComponent(documentId)}/${field}${version ? `?v=${version}` : ''}`
 }
+
+/** The URL an app's cover <img> loads (same as AppCover/AppHeroCover), or null without a cover: for a preload hint. */
+export function coverImageUrl(app: { documentId: string; coverRef?: string | null } | null | undefined): string | null {
+  return app?.coverRef ? mediaUrl(app.documentId, 'cover', '', app.coverRef) : null
+}

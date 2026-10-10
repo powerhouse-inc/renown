@@ -98,6 +98,14 @@ test.describe('app page', () => {
     expect(response.headers()['retry-after']).toBe('30')
   })
 
+  test('preloads the hero cover from <head>, only when the app has one', async ({ request }) => {
+    const html = await (await request.get(`/app/${APP_DID}`)).text()
+    const head = html.slice(0, html.indexOf('</head>'))
+    expect(head).toMatch(/<link rel="preload" as="image" href="\/media\/stub-app-doc\/cover\?v=222222222222" fetchPriority="high"[^>]*>/i)
+    const minimal = await (await request.get(`/app/${MINIMAL_DID}`)).text()
+    expect(minimal.slice(0, minimal.indexOf('</head>'))).not.toContain('as="image"')
+  })
+
   test('/media serves app logos and covers', async ({ request }) => {
     for (const field of ['logo', 'cover']) {
       const response = await request.get(`/media/stub-app-doc/${field}`, { maxRedirects: 0 })

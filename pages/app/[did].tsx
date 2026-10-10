@@ -16,7 +16,7 @@ import { appJsonLd } from '../../lib/json-ld'
 import { qrCode, type QrCode } from '../../lib/qr'
 import { APP_DID_RE, fetchAppProfile, getAppProfilesByPublisher, listAppProfiles, type RenownAppProfile } from '../../services/app-profiles'
 import { getAppStats, type AppStats } from '../../services/app-stats'
-import { mediaUrl } from '../../services/media'
+import { coverImageUrl, mediaUrl } from '../../services/media'
 import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { linkTarget } from '../../utils/link-service'
 import { clipText, markdownPlainText } from '../../utils/markdown-lite'
@@ -111,6 +111,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publis
         description={description}
         path={path}
         {...(ogImage && { image: ogImage })}
+        preloadImage={coverImageUrl(app)}
         jsonLd={[appJsonLd({ app, name, url, image, publisher: publisherLd })]}
       />
 

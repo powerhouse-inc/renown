@@ -13,7 +13,7 @@ import { ADDRESS_RE, memberSince, profileDisplayName, walletDid } from '../../li
 import { qrCode, type QrCode } from '../../lib/qr'
 import { getAppProfilesByPublisher, type RenownAppProfile } from '../../services/app-profiles'
 import { getUserStats, type UserStatEntry } from '../../services/app-stats'
-import { mediaUrl } from '../../services/media'
+import { coverImageUrl, mediaUrl } from '../../services/media'
 import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
@@ -79,6 +79,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, ap
         description={description}
         path={path}
         ogType="profile"
+        preloadImage={coverImageUrl(apps[0])}
         {...(ogImage && { image: ogImage })}
         jsonLd={[profileJsonLd({ profile, name, url, image, did: address ? walletDid(address) : null })]}
       >

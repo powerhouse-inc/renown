@@ -31,9 +31,10 @@ export function ProfileApps({ apps }: { apps: RenownAppProfile[] }) {
   return (
     <PageSection id="apps-published" title="Apps published">
       <ul className="grid gap-5 sm:grid-cols-2">
-        {apps.map((app) => (
+        {apps.map((app, index) => (
           <li key={app.appDid}>
-            <AppTile app={app} />
+            {/* The first tile's cover is the page's LCP image on mobile: load it eagerly at high priority. */}
+            <AppTile app={app} priority={index === 0} />
           </li>
         ))}
       </ul>

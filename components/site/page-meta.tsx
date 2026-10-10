@@ -19,6 +19,8 @@ export interface PageMetaProps {
   jsonLd?: object[]
   /** The whole <title> when it is not "<title> - Renown" (e.g. "Ada (@ada) on Renown"); og/twitter titles still use `title`. */
   documentTitle?: string
+  /** Same-origin URL of the page's LCP image (e.g. a cover): preloaded at high priority from <head>. */
+  preloadImage?: string | null
   /** Extra head tags (e.g. profile:username). */
   children?: ReactNode
 }
@@ -34,6 +36,7 @@ export function PageMeta({
   noindex = false,
   jsonLd = [],
   documentTitle,
+  preloadImage,
   children,
 }: PageMetaProps) {
   const fullTitle = documentTitle ? documentTitle : title ? `${title} - ${SITE_NAME}` : `${SITE_NAME} - One identity for the Powerhouse network`
@@ -54,6 +57,7 @@ export function PageMeta({
       <meta name="twitter:title" content={title ?? SITE_NAME} key="twitter:title" />
       <meta name="twitter:description" content={description} key="twitter:description" />
       <meta name="twitter:image" content={image} key="twitter:image" />
+      {preloadImage && <link rel="preload" as="image" href={preloadImage} fetchPriority="high" key="preload-lcp-image" />}
       {jsonLd.map((data, index) => (
         <script
           key={`ld-${index}`}

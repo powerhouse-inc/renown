@@ -244,6 +244,16 @@ test('the first row of app covers loads eagerly and later ones lazily', async ({
     await expect(covers.nth(i)).toHaveAttribute('fetchpriority', 'high')
   }
   await expect(covers.nth(3)).toHaveAttribute('loading', 'lazy')
+  // The first cover (the LCP image) is preloaded from <head>; the plain directory (no covers) preloads nothing.
+  const html = await (await p.request.get('/apps')).text()
+  const head = html.slice(0, html.indexOf('</head>'))
+  expect(head).toMatch(new RegExp(`<link rel="preload" as="image" href="/media/stub-dir-B1/cover\\?v=${'4'.repeat(12)}" fetchPriority="high"[^>]*>`, 'i'))
+  expect(head.match(/rel="preload" as="image"/g)).toHaveLength(1)
+})
+
+test('a directory whose first app has no cover preloads no image', async ({ page: p }) => {
+  const html = await (await p.request.get('/apps')).text()
+  expect(html.slice(0, html.indexOf('</head>'))).not.toContain('as="image"')
 })
 
 test('an empty category invites listing an app on Vetra', async ({ page: p }) => {
