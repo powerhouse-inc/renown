@@ -9,7 +9,7 @@ import { LinkChips } from '../identity/link-chip'
 import { MetricCard } from '../identity/metric-card'
 import { PageSection } from '../identity/page-section'
 
-/** Bio (markdown subset, safe links only) and links; nothing when there is neither. */
+/** Bio (markdown subset, safe links only) and links (http(s) only, filtered by the page); nothing when there is neither. */
 export function ProfileAbout({ bio, links }: { bio: string | null; links: RenownProfileLink[] }) {
   const text = bio?.trim()
   if (!text && links.length === 0) return null

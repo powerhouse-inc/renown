@@ -20,7 +20,7 @@ export function LinkChips({ links, label = 'Links' }: { links: readonly RenownPr
             href={link.url}
             target="_blank"
             rel="me noopener noreferrer nofollow"
-            className="border-hairline bg-surface-1 text-ink hover:border-primary/50 hover:bg-surface-2 inline-flex max-w-full items-center gap-2 rounded-full border py-1.5 pr-3.5 pl-3 text-sm transition-colors"
+            className="border-hairline bg-surface-1 text-ink hover:border-primary/50 hover:bg-surface-2 inline-flex max-w-full items-center gap-2 rounded-full border py-1.5 pr-3.5 pl-3 text-sm motion-safe:transition-colors"
           >
             <ServiceIcon service={link.service} className="text-ink-muted h-4 w-4 shrink-0" />
             <span className="truncate font-medium">{link.label || link.host}</span>

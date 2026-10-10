@@ -17,7 +17,8 @@ import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
-import { ogImageUrl } from '../../utils/seo'
+import { canonicalUrl as siteCanonicalUrl, ogImageUrl } from '../../utils/seo'
+import { linkTarget } from '../../utils/link-service'
 import { siteOrigin } from '../../utils/site-origin'
 import { groupUserStats } from '../../utils/stat-format'
 import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
@@ -58,7 +59,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, s
     ...(apps.length > 0 ? [{ key: 'apps', icon: 'apps' as const, text: `${plural(apps.length, 'app', 'apps')} published` }] : []),
     ...(groups.length > 0 ? [{ key: 'active', icon: 'activity' as const, text: `Active in ${plural(groups.length, 'app', 'apps')}` }] : []),
   ]
-  const links = profile.links ?? []
+  // Only http(s) links are ever shown; the rest count as no links at all.
+  const links = (profile.links ?? []).filter((link) => linkTarget(link.url))
   const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0
   const path = profilePath(profile)
   const url = canonicalUrl ?? path
@@ -161,7 +163,8 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
     wallet ? optional(getAppProfilesByPublisher(address.toLowerCase()), []) : Promise.resolve([]),
     wallet ? optional(getUserStats(address), []) : Promise.resolve([]),
   ])
-  const canonicalUrl = `${origin}${profilePath(profile)}`
+  // The same URL as <link rel=canonical> (PageMeta), so share, QR and JSON-LD agree with it.
+  const canonicalUrl = siteCanonicalUrl(profilePath(profile))
   return {
     props: { profile, ensVerified, apps, stats, canonicalUrl, ogImage, qr: qrCode(canonicalUrl) },
   }

@@ -20,7 +20,7 @@ const noSubscribe = () => () => {}
 
 /** "Share": copy the link (announced), a QR code, and the system share sheet where there is one. */
 export function ShareMenu({ url, title, qr, subject, align = 'end' }: ShareMenuProps) {
-  const { open, rootRef, buttonProps, panelId } = usePopover()
+  const { open, rootRef, buttonProps, panelId, panelRef, placement } = usePopover()
   const [copied, setCopied] = useState(false)
   // The system share sheet exists only in some browsers; false on the server and during hydration.
   const canShare = useSyncExternalStore(noSubscribe, () => typeof navigator.share === 'function', () => false)
@@ -62,13 +62,15 @@ export function ShareMenu({ url, title, qr, subject, align = 'end' }: ShareMenuP
       </button>
       {open && (
         <div
+          ref={panelRef}
           id={panelId}
           role="region"
           aria-label="Share"
           className={cx(
             // Below 640 px a sheet pinned to the bottom of the screen, like the verified badge's.
-            'border-hairline-strong bg-background shadow-card rounded-card z-30 border p-4 max-sm:fixed max-sm:inset-x-4 max-sm:bottom-4 sm:absolute sm:top-full sm:mt-2 sm:w-72',
+            'border-hairline-strong bg-background shadow-card rounded-card z-30 border p-4 max-sm:fixed max-sm:inset-x-4 max-sm:bottom-4 sm:absolute sm:w-72',
             align === 'end' ? 'sm:right-0' : 'sm:left-0',
+            placement === 'above' ? 'sm:bottom-full sm:mb-2' : 'sm:top-full sm:mt-2',
           )}
         >
           <p className="text-ink-muted truncate font-mono text-xs" title={url}>

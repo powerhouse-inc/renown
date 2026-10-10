@@ -20,7 +20,7 @@ export function ProfileOwnerActions({ address, completeness }: { address: string
         <Link
           href="/profile/edit"
           title={`To do: ${open.map((item) => item.label.toLowerCase()).join(', ')}`}
-          className="text-ink-muted hover:text-ink hover:bg-surface-2 inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-medium transition-colors"
+          className="text-ink-muted hover:text-ink hover:bg-surface-2 inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-medium motion-safe:transition-colors"
         >
           <Ring percent={completeness.percent} />
           <span>

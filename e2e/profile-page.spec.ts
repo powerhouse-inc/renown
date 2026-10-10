@@ -7,6 +7,7 @@ import { fixtureStub } from './support/stub-switchboard-client'
 const RICH = '0x5e00000000000000000000000000000000000f11'
 const MINIMAL = '0x5e00000000000000000000000000000000000f12'
 const LONG = '0x5e00000000000000000000000000000000000f13'
+const UNSAFE = '0x5e00000000000000000000000000000000000f14'
 const APP_DID = 'did:key:z6MkRuthNotesAppxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const LONG_WORD = 'W'.repeat(120)
 const profile = (handle: string, address: string, extra: Record<string, unknown> = {}) => ({
@@ -37,6 +38,11 @@ test.beforeAll(async () => {
   const users = (p: unknown) => ({ data: { renownUsers: [p] } })
   await fixtureStub({ match: 'renownUsers', variables: '"rich-ruth"', response: users(RICH_PROFILE) })
   await fixtureStub({ match: 'renownUsers', variables: '"min-mo"', response: users(profile('min-mo', MINIMAL, { username: '0x5E00...0f12' })) })
+  await fixtureStub({
+    match: 'renownUsers',
+    variables: '"unsafe-una"',
+    response: users(profile('unsafe-una', UNSAFE, { links: [{ id: 'u1', label: 'Script', url: 'javascript:alert(1)' }] })),
+  })
   await fixtureStub({
     match: 'renownUsers',
     variables: '"long-lars"',
@@ -93,7 +99,7 @@ test.describe('profile page', () => {
     await expect(page.getByRole('link', { name: /Ruth Notes/ }).first()).toHaveAttribute('href', `/app/${APP_DID}`)
     await expect(page.getByRole('heading', { level: 2, name: 'Activity' })).toBeVisible()
     await expect(page.locator(`[data-app-did="${APP_DID}"] [data-metric="notes"]`)).toContainText('1,284')
-    await expect(page.getByRole('heading', { name: 'Nothing public yet' })).toHaveCount(0)
+    await expect(page.getByText('Nothing public yet')).toHaveCount(0)
   })
 
   test('a minimal profile names itself by handle and says what will appear, never an empty frame', async ({ page }) => {
@@ -104,6 +110,13 @@ test.describe('profile page', () => {
     await expect(page.getByText(/apps? published/)).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'About', exact: true })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Activity' })).toHaveCount(0)
+  })
+
+  test('a profile whose only link is not http(s) counts as empty: no About heading', async ({ page }) => {
+    expect((await page.goto('/@unsafe-una'))?.status()).toBe(200)
+    await expect(page.getByText('Nothing public yet')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'About', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Script/ })).toHaveCount(0)
   })
 
   test('the verified badge explains what is verified and links to /trust', async ({ page }) => {
@@ -131,6 +144,20 @@ test.describe('profile page', () => {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/@rich-ruth$/)
     await page.mouse.click(5, 5)
     await expect(menu).toHaveCount(0)
+  })
+
+  test('on a 1280 x 900 screen the whole Share panel, QR code included, is on screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto('/@rich-ruth')
+    await page.getByRole('button', { name: 'Share' }).click()
+    const menu = page.getByRole('region', { name: 'Share' })
+    const header = await page.locator('body header').first().boundingBox()
+    for (const part of [menu, menu.getByRole('img', { name: /^QR code for / }), menu.getByText('Scan to open this profile')]) {
+      const box = await part.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.y).toBeGreaterThanOrEqual(header!.y + header!.height)
+      expect(box!.y + box!.height).toBeLessThanOrEqual(900)
+    }
   })
 
   test('the owner sees Edit profile and how complete the profile is; visitors never do', async ({ page }) => {

@@ -33,7 +33,7 @@ export function CopyRow({ label, value, link }: CopyRowProps) {
         <button
           type="button"
           onClick={() => void copy()}
-          className="text-primary-ink hover:bg-surface-2 -my-1 shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors"
+          className="text-primary-ink hover:bg-surface-2 -my-1 shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold motion-safe:transition-colors"
         >
           {copied ? 'Copied' : 'Copy'}
           <span className="sr-only"> {label.toLowerCase()}</span>
