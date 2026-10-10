@@ -1,3 +1,4 @@
+import { profileFooter } from '../../lib/og/og-footer'
 import { ImageResponse } from 'next/og'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { publicOrigin } from '../../utils/seo'
@@ -70,7 +71,7 @@ function Frame({ children, footer }: { children: React.ReactNode; footer: string
         <span style={{ fontSize: 36, fontWeight: 600, letterSpacing: -1 }}>Renown</span>
       </div>
       {children}
-      <div style={{ ...clamp(1), fontSize: 24, color: MUTED }}>{footer}</div>
+      <div style={{ ...clamp(1), whiteSpace: 'nowrap', fontSize: 24, color: MUTED }}>{footer}</div>
     </div>
   )
 }
@@ -100,7 +101,7 @@ function Monogram({ text, size, radius }: { text: string; size: number; radius: 
 function render(card: OgCard) {
   if (card.variant === 'profile') {
     return (
-      <Frame footer={card.handle ? `renown.id/@${card.handle}` : 'renown.id'}>
+      <Frame footer={profileFooter(card.handle)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
           {card.image ? (
             // eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>

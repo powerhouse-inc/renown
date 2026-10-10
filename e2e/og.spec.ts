@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import sharp from 'sharp'
 import { fixtureStub } from './support/stub-switchboard-client'
+import { profileFooter } from '../lib/og/og-footer'
 import { readFont } from '../lib/og/og-font'
 
 // Fixtures use ids no other spec uses (they survive renown-writes.spec.ts's resets).
@@ -144,6 +145,12 @@ async function textPixelsInMargins(png: Buffer): Promise<number> {
 }
 
 test.describe('link-preview text', () => {
+  test('the profile footer shortens a long handle and keeps a short one', () => {
+    expect(profileFooter('h'.repeat(120))).toBe(`renown.id/@${'h'.repeat(24)}…`)
+    expect(profileFooter('alice')).toBe('renown.id/@alice')
+    expect(profileFooter(null)).toBe('renown.id')
+  })
+
   for (const [label, query] of [
     ['a 120-character app name, tagline and category', `?variant=app&did=${LONG_APP_DID}`],
     ['a 120-character display name and handle', `?variant=profile&address=${LONG_NAME}`],

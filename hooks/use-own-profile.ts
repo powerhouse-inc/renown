@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getProfile, type RenownProfile } from '../services/switchboard'
-import { CLIENT_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
+import { CLIENT_DATA_TIMEOUT_MS, TimeoutError, withTimeout } from '../utils/with-timeout'
 
 export interface OwnProfile {
   /** The profile; null while loading, when there is none, or when the read failed or timed out. */
@@ -30,11 +30,16 @@ export function useOwnProfile(address: string | undefined): OwnProfile {
       .then((profile) => {
         if (!cancelled) setAnswer({ address, profile, timedOut: false })
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (cancelled) return
         // No address or profile data in the log.
-        console.warn(`Renown profile read timed out after ${CLIENT_DATA_TIMEOUT_MS} ms`)
-        setAnswer({ address, profile: null, timedOut: true })
+        if (error instanceof TimeoutError) {
+          console.warn(`Renown profile read timed out after ${CLIENT_DATA_TIMEOUT_MS} ms`)
+          setAnswer({ address, profile: null, timedOut: true })
+        } else {
+          console.warn('Renown profile read failed unexpectedly', error instanceof Error ? error.name : typeof error)
+          setAnswer({ address, profile: null, timedOut: false })
+        }
       })
     return () => {
       cancelled = true
