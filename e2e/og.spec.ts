@@ -200,3 +200,68 @@ test('fonts are read from assets/fonts; a missing font is a failure, so the card
   expect((await readFont('Inter-SemiBold.ttf')).byteLength).toBeGreaterThan(100_000)
   await expect(readFont('Inter-SemiBold.ttf', '/nonexistent-font-dir')).rejects.toThrow()
 })
+
+test.describe('link-preview backgrounds', () => {
+  const COVER_APP_DID = 'did:key:z6MkSeoCoverAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
+  const BROKEN_COVER_DID = 'did:key:z6MkSeoBrokenCoverxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
+  test.beforeAll(async () => {
+    const row = (documentId: string, coverRef: string) => ({ documentId, name: 'Cover App', tagline: 'Has a cover', category: 'Tools', logo: null, logoRef: null, coverRef })
+    // stub-app-doc serves a cover; doc-og-nocover has none (its /media cover 404s).
+    await fixtureStub({ match: 'OgApp', variables: COVER_APP_DID, response: { data: { appProfile: row('stub-app-doc', `attachment://v1:${'2'.repeat(64)}`) } } })
+    await fixtureStub({ match: 'OgApp', variables: BROKEN_COVER_DID, response: { data: { appProfile: row('doc-og-nocover', `attachment://v1:${'9'.repeat(64)}`) } } })
+  })
+
+  for (const [label, query, background] of [
+    ['a profile is drawn on its identity art', `?variant=profile&address=${ADDRESS}`, 'art'],
+    ['an app without a cover is drawn on its identity art', `?variant=app&did=${APP_DID}`, 'art'],
+    ['an app with a cover is drawn on the cover', `?variant=app&did=${COVER_APP_DID}`, 'cover'],
+    ['an app whose cover cannot be fetched falls back to its identity art', `?variant=app&did=${BROKEN_COVER_DID}`, 'art'],
+    ['the default card has no backdrop', '?variant=default', 'none'],
+  ] as const) {
+    test(label, async ({ request }) => {
+      const response = await request.get(`/api/og${query}`)
+      expect(response.status()).toBe(200)
+      expect(response.headers()['x-og-background']).toBe(background)
+      expect(response.headers()['cache-control']).toBe('public, max-age=300, s-maxage=3600, stale-while-revalidate=86400')
+    })
+  }
+
+  test('the same profile always gets the same card, and two profiles differ', async ({ request }) => {
+    const a = await (await request.get(`/api/og?variant=profile&address=${ADDRESS}`)).body()
+    const again = await (await request.get(`/api/og?variant=profile&address=${ADDRESS}`)).body()
+    const other = await (await request.get(`/api/og?variant=profile&address=${WEBP}`)).body()
+    expect(again.equals(a)).toBe(true)
+    expect(other.equals(a)).toBe(false)
+  })
+})
+
+test.describe('link-preview avatars are the real picture', () => {
+  const PHOTO_PNG = '0x5e00000000000000000000000000000000000c10'
+  const PHOTO_WEBP = '0x5e00000000000000000000000000000000000c11'
+  test.beforeAll(async () => {
+    await fixtureStub({ match: 'OgProfile', variables: PHOTO_PNG, response: { data: { renownUsers: [profile('stub-photopng-doc', `attachment://v1:${'d'.repeat(64)}`)] } } })
+    await fixtureStub({ match: 'OgProfile', variables: PHOTO_WEBP, response: { data: { renownUsers: [profile('stub-photowebp-doc', `attachment://v1:${'e'.repeat(64)}`)] } } })
+  })
+
+  // The avatar circle is 220 px at x 72..292, centred vertically; the stub photo is
+  // four vertical colour bands (red, green, blue, yellow). Count how many of the
+  // bands show up in a strip across the middle of the circle.
+  for (const [label, address] of [['PNG', PHOTO_PNG], ['WebP', PHOTO_WEBP]]) {
+    test(`a multi-colour ${label} avatar draws as the image, not a flat colour`, async ({ request }) => {
+      const response = await request.get(`/api/og?variant=profile&address=${address}`)
+      expect(response.headers()['x-og-image']).toBe('drawn')
+      const { data, info } = await sharp(await response.body()).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      const bands = new Set<string>()
+      const y = Math.round(info.height / 2)
+      for (let x = 100; x < 265; x++) {
+        const i = (y * info.width + x) * 3
+        const [r, g, b] = [data[i], data[i + 1], data[i + 2]]
+        if (r > 180 && g < 90 && b < 90) bands.add('red')
+        if (g > 150 && r < 90 && b < 120) bands.add('green')
+        if (b > 180 && r < 90 && g < 140) bands.add('blue')
+        if (r > 200 && g > 170 && b < 90) bands.add('yellow')
+      }
+      expect([...bands].sort()).toEqual(['blue', 'green', 'red', 'yellow'])
+    })
+  }
+})

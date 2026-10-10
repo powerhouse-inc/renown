@@ -27,6 +27,7 @@
 //
 // Unscripted requests get empty read-model results, so pages rendered by other
 // specs keep working.
+import sharp from 'sharp'
 import { createHash } from 'node:crypto'
 import http from 'node:http'
 import { crc32, deflateSync } from 'node:zlib'
@@ -75,6 +76,25 @@ const OG_IMAGES = {
   },
   badwebp: { type: 'image/webp', bytes: () => Buffer.concat([Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1'), Buffer.alloc(64, 0x5a)]) },
   bomb: { type: 'image/png', bytes: () => pixelBombPng(8000) },
+}
+
+// Real multi-colour pictures (four vertical bands, red/green/blue/yellow), as PNG and
+// WebP, to prove the OG route draws the picture and not a flat colour.
+const bands = (width, height) =>
+  Buffer.concat(
+    [[230, 30, 30], [30, 200, 60], [30, 90, 240], [250, 210, 20]].map(([r, g, b]) => Buffer.alloc((width / 4) * 3, Buffer.from([r, g, b]))),
+  )
+async function bandedImage(format, width, height) {
+  const row = bands(width, height)
+  const raw = Buffer.concat(Array.from({ length: height }, () => row))
+  return sharp(raw, { raw: { width, height, channels: 3 } })[format]().toBuffer()
+}
+OG_IMAGES.photopng = { type: 'image/png', bytes: await bandedImage('png', 800, 800) }
+OG_IMAGES.photowebp = { type: 'image/webp', bytes: await bandedImage('webp', 800, 800) }
+OG_IMAGES.photocover = { type: 'image/png', bytes: await bandedImage('png', 1600, 840) }
+for (const key of ['photopng', 'photowebp', 'photocover']) {
+  const { bytes } = OG_IMAGES[key]
+  OG_IMAGES[key].bytes = () => bytes
 }
 
 let script = []
@@ -163,6 +183,9 @@ async function packageRoute(req, res) {
       'stub-svg-doc': `http://localhost:${port}/__stub/og/svg`,
       'stub-badwebp-doc': `http://localhost:${port}/__stub/og/badwebp`,
       'stub-bomb-doc': `http://localhost:${port}/__stub/og/bomb`,
+      'stub-photopng-doc': `http://localhost:${port}/__stub/og/photopng`,
+      'stub-photowebp-doc': `http://localhost:${port}/__stub/og/photowebp`,
+      'stub-photocover-doc': `http://localhost:${port}/__stub/og/photocover`,
     }
     if (hostile[media[1]]) {
       res.writeHead(302, { Location: hostile[media[1]] })
@@ -171,7 +194,7 @@ async function packageRoute(req, res) {
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
-  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|loop1|loop2|loop3)$/.exec(url.pathname)
+  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|photopng|photowebp|photocover|loop1|loop2|loop3)$/.exec(url.pathname)
   if (og && req.method === 'GET') {
     if (og[1] === 'text') {
       res.writeHead(200, { 'Content-Type': 'text/plain' })

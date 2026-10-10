@@ -2,7 +2,7 @@ import { profileFooter } from '../../lib/og/og-footer'
 import { ImageResponse } from 'next/og'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { publicOrigin } from '../../utils/seo'
-import { loadAppCard, loadProfileCard, type OgCard } from '../../lib/og/og-data'
+import { loadAppCard, loadProfileCard, type OgBackground, type OgCard } from '../../lib/og/og-data'
 import { readFont } from '../../lib/og/og-font'
 
 // Link-preview images: /api/og?variant=default | profile&address=0x… | app&did=did:key:…
@@ -50,10 +50,35 @@ function clamp(lines: number): React.CSSProperties {
   return { display: 'block', lineClamp: lines, overflow: 'hidden', wordBreak: 'break-word' }
 }
 
-function Frame({ children, footer }: { children: React.ReactNode; footer: string }) {
+/**
+ * The card's backdrop: the app cover or the identity art, under a scrim that
+ * keeps the text legible (darker on the left, where the text sits) and the art
+ * dim enough that no backdrop pixel reads as text.
+ */
+function Backdrop({ background }: { background: OgBackground }) {
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, width: SIZE.width, height: SIZE.height, display: 'flex' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img> */}
+      <img src={background.src} width={SIZE.width} height={SIZE.height} alt="" style={{ objectFit: 'cover' }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: SIZE.width,
+          height: SIZE.height,
+          backgroundImage: 'linear-gradient(90deg, rgba(5,10,26,0.9) 0%, rgba(5,10,26,0.72) 55%, rgba(5,10,26,0.5) 100%)',
+        }}
+      />
+    </div>
+  )
+}
+
+function Frame({ children, footer, background = null }: { children: React.ReactNode; footer: string; background?: OgBackground | null }) {
   return (
     <div
       style={{
+        position: 'relative',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -61,11 +86,14 @@ function Frame({ children, footer }: { children: React.ReactNode; footer: string
         justifyContent: 'space-between',
         padding: '64px 72px',
         backgroundColor: BG,
-        backgroundImage: `radial-gradient(circle at 85% 10%, rgba(0,128,255,0.35), transparent 45%), radial-gradient(circle at 5% 0%, rgba(33,255,180,0.14), transparent 40%)`,
+        ...(!background && {
+          backgroundImage: `radial-gradient(circle at 85% 10%, rgba(0,128,255,0.35), transparent 45%), radial-gradient(circle at 5% 0%, rgba(33,255,180,0.14), transparent 40%)`,
+        }),
         color: INK,
         fontFamily: 'Inter',
       }}
     >
+      {background && <Backdrop background={background} />}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <Sparkle size={40} />
         <span style={{ fontSize: 36, fontWeight: 600, letterSpacing: -1 }}>Renown</span>
@@ -101,7 +129,7 @@ function Monogram({ text, size, radius }: { text: string; size: number; radius: 
 function render(card: OgCard) {
   if (card.variant === 'profile') {
     return (
-      <Frame footer={profileFooter(card.handle)}>
+      <Frame footer={profileFooter(card.handle)} background={card.background}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
           {card.image ? (
             // eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>
@@ -120,7 +148,7 @@ function render(card: OgCard) {
   }
   if (card.variant === 'app') {
     return (
-      <Frame footer="An app on Renown">
+      <Frame footer="An app on Renown" background={card.background}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
           {card.logo ? (
             // eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>
@@ -204,5 +232,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Cache-Control', degraded || !fonts ? CACHE_DEGRADED : CACHE_OK)
   res.setHeader('X-Og-Variant', card.variant)
   res.setHeader('X-Og-Image', imageState(card))
+  res.setHeader('X-Og-Background', card.variant === 'default' ? 'none' : (card.background?.kind ?? 'none'))
   res.status(200).send(png)
 }

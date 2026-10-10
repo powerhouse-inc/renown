@@ -4,6 +4,7 @@
 import { APP_DID_RE } from '../../services/app-profiles'
 import { mediaUrl, switchboardOrigin } from '../../services/media'
 import { SWITCHBOARD_ENDPOINT } from '../../services/switchboard-endpoint'
+import { CARD_BOX, identityArtDataUrl } from './og-art'
 import { AVATAR_BOX, LOGO_BOX, toPngDataUrl, type ImageBox } from './og-image'
 
 export const OG_FETCH_TIMEOUT_MS = 2500
@@ -12,10 +13,22 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 // Every image is converted to PNG before drawing (lib/og/og-image.ts).
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/svg+xml'])
 
+/** What a card is drawn on: the app's cover, the seed's identity art, or the plain frame. */
+export interface OgBackground {
+  kind: 'cover' | 'art'
+  /** PNG data URL at card size. */
+  src: string
+}
+
 export type OgCard =
   | { variant: 'default' }
-  | { variant: 'profile'; name: string; handle: string | null; address: string; image: string | null }
-  | { variant: 'app'; name: string; tagline: string | null; category: string | null; logo: string | null }
+  | { variant: 'profile'; name: string; handle: string | null; address: string; image: string | null; background: OgBackground | null }
+  | { variant: 'app'; name: string; tagline: string | null; category: string | null; logo: string | null; background: OgBackground | null }
+
+async function artBackground(seed: string): Promise<OgBackground | null> {
+  const src = await identityArtDataUrl(seed)
+  return src ? { kind: 'art', src } : null
+}
 
 async function graphql<T>(endpoint: string, query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(endpoint, {
@@ -132,12 +145,17 @@ export async function loadProfileCard(address: string, origin: string): Promise<
   if (!profile) return null
   // Only images stored with Renown (the /media route); external avatar URLs are never fetched.
   const imageUrl = profile.avatar ? mediaUrl(profile.documentId, 'avatar', origin, profile.avatar) : null
+  const [image, background] = await Promise.all([
+    imageUrl ? fetchImageDataUrl(imageUrl, origin, AVATAR_BOX) : Promise.resolve(null),
+    artBackground(lower),
+  ])
   return {
     variant: 'profile',
     name: profile.displayName || profile.username || `${lower.slice(0, 6)}…${lower.slice(-4)}`,
     handle: profile.handle,
     address: lower,
-    image: imageUrl ? await fetchImageDataUrl(imageUrl, origin, AVATAR_BOX) : null,
+    image,
+    background,
   }
 }
 
@@ -148,6 +166,7 @@ interface AppRow {
   category: string | null
   logo: string | null
   logoRef: string | null
+  coverRef: string | null
 }
 
 /** The app card for an app DID; null when there is no such app. */
@@ -155,17 +174,24 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
   if (!APP_DID_RE.test(did)) return null
   const data = await graphql<{ appProfile: AppRow | null }>(
     `${switchboardOrigin()}/graphql/renown-stats`,
-    `query OgApp($appDid: String!) { appProfile(appDid: $appDid) { documentId name tagline category logo logoRef } }`,
+    `query OgApp($appDid: String!) { appProfile(appDid: $appDid) { documentId name tagline category logo logoRef coverRef } }`,
     { appDid: did },
   )
   const app = data.appProfile
   if (!app) return null
   const logoUrl = app.logoRef ? mediaUrl(app.documentId, 'logo', origin, app.logoRef) : null
+  const coverUrl = app.coverRef ? mediaUrl(app.documentId, 'cover', origin, app.coverRef) : null
+  const [logo, cover] = await Promise.all([
+    logoUrl ? fetchImageDataUrl(logoUrl, origin, LOGO_BOX) : Promise.resolve(null),
+    // A cover that cannot be fetched or decoded is decoration: the identity art stands in.
+    coverUrl ? fetchImageDataUrl(coverUrl, origin, CARD_BOX).catch(() => null) : Promise.resolve(null),
+  ])
   return {
     variant: 'app',
     name: app.name || 'Untitled app',
     tagline: app.tagline,
     category: app.category,
-    logo: logoUrl ? await fetchImageDataUrl(logoUrl, origin, LOGO_BOX) : null,
+    logo,
+    background: cover ? { kind: 'cover', src: cover } : await artBackground(did),
   }
 }
