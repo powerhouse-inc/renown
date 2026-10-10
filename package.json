@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "build": "next build --webpack && node scripts/check-wallet-chunks.mjs",
+    "check:wallet-chunks": "node scripts/check-wallet-chunks.mjs",
     "start": "next start",
     "lint": "eslint .",
     "next:dev": "next dev --webpack",

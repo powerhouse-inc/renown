@@ -32,7 +32,7 @@ test.describe("OIDC login page", () => {
       }),
     );
     await page.goto("/oidc/login?request=req1");
-    await expect(page.getByText("Speckle cool-frog")).toBeVisible();
+    await expect(page.getByText("Speckle cool-frog")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("cool-frog-speckle.vetra.io")).toBeVisible();
     await expect(page).toHaveTitle("Renown - Sign in");
   });
@@ -42,7 +42,7 @@ test.describe("OIDC login page", () => {
       r.fulfill({ status: 404, json: { error: "invalid_request" } }),
     );
     await page.goto("/oidc/login?request=gone");
-    await expect(page.getByText(/expired|no longer valid/i)).toBeVisible();
+    await expect(page.getByText(/expired|no longer valid/i)).toBeVisible({ timeout: 30_000 });
   });
 
   test("ignores an untrusted issuer parameter", async ({ page }) => {
@@ -55,7 +55,7 @@ test.describe("OIDC login page", () => {
       r.fulfill({ status: 404, json: { error: "invalid_request" } }),
     );
     await page.goto(`/oidc/login?request=req2&issuer=${encodeURIComponent("https://evil.example/oidc")}`);
-    await expect(page.getByText(/expired|no longer valid/i)).toBeVisible();
+    await expect(page.getByText(/expired|no longer valid/i)).toBeVisible({ timeout: 30_000 });
     expect(hitEvil).toBe(false);
   });
 });

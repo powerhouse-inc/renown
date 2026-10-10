@@ -14,7 +14,7 @@ test.describe('Console Login Page', () => {
     await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
 
     // Should show authorize CLI title
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
 
     // Should show CLI application card with session info
     await expect(page.getByRole('heading', { name: 'Powerhouse CLI' })).toBeVisible()
@@ -38,7 +38,7 @@ test.describe('Console Login Page', () => {
     // The wallet button should be visible (RainbowKit connect button)
     // Note: The exact text may vary based on RainbowKit configuration
     const connectButton = page.locator('button').filter({ hasText: /connect|wallet/i })
-    await expect(connectButton.first()).toBeVisible()
+    await expect(connectButton.first()).toBeVisible({ timeout: 30_000 })
   })
 
   test('displays Renown branding', async ({ page }) => {
@@ -53,15 +53,15 @@ test.describe('Console Login Page', () => {
   test('handles different session ID formats', async ({ page }) => {
     // UUID format
     await page.goto('/console?session=550e8400-e29b-41d4-a716-446655440000&connect=did:key:test')
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
 
     // Short session ID
     await page.goto('/console?session=abc123&connect=did:key:test')
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
 
     // Long session ID
     await page.goto('/console?session=very-long-session-id-with-many-characters-1234567890&connect=did:key:test')
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
   })
 })
 
@@ -71,7 +71,7 @@ test.describe('Console Login Page - API Integration', () => {
 
     // Load the page
     await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
 
     // The session should exist now (created lazily or by the page)
     // When we poll, it should return pending
@@ -88,7 +88,7 @@ test.describe('Console Login Page - API Integration', () => {
 
     // Load the page
     await page.goto(`/console?session=${sessionId}&connect=did:key:test`)
-    await expect(page.getByText('Authorize CLI')).toBeVisible()
+    await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
 
     // Simulate completing the session via API (as if user authenticated)
     const completeResponse = await request.put(`/api/console/session/${sessionId}`, {

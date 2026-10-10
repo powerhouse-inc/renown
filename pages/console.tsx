@@ -2,10 +2,17 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import styles from "../styles/Home.module.css";
 import { useRouter } from "next/router";
-import ConsoleFlow from "../components/auth/console-flow";
+import { AuthFlowLoading } from "../components/auth/auth-flow-loading";
 import { SiteLayout } from "../components/site/site-layout";
+import { withLazyWalletShell } from "../components/wallet/lazy-wallet-shell";
 import { useIsClient } from "../hooks/useIsClient";
 import { parseExpiresInDays } from "../utils/credential-validity";
+
+// The CLI sign-in flow with the wallet stack, loaded in the browser only.
+const ConsoleFlow = withLazyWalletShell(
+    () => import("../components/auth/console-flow").then((m) => m.default),
+    AuthFlowLoading,
+);
 
 const ConsolePage: NextPage = () => {
     const router = useRouter();

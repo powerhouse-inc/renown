@@ -1,7 +1,7 @@
 import type { GetServerSideProps, NextPage } from 'next'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { WebFlow } from '../components/auth/web-flow'
+import { AuthFlowLoading } from '../components/auth/auth-flow-loading'
 import { DevelopersTeaser, TEASER_CODE } from '../components/home/developers-teaser'
 import { EcosystemStrip } from '../components/home/ecosystem-strip'
 import { FeaturedApps } from '../components/home/featured-apps'
@@ -13,6 +13,7 @@ import { Pillars } from '../components/home/pillars'
 import type { HomePageData } from '../components/home/types'
 import { PageMeta } from '../components/site/page-meta'
 import { SiteLayout } from '../components/site/site-layout'
+import { withLazyWalletShell } from '../components/wallet/lazy-wallet-shell'
 import { useIsClient } from '../hooks/useIsClient'
 import { listAppProfiles } from '../services/app-profiles'
 import { fetchNetworkStats } from '../services/network-stats'
@@ -24,6 +25,13 @@ import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
 import styles from '../styles/Home.module.css'
 
 type HomeProps = { mode: 'auth' } | ({ mode: 'site' } & HomePageData)
+
+// The sign-in flow and the wallet stack load only on `/?app=` / `/?connect=`:
+// the marketing homepage ships no wallet code.
+const LazyWebFlow = withLazyWalletShell(
+  () => import('../components/auth/web-flow').then((m) => m.WebFlow),
+  AuthFlowLoading,
+)
 
 /** `/?app=` / `/?connect=`: the sign-in flow, exactly as before, in the minimal auth chrome. */
 function AuthHome() {
@@ -44,7 +52,7 @@ function AuthHome() {
         </Head>
         <div className={styles.main}>
           {appId && isClient && (
-            <WebFlow appId={appId} deeplink={deeplink} returnUrl={returnUrl} expiresInDays={expiresInDays} />
+            <LazyWebFlow appId={appId} deeplink={deeplink} returnUrl={returnUrl} expiresInDays={expiresInDays} />
           )}
         </div>
       </div>

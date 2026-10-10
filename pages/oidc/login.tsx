@@ -2,9 +2,16 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import styles from "../../styles/Home.module.css";
-import OidcLoginFlow from "../../components/auth/oidc-login-flow";
+import { AuthFlowLoading } from "../../components/auth/auth-flow-loading";
 import { SiteLayout } from "../../components/site/site-layout";
+import { withLazyWalletShell } from "../../components/wallet/lazy-wallet-shell";
 import { useIsClient } from "../../hooks/useIsClient";
+
+// The OIDC sign-in flow with the wallet stack, loaded in the browser only.
+const OidcLoginFlow = withLazyWalletShell(
+    () => import("../../components/auth/oidc-login-flow").then((m) => m.default),
+    AuthFlowLoading,
+);
 
 const OidcLoginPage: NextPage = () => {
     const router = useRouter();
