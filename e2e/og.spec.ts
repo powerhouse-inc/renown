@@ -265,3 +265,43 @@ test.describe('link-preview avatars are the real picture', () => {
     })
   }
 })
+
+test.describe('link-preview cover legibility and failures', () => {
+  const did = (name: string) => `did:key:z6MkSeo${name}xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.slice(0, 48) + '1'
+  const WHITE = did('WhiteCover')
+  const YELLOW = did('YeowCover')
+  const PHOTO = did('PhotoCover')
+  const FAIL = did('BrknCover')
+  test.beforeAll(async () => {
+    const row = (documentId: string) => ({ documentId, name: 'Treasury Console', tagline: 'Reconcile every wallet in one place', category: 'Finance', logo: null, logoRef: null, coverRef: `attachment://v1:${'4'.repeat(64)}` })
+    for (const [d, doc] of [[WHITE, 'stub-whitecover-doc'], [YELLOW, 'stub-yellowcover-doc'], [PHOTO, 'stub-photocover-doc'], [FAIL, 'stub-broken-doc']]) {
+      await fixtureStub({ match: 'OgApp', variables: d, response: { data: { appProfile: row(doc) } } })
+    }
+  })
+
+  // The scrim is lightest at the right edge: sample the text-free strip there. Anything the
+  // backdrop shows at the lightest end must still leave #94A3B8 text readable (backdrop <= 60 grey).
+  for (const [label, d] of [['white', WHITE], ['yellow', YELLOW], ['banded', PHOTO]] as const) {
+    test(`a ${label} cover keeps the text region dark`, async ({ request }) => {
+      const response = await request.get(`/api/og?variant=app&did=${d}`)
+      expect(response.headers()['x-og-background']).toBe('cover')
+      const { data, info } = await sharp(await response.body()).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+      let max = 0
+      for (let y = 100; y < 520; y++) {
+        for (let x = 960; x < 1150; x++) {
+          const i = (y * info.width + x) * 3
+          max = Math.max(max, data[i], data[i + 1], data[i + 2])
+        }
+      }
+      expect(max).toBeLessThan(60)
+    })
+  }
+
+  test('a cover that cannot be fetched draws the identity art but is cached as degraded', async ({ request }) => {
+    const response = await request.get(`/api/og?variant=app&did=${FAIL}`)
+    expect(response.status()).toBe(200)
+    expect(response.headers()['x-og-variant']).toBe('app')
+    expect(response.headers()['x-og-background']).toBe('art')
+    expect(response.headers()['cache-control']).toBe('public, max-age=60')
+  })
+})

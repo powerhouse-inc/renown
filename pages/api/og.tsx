@@ -67,7 +67,12 @@ function Backdrop({ background }: { background: OgBackground }) {
           left: 0,
           width: SIZE.width,
           height: SIZE.height,
-          backgroundImage: 'linear-gradient(90deg, rgba(5,10,26,0.9) 0%, rgba(5,10,26,0.72) 55%, rgba(5,10,26,0.5) 100%)',
+          // An app cover can be any brightness: a strong flat scrim guarantees text contrast
+          // (a white cover stays under ~45 grey). The art is dark by design and keeps a lighter one.
+          backgroundImage:
+            background.kind === 'cover'
+              ? 'linear-gradient(90deg, rgba(5,10,26,0.92) 0%, rgba(5,10,26,0.86) 100%)'
+              : 'linear-gradient(90deg, rgba(5,10,26,0.9) 0%, rgba(5,10,26,0.72) 55%, rgba(5,10,26,0.5) 100%)',
         }}
       />
     </div>
@@ -180,7 +185,10 @@ async function loadCard(url: URL): Promise<{ card: OgCard; degraded: boolean }> 
   const variant = url.searchParams.get('variant')
   try {
     if (variant === 'profile') return { card: (await loadProfileCard(url.searchParams.get('address') ?? '', publicOrigin())) ?? { variant: 'default' }, degraded: false }
-    if (variant === 'app') return { card: (await loadAppCard(url.searchParams.get('did') ?? '', publicOrigin())) ?? { variant: 'default' }, degraded: false }
+    if (variant === 'app') {
+      const card = (await loadAppCard(url.searchParams.get('did') ?? '', publicOrigin())) ?? { variant: 'default' as const }
+      return { card, degraded: card.variant === 'app' && card.degraded === true }
+    }
   } catch (error) {
     console.error('og: falling back to the default card:', error)
     return { card: { variant: 'default' }, degraded: true }

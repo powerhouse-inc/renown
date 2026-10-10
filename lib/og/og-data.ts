@@ -23,12 +23,15 @@ export interface OgBackground {
 export type OgCard =
   | { variant: 'default' }
   | { variant: 'profile'; name: string; handle: string | null; address: string; image: string | null; background: OgBackground | null }
-  | { variant: 'app'; name: string; tagline: string | null; category: string | null; logo: string | null; background: OgBackground | null }
+  | { variant: 'app'; name: string; tagline: string | null; category: string | null; logo: string | null; background: OgBackground | null; degraded?: boolean }
 
 async function artBackground(seed: string): Promise<OgBackground | null> {
   const src = await identityArtDataUrl(seed)
   return src ? { kind: 'art', src } : null
 }
+
+/** The media route answered 404/410: there is no such image (a valid answer, not an outage). */
+export class ImageNotFoundError extends Error {}
 
 async function graphql<T>(endpoint: string, query: string, variables: Record<string, unknown>): Promise<T> {
   const response = await fetch(endpoint, {
@@ -110,6 +113,7 @@ export async function fetchImageDataUrl(url: string, origin: string, box: ImageB
       target = new URL(location, target)
       continue
     }
+    if (response.status === 404 || response.status === 410) throw new ImageNotFoundError(`Image not found (${response.status})`)
     const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
     if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
     const bytes = await readCapped(response)
@@ -181,10 +185,22 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
   if (!app) return null
   const logoUrl = app.logoRef ? mediaUrl(app.documentId, 'logo', origin, app.logoRef) : null
   const coverUrl = app.coverRef ? mediaUrl(app.documentId, 'cover', origin, app.coverRef) : null
-  const [logo, cover] = await Promise.all([
+  // A missing or undecodable cover is decoration (the identity art stands in, cached normally);
+  // a cover that could not be fetched (timeout, 5xx, network, disallowed host) also falls back
+  // to the art but marks the card degraded so it is not cached as a success.
+  let degraded = false
+  const [logo, cover, art] = await Promise.all([
     logoUrl ? fetchImageDataUrl(logoUrl, origin, LOGO_BOX) : Promise.resolve(null),
-    // A cover that cannot be fetched or decoded is decoration: the identity art stands in.
-    coverUrl ? fetchImageDataUrl(coverUrl, origin, CARD_BOX).catch(() => null) : Promise.resolve(null),
+    coverUrl
+      ? fetchImageDataUrl(coverUrl, origin, CARD_BOX).catch((error) => {
+          if (!(error instanceof ImageNotFoundError)) {
+            console.error('og: cover fetch failed, drawing the identity art:', error)
+            degraded = true
+          }
+          return null
+        })
+      : Promise.resolve(null),
+    artBackground(did),
   ])
   return {
     variant: 'app',
@@ -192,6 +208,7 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
     tagline: app.tagline,
     category: app.category,
     logo,
-    background: cover ? { kind: 'cover', src: cover } : await artBackground(did),
+    background: cover ? { kind: 'cover', src: cover } : art,
+    ...(degraded ? { degraded } : {}),
   }
 }
