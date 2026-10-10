@@ -2,7 +2,7 @@
 // (RenownBuilder, renown.did, renown.login, renown.getBearerToken,
 // verifyAuthBearerToken, fetchDelegationCredential); keep them in sync with it.
 import type { CodeLang } from '../../lib/highlight'
-import { DEFAULT_OIDC_ISSUER } from '../../services/oidc'
+import { DEFAULT_OIDC_ISSUER } from '../../utils/oidc-issuer'
 
 export type SnippetKey = 'install' | 'identity' | 'callback' | 'bearer' | 'verify' | 'oidc' | 'graphql' | 'graphqlCurl'
 

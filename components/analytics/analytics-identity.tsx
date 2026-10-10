@@ -1,7 +1,7 @@
 'use client'
 
+import { useRenownAuth } from '@powerhousedao/reactor-browser/renown'
 import { useEffect, useRef } from 'react'
-import { useSession } from '../../hooks/use-wallet-adapter'
 import {
   clearProfileHint,
   useOpenPanelAnalytics,
@@ -9,11 +9,15 @@ import {
 } from '../../services/analytics'
 
 /**
- * Drives OpenPanel user identity from the active wallet session.
+ * Drives OpenPanel user identity from the Renown session.
  *
+ * The Renown session (`<Renown>` in _app) is restored on every page without
+ * the wallet stack, so returning users are identified on marketing pages too.
  * Identifies on login (address `undefined → defined`) and clears on logout
  * (`defined → undefined`). A `prevAddressRef` guards against re-firing on
  * unrelated re-renders — identify/clear run only on an actual transition.
+ * While the session is still being restored nothing happens, so a returning
+ * user is never cleared and re-identified on load.
  *
  * The wallet address is the stable profile ID; chain context travels as
  * properties. No credentials/JWTs are ever forwarded.
@@ -22,26 +26,24 @@ import {
  * next load's first pageview (see profile-hint.ts).
  */
 export function AnalyticsIdentity() {
-  const session = useSession()
+  const { status, user } = useRenownAuth()
   const { identify, clear } = useOpenPanelAnalytics()
   const prevAddressRef = useRef<string | null>(null)
+  const settled = status === 'authorized' || status === 'not-authorized'
+  const address = user?.address ?? null
+  const did = user?.did
+  const networkId = user?.networkId
+  const chainId = user?.chainId
 
   useEffect(() => {
-    const address = session?.address ?? null
+    if (!settled) return
     if (address === prevAddressRef.current) return
     prevAddressRef.current = address
 
-    if (address && session) {
+    if (address) {
       identify({
         profileId: address,
-        properties: {
-          address,
-          did: `did:pkh:${session.caip2}:${address}`,
-          networkId: session.caip2.split(':')[0],
-          chainId: session.chainId,
-          caip2: session.caip2,
-          accountType: session.accountType,
-        },
+        properties: { address, did, networkId, chainId, caip2: `${networkId}:${chainId}` },
       })
       try {
         writeProfileHint(address)
@@ -56,7 +58,7 @@ export function AnalyticsIdentity() {
         console.warn('[analytics] failed to clear profile hint', e)
       }
     }
-  }, [session, identify, clear])
+  }, [settled, address, did, networkId, chainId, identify, clear])
 
   return null
 }

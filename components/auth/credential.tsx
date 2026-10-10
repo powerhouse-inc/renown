@@ -7,7 +7,7 @@ import { useVerifyToken } from "../../hooks/useVerifyToken";
 import { useSession } from "../../hooks/use-wallet-adapter";
 import AppCard from "../ui/app-card";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../../services/analytics";
-import { RevokeSignatureRejectedError } from "../../services/wallet/orchestrator";
+import { RevokeSignatureRejectedError } from "../../services/wallet/errors";
 
 interface CredentialDetails {
     documentId: string;

@@ -6,6 +6,7 @@ import { buildAndSignEip712Vc } from './credentials'
 import type { AdapterListener, LoginMethod, LoginOptions, Session, Unsubscribe } from './types'
 import { revokeMessage } from '../renown-signed-messages'
 import { refreshProfile, type ProfileRefreshOutcome, type StoredProfile } from './profile-refresh'
+import { RevokeSignatureRejectedError } from './errors'
 
 /** Optional metadata sent with a newly issued delegation credential. */
 export interface IssueCredentialOptions {
@@ -16,13 +17,8 @@ export interface IssueCredentialOptions {
   expiresInDays?: number
 }
 
-/** Thrown when the wallet did not sign a revocation (the user declined, or signing failed). */
-export class RevokeSignatureRejectedError extends Error {
-  constructor(cause?: unknown) {
-    super('The revocation was not signed, so the credential is still active.', { cause })
-    this.name = 'RevokeSignatureRejectedError'
-  }
-}
+// Re-exported for compatibility; the class lives in a dependency-free module.
+export { RevokeSignatureRejectedError }
 
 /** Outcome of {@link AuthOrchestrator.issueDelegationVc}. */
 export interface IssueCredentialResult {

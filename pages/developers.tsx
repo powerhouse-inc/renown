@@ -9,7 +9,7 @@ import { APP_STATS_DOCS_URL, VETRA_URL } from '../components/site/nav'
 import { CodeBlock, Container, Eyebrow, Heading, Lead } from '../components/site/primitives'
 import { SiteLayout } from '../components/site/site-layout'
 import type { HighlightedCode } from '../lib/highlight'
-import { DEFAULT_OIDC_ISSUER } from '../services/oidc'
+import { DEFAULT_OIDC_ISSUER } from '../utils/oidc-issuer'
 import { DEFAULT_CREDENTIAL_VALIDITY_DAYS, MAX_CREDENTIAL_VALIDITY_DAYS } from '../utils/credential-validity'
 
 interface DevelopersProps {

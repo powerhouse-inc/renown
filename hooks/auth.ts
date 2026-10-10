@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { atom, useAtom } from 'jotai'
 import { useOrchestrator, useSession } from './use-wallet-adapter'
-import { RevokeSignatureRejectedError } from '../services/wallet/orchestrator'
+import { RevokeSignatureRejectedError } from '../services/wallet/errors'
 import { getProfile } from '../services/switchboard'
 
 const credentialIdAtom = atom<string | null>(null)

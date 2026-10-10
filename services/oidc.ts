@@ -1,9 +1,9 @@
 import { createSiweMessage } from "viem/siwe";
 import type { Hex } from "viem";
 
-/** Default Renown OIDC issuer, served by the Renown switchboard. */
-export const DEFAULT_OIDC_ISSUER =
-    "https://switchboard.renown.vetra.io/api/@powerhousedao/renown-package/oidc";
+import { DEFAULT_OIDC_ISSUER } from "../utils/oidc-issuer";
+
+export { DEFAULT_OIDC_ISSUER };
 
 export interface SiweTemplate {
     domain: string;
