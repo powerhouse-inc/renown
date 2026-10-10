@@ -1,15 +1,16 @@
-// Data for the link-preview route (pages/api/og.tsx, edge runtime): plain
-// fetch only. Every failure throws; the route answers with the default card.
+// Data for the link-preview route (pages/api/og.tsx, Node runtime). A failed
+// lookup or fetch throws, and the route answers with the default card; an image
+// that cannot be decoded draws the card with its monogram instead.
 import { APP_DID_RE } from '../../services/app-profiles'
 import { mediaUrl, switchboardOrigin } from '../../services/media'
 import { SWITCHBOARD_ENDPOINT } from '../../services/switchboard-endpoint'
+import { AVATAR_BOX, LOGO_BOX, toPngDataUrl, type ImageBox } from './og-image'
 
 export const OG_FETCH_TIMEOUT_MS = 2500
 const ADDRESS_RE = /^0x[0-9a-f]{40}$/
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
-const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif'])
-// Valid images Satori cannot draw: not a failure, the card draws its monogram instead.
-const UNDRAWABLE_IMAGE_TYPES = new Set(['image/webp', 'image/avif', 'image/svg+xml'])
+// Every image is converted to PNG before drawing (lib/og/og-image.ts).
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/svg+xml'])
 
 export type OgCard =
   | { variant: 'default' }
@@ -27,12 +28,6 @@ async function graphql<T>(endpoint: string, query: string, variables: Record<str
   const body = (await response.json()) as { data?: T; errors?: unknown[] }
   if (!body.data || body.errors?.length) throw new Error('GraphQL error')
   return body.data
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(binary)
 }
 
 const MAX_HOPS = 2
@@ -84,12 +79,13 @@ async function readCapped(response: Response): Promise<Uint8Array> {
 }
 
 /**
- * Fetches a media image as a data URL (PNG/JPEG/GIF, at most 4 MB); null for a
- * valid image in a format Satori cannot draw (WebP/AVIF/SVG); throws on
- * anything else. Redirects are followed by hand: at most two hops, each only to
- * an allowed host (see isAllowedTarget). `origin` is the site's public origin.
+ * Fetches a media image (PNG/JPEG/GIF/WebP/AVIF/SVG, at most 4 MB) as a PNG
+ * data URL that fits `box`; null when the bytes cannot be decoded or the image
+ * is too large to decode (the card draws its monogram); throws on anything else.
+ * Redirects are followed by hand: at most two hops, each only to an allowed
+ * host (see isAllowedTarget). `origin` is the site's public origin.
  */
-export async function fetchImageDataUrl(url: string, origin: string): Promise<string | null> {
+export async function fetchImageDataUrl(url: string, origin: string, box: ImageBox): Promise<string | null> {
   const signal = AbortSignal.timeout(OG_FETCH_TIMEOUT_MS)
   let target = new URL(url)
   for (let hop = 0; ; hop++) {
@@ -102,12 +98,15 @@ export async function fetchImageDataUrl(url: string, origin: string): Promise<st
       continue
     }
     const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-    if (response.ok && UNDRAWABLE_IMAGE_TYPES.has(type)) {
-      await response.body?.cancel()
+    if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
+    const bytes = await readCapped(response)
+    try {
+      return await toPngDataUrl(bytes, box)
+    } catch (error) {
+      // Corrupt bytes or a decompression bomb: a valid answer, not an outage.
+      console.warn('og: image could not be converted, drawing the monogram:', error instanceof Error ? error.message : error)
       return null
     }
-    if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
-    return `data:${type};base64,${toBase64(await readCapped(response))}`
   }
 }
 
@@ -138,7 +137,7 @@ export async function loadProfileCard(address: string, origin: string): Promise<
     name: profile.displayName || profile.username || `${lower.slice(0, 6)}…${lower.slice(-4)}`,
     handle: profile.handle,
     address: lower,
-    image: imageUrl ? await fetchImageDataUrl(imageUrl, origin) : null,
+    image: imageUrl ? await fetchImageDataUrl(imageUrl, origin, AVATAR_BOX) : null,
   }
 }
 
@@ -167,6 +166,6 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
     name: app.name || 'Untitled app',
     tagline: app.tagline,
     category: app.category,
-    logo: logoUrl ? await fetchImageDataUrl(logoUrl, origin) : null,
+    logo: logoUrl ? await fetchImageDataUrl(logoUrl, origin, LOGO_BOX) : null,
   }
 }

@@ -1,8 +1,13 @@
-// Font bytes for the link-preview route (pages/api/og.tsx). A non-OK answer
-// throws, so the route degrades to the default font instead of handing satori
-// an error page as a font.
-export async function fetchFont(url: URL, fetcher: typeof fetch = fetch): Promise<ArrayBuffer> {
-  const response = await fetcher(url)
-  if (!response.ok) throw new Error(`Font ${response.status}`)
-  return response.arrayBuffer()
+// Font bytes for the link-preview route (pages/api/og.tsx, Node runtime). The
+// fonts ship with the server: next.config.ts traces assets/fonts into the
+// standalone output for /api/og.
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+export const FONT_DIR = join(process.cwd(), 'assets', 'fonts')
+
+/** The font file `name` from `dir`; rejects when it cannot be read. */
+export async function readFont(name: string, dir = FONT_DIR): Promise<ArrayBuffer> {
+  const bytes = await readFile(join(dir, name))
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }

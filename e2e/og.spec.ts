@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { fixtureStub } from './support/stub-switchboard-client'
-import { fetchFont } from '../lib/og/og-font'
+import { readFont } from '../lib/og/og-font'
 
 // Fixtures use ids no other spec uses (they survive renown-writes.spec.ts's resets).
 // The OG route (pages/api/og.tsx) against the stub switchboard.
@@ -12,6 +12,10 @@ const HUGE = '0x5e00000000000000000000000000000000000c05'
 const EVIL = '0x5e00000000000000000000000000000000000c06'
 const LOOP = '0x5e00000000000000000000000000000000000c07'
 const WEBP = '0x5e00000000000000000000000000000000000c08'
+const AVIF = '0x5e00000000000000000000000000000000000c09'
+const SVG = '0x5e00000000000000000000000000000000000c0a'
+const BAD_WEBP = '0x5e00000000000000000000000000000000000c0b'
+const BOMB = '0x5e00000000000000000000000000000000000c0c'
 const WEBP_APP_DID = 'did:key:z6MkSeoWebpAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const APP_DID = 'did:key:z6MkSeoAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const profile = (documentId: string, avatar: string | null) => ({
@@ -35,11 +39,13 @@ test.beforeAll(async () => {
   for (const [address, doc] of [[TEXT, 'stub-text-doc'], [HUGE, 'stub-huge-doc'], [EVIL, 'stub-evil-doc'], [LOOP, 'stub-loop-doc']]) {
     await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'b'.repeat(64)}`)] } } })
   }
-  await fixtureStub({ match: 'OgProfile', variables: WEBP, response: { data: { renownUsers: [profile('stub-webp-doc', `attachment://v1:${'c'.repeat(64)}`)] } } })
+  for (const [address, doc] of [[WEBP, 'stub-webp-doc'], [AVIF, 'stub-avif-doc'], [SVG, 'stub-svg-doc'], [BAD_WEBP, 'stub-badwebp-doc'], [BOMB, 'stub-bomb-doc']]) {
+    await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'c'.repeat(64)}`)] } } })
+  }
   await fixtureStub({
     match: 'OgApp',
     variables: WEBP_APP_DID,
-    response: { data: { appProfile: { documentId: 'stub-webp-doc', name: 'Webp App', tagline: 'Draws a monogram', category: 'Tools', logo: null, logoRef: `attachment://v1:${'2'.repeat(64)}` } } },
+    response: { data: { appProfile: { documentId: 'stub-webp-doc', name: 'Webp App', tagline: 'Draws its WebP logo', category: 'Tools', logo: null, logoRef: `attachment://v1:${'2'.repeat(64)}` } } },
   })
   await fixtureStub({
     match: 'OgApp',
@@ -49,12 +55,13 @@ test.beforeAll(async () => {
 })
 
 test.describe('link-preview images', () => {
-  const variantOf = async (request: import('@playwright/test').APIRequestContext, query: string) => {
+  const cardOf = async (request: import('@playwright/test').APIRequestContext, query: string) => {
     const response = await request.get(`/api/og${query}`)
     expect(response.status(), query).toBe(200)
     expect(response.headers()['content-type'], query).toBe('image/png')
-    return response.headers()['x-og-variant']
+    return { variant: response.headers()['x-og-variant'], image: response.headers()['x-og-image'] }
   }
+  const variantOf = async (request: import('@playwright/test').APIRequestContext, query: string) => (await cardOf(request, query)).variant
 
   test('render the default, profile and app cards', async ({ request }) => {
     expect(await variantOf(request, '')).toBe('default')
@@ -66,9 +73,22 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe('profile')
   })
 
-  test('draw the intended card with a monogram when the image is WebP (Satori cannot draw it)', async ({ request }) => {
-    expect(await variantOf(request, `?variant=profile&address=${WEBP}`)).toBe('profile')
-    expect(await variantOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toBe('app')
+  test('draw the stored image: PNG as is, WebP, AVIF and SVG converted to PNG', async ({ request }) => {
+    expect(await cardOf(request, `?variant=app&did=${APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
+    expect(await cardOf(request, `?variant=profile&address=${WEBP}`)).toEqual({ variant: 'profile', image: 'drawn' })
+    expect(await cardOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
+    expect(await cardOf(request, `?variant=profile&address=${AVIF}`)).toEqual({ variant: 'profile', image: 'drawn' })
+    expect(await cardOf(request, `?variant=profile&address=${SVG}`)).toEqual({ variant: 'profile', image: 'drawn' })
+  })
+
+  test('draw the monogram when the image cannot be decoded or is a decompression bomb', async ({ request }) => {
+    expect(await cardOf(request, `?variant=profile&address=${BAD_WEBP}`)).toEqual({ variant: 'profile', image: 'monogram' })
+    expect(await cardOf(request, `?variant=profile&address=${BOMB}`)).toEqual({ variant: 'profile', image: 'monogram' })
+  })
+
+  test('without a stored image the card draws its monogram; the default card has no image', async ({ request }) => {
+    expect(await cardOf(request, `?variant=profile&address=${ADDRESS}`)).toEqual({ variant: 'profile', image: 'monogram' })
+    expect(await cardOf(request, '')).toEqual({ variant: 'default', image: 'none' })
   })
 
   test('fall back to the default card on a non-image, an oversized image, a foreign redirect or a redirect loop', async ({ request }) => {
@@ -100,6 +120,8 @@ test.describe('link-preview caching', () => {
     expect(await cacheOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe(LONG)
     expect(await cacheOf(request, `?variant=profile&address=${WEBP}`)).toBe(LONG)
     expect(await cacheOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toBe(LONG)
+    expect(await cacheOf(request, `?variant=profile&address=${BAD_WEBP}`)).toBe(LONG)
+    expect(await cacheOf(request, `?variant=profile&address=${BOMB}`)).toBe(LONG)
     expect(await cacheOf(request, '?variant=profile&address=0x5e00000000000000000000000000000000000c99')).toBe(LONG)
   })
 
@@ -110,8 +132,7 @@ test.describe('link-preview caching', () => {
   })
 })
 
-test('a font that answers non-OK is a failure, so the card falls back to the default font', async () => {
-  const answer = (status: number) => (async () => new Response(status === 200 ? 'font' : 'nope', { status })) as typeof fetch
-  await expect(fetchFont(new URL('https://example.test/f.ttf'), answer(404))).rejects.toThrow('Font 404')
-  expect(new TextDecoder().decode(await fetchFont(new URL('https://example.test/f.ttf'), answer(200)))).toBe('font')
+test('fonts are read from assets/fonts; a missing font is a failure, so the card falls back to the default font', async () => {
+  expect((await readFont('Inter-SemiBold.ttf')).byteLength).toBeGreaterThan(100_000)
+  await expect(readFont('Inter-SemiBold.ttf', '/nonexistent-font-dir')).rejects.toThrow()
 })

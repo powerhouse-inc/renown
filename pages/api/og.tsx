@@ -1,12 +1,13 @@
 import { ImageResponse } from 'next/og'
-import type { NextRequest } from 'next/server'
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { publicOrigin } from '../../utils/seo'
 import { loadAppCard, loadProfileCard, type OgCard } from '../../lib/og/og-data'
-import { fetchFont } from '../../lib/og/og-font'
+import { readFont } from '../../lib/og/og-font'
 
 // Link-preview images: /api/og?variant=default | profile&address=0x… | app&did=did:key:…
 // Any lookup or image failure answers with the default card (always 200).
-export const config = { runtime: 'edge' }
+// Node runtime (the pages-router default): images are converted with sharp
+// (lib/og/og-image.ts), which the edge runtime cannot load.
 
 const SIZE = { width: 1200, height: 630 }
 const INK = '#F4F7FF'
@@ -18,10 +19,7 @@ const BLUE = '#0080FF'
 // A failed font load is not cached (the next request retries) and never fails the route.
 let fontsPromise: Promise<[ArrayBuffer, ArrayBuffer]> | null = null
 function loadFonts(): Promise<[ArrayBuffer, ArrayBuffer] | null> {
-  fontsPromise ??= Promise.all([
-    fetchFont(new URL('../../assets/fonts/Inter-Regular.ttf', import.meta.url)),
-    fetchFont(new URL('../../assets/fonts/Inter-SemiBold.ttf', import.meta.url)),
-  ])
+  fontsPromise ??= Promise.all([readFont('Inter-Regular.ttf'), readFont('Inter-SemiBold.ttf')])
   return fontsPromise.catch((error) => {
     console.error('og: font load failed, rendering with the default font:', error)
     fontsPromise = null
@@ -157,21 +155,44 @@ async function loadCard(url: URL): Promise<{ card: OgCard; degraded: boolean }> 
 const CACHE_OK = 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400'
 const CACHE_DEGRADED = 'public, max-age=60'
 
-export default async function handler(req: NextRequest) {
-  const url = new URL(req.url)
-  const { card, degraded } = await loadCard(url)
-  const loaded = await loadFonts()
-  return new ImageResponse(render(card), {
+/** Whether the card drew the stored image, its monogram, or has no image slot (default card). */
+function imageState(card: OgCard): 'drawn' | 'monogram' | 'none' {
+  if (card.variant === 'profile') return card.image ? 'drawn' : 'monogram'
+  if (card.variant === 'app') return card.logo ? 'drawn' : 'monogram'
+  return 'none'
+}
+
+async function drawPng(card: OgCard, fonts: [ArrayBuffer, ArrayBuffer] | null): Promise<Buffer> {
+  const image = new ImageResponse(render(card), {
     ...SIZE,
-    ...(loaded && {
+    ...(fonts && {
       fonts: [
-        { name: 'Inter', data: loaded[0], weight: 400 as const, style: 'normal' as const },
-        { name: 'Inter', data: loaded[1], weight: 600 as const, style: 'normal' as const },
+        { name: 'Inter', data: fonts[0], weight: 400 as const, style: 'normal' as const },
+        { name: 'Inter', data: fonts[1], weight: 600 as const, style: 'normal' as const },
       ],
     }),
-    headers: {
-      'Cache-Control': degraded || !loaded ? CACHE_DEGRADED : CACHE_OK,
-      'X-Og-Variant': card.variant,
-    },
   })
+  return Buffer.from(await image.arrayBuffer())
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Only the query matters; the base is a placeholder.
+  const url = new URL(req.url ?? '/', 'http://og.invalid')
+  let { card, degraded } = await loadCard(url)
+  const fonts = await loadFonts()
+  let png: Buffer
+  try {
+    png = await drawPng(card, fonts)
+  } catch (error) {
+    // Satori refused this card (e.g. an image it cannot lay out): draw the default card instead.
+    console.error('og: drawing failed, falling back to the default card:', error)
+    card = { variant: 'default' }
+    degraded = true
+    png = await drawPng(card, fonts)
+  }
+  res.setHeader('Content-Type', 'image/png')
+  res.setHeader('Cache-Control', degraded || !fonts ? CACHE_DEGRADED : CACHE_OK)
+  res.setHeader('X-Og-Variant', card.variant)
+  res.setHeader('X-Og-Image', imageState(card))
+  res.status(200).send(png)
 }

@@ -22,14 +22,60 @@
 //   PUT  /__stub/s3/<sha256>   stores the bytes (checks the hash)
 //   GET  /__stub/s3/<sha256>   serves them
 //   GET  /api/@powerhousedao/renown-package/media/<doc>/<field>   302 to
+//        /__stub/og/<webp|avif|svg|badwebp|bomb>   OG image fixtures
 //        /__stub/s3/<STUB_AVATAR_SHA> for "stub-avatar-doc" + avatar and "stub-app-doc" + logo/cover, else 404
 //
 // Unscripted requests get empty read-model results, so pages rendered by other
 // specs keep working.
 import { createHash } from 'node:crypto'
 import http from 'node:http'
+import { crc32, deflateSync } from 'node:zlib'
 
 const port = Number(process.env.STUB_SWITCHBOARD_PORT || 4799)
+
+/** A PNG whose header claims `size` x `size` 1-bit pixels, all zero: a few KB that decode to `size`^2 pixels. */
+function pixelBombPng(size) {
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, 'latin1'), data])
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(body))
+    return Buffer.concat([length, body, crc])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(size, 0)
+  header.writeUInt32BE(size, 4)
+  header[8] = 1 // bit depth
+  header[9] = 0 // greyscale
+  const rows = Buffer.alloc(size * (1 + Math.ceil(size / 8)))
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(rows, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+// Images the OG route converts with sharp (e2e/og.spec.ts): valid WebP/AVIF/SVG,
+// a WebP with corrupt bytes, and a 64-megapixel PNG (over the 40 MP limit).
+const OG_IMAGES = {
+  webp: { type: 'image/webp', bytes: () => Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvB8ABAAfQ/4aUtv+BiOh/AAA=', 'base64') },
+  avif: {
+    type: 'image/avif',
+    bytes: () =>
+      Buffer.from(
+        'AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAANZtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAD6AAEAAAAAAAAAHQAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAVmlwcnAAAAA4aXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAgAAAAIAAAAEHBpeGkAAAAAAwgICAAAABZpcG1hAAAAAAAAAAEAAQOBAgMAAAAlbWRhdBIACgg4CL9hAQ0GkDIPGAAAAEAAsAxmyziV6Ug4',
+        'base64',
+      ),
+  },
+  svg: {
+    type: 'image/svg+xml',
+    bytes: () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#0080ff"/></svg>'),
+  },
+  badwebp: { type: 'image/webp', bytes: () => Buffer.concat([Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1'), Buffer.alloc(64, 0x5a)]) },
+  bomb: { type: 'image/png', bytes: () => pixelBombPng(8000) },
+}
 
 let script = []
 let requests = []
@@ -107,7 +153,17 @@ async function packageRoute(req, res) {
       return res.end()
     }
     // Fixtures for the OG route's image guards (e2e/og.spec.ts).
-    const hostile = { 'stub-text-doc': `http://localhost:${port}/__stub/og/text`, 'stub-huge-doc': `http://localhost:${port}/__stub/og/huge`, 'stub-evil-doc': 'https://evil.example/avatar.png', 'stub-loop-doc': `http://localhost:${port}/__stub/og/loop1`, 'stub-webp-doc': `http://localhost:${port}/__stub/og/webp` }
+    const hostile = {
+      'stub-text-doc': `http://localhost:${port}/__stub/og/text`,
+      'stub-huge-doc': `http://localhost:${port}/__stub/og/huge`,
+      'stub-evil-doc': 'https://evil.example/avatar.png',
+      'stub-loop-doc': `http://localhost:${port}/__stub/og/loop1`,
+      'stub-webp-doc': `http://localhost:${port}/__stub/og/webp`,
+      'stub-avif-doc': `http://localhost:${port}/__stub/og/avif`,
+      'stub-svg-doc': `http://localhost:${port}/__stub/og/svg`,
+      'stub-badwebp-doc': `http://localhost:${port}/__stub/og/badwebp`,
+      'stub-bomb-doc': `http://localhost:${port}/__stub/og/bomb`,
+    }
     if (hostile[media[1]]) {
       res.writeHead(302, { Location: hostile[media[1]] })
       return res.end()
@@ -115,15 +171,16 @@ async function packageRoute(req, res) {
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
-  const og = /^\/__stub\/og\/(text|huge|webp|loop1|loop2|loop3)$/.exec(url.pathname)
+  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|loop1|loop2|loop3)$/.exec(url.pathname)
   if (og && req.method === 'GET') {
     if (og[1] === 'text') {
       res.writeHead(200, { 'Content-Type': 'text/plain' })
       return res.end('not an image')
     }
-    if (og[1] === 'webp') {
-      res.writeHead(200, { 'Content-Type': 'image/webp' })
-      return res.end(Buffer.from('UklGRhYAAABXRUJQVlA4TAoAAAAvAAAAAAfQ//73/6L/', 'base64'))
+    const image = OG_IMAGES[og[1]]
+    if (image) {
+      res.writeHead(200, { 'Content-Type': image.type })
+      return res.end(image.bytes())
     }
     if (og[1] === 'huge') {
       res.writeHead(200, { 'Content-Type': 'image/png' })

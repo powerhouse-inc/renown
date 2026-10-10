@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     reactStrictMode: false,
     output: "standalone",
+    // /api/og reads its fonts from disk (lib/og/og-font.ts): ship them with the server.
+    outputFileTracingIncludes: {
+        "/api/og": ["./assets/fonts/Inter-Regular.ttf", "./assets/fonts/Inter-SemiBold.ttf"],
+    },
     images: {
         remotePatterns: [
             { protocol: "https", hostname: "euc.li" },
