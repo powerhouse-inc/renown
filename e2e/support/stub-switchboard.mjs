@@ -23,6 +23,7 @@
 //   GET  /__stub/s3/<sha256>   serves them
 //   GET  /api/@powerhousedao/renown-package/media/<doc>/<field>   302 to
 //        /__stub/og/<webp|avif|svg|badwebp|bomb>   OG image fixtures
+//        /__stub/og/<fakepng|hugepng>   /media route guards (e2e/media.spec.ts)
 //        /__stub/s3/<STUB_AVATAR_SHA> for "stub-avatar-doc" + avatar and "stub-app-doc" + logo/cover, else 404
 //
 // Unscripted requests get empty read-model results, so pages rendered by other
@@ -191,6 +192,8 @@ async function packageRoute(req, res) {
       'stub-whitecover-doc': `http://localhost:${port}/__stub/og/whitecover`,
       'stub-yellowcover-doc': `http://localhost:${port}/__stub/og/yellowcover`,
       'stub-photocover-doc': `http://localhost:${port}/__stub/og/photocover`,
+      'stub-fakepng-doc': `http://localhost:${port}/__stub/og/fakepng`,
+      'stub-hugepng-doc': `http://localhost:${port}/__stub/og/hugepng`,
     }
     if (hostile[media[1]]) {
       res.writeHead(302, { Location: hostile[media[1]] })
@@ -199,7 +202,7 @@ async function packageRoute(req, res) {
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
-  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|photopng|photowebp|photocover|whitecover|yellowcover|loop1|loop2|loop3)$/.exec(url.pathname)
+  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|photopng|photowebp|photocover|whitecover|yellowcover|fakepng|hugepng|loop1|loop2|loop3)$/.exec(url.pathname)
   if (og && req.method === 'GET') {
     if (og[1] === 'text') {
       res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -209,6 +212,18 @@ async function packageRoute(req, res) {
     if (image) {
       res.writeHead(200, { 'Content-Type': image.type })
       return res.end(image.bytes())
+    }
+    if (og[1] === 'fakepng') {
+      // Labelled PNG, but HTML bytes: the /media route must sniff, not trust the header.
+      res.writeHead(200, { 'Content-Type': 'image/png' })
+      return res.end('<html><script>alert(1)</script></html>')
+    }
+    if (og[1] === 'hugepng') {
+      // A PNG signature, then 6 MB streamed without a Content-Length (chunked): only the streaming cap stops it.
+      res.writeHead(200, { 'Content-Type': 'image/png' })
+      res.write(Buffer.from('89504e470d0a1a0a', 'hex'))
+      for (let i = 0; i < 6; i++) res.write(Buffer.alloc(1024 * 1024))
+      return res.end()
     }
     if (og[1] === 'huge') {
       res.writeHead(200, { 'Content-Type': 'image/png' })

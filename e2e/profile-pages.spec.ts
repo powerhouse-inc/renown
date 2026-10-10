@@ -107,11 +107,10 @@ test.describe('/media', () => {
     expect(image.headers()['content-type']).toBe('image/png')
   })
 
-  test('ignores a ?v= cache-busting query', async ({ request }) => {
+  test('answers a ?v= versioned URL with the bytes, same-origin (e2e/media.spec.ts)', async ({ request }) => {
     const response = await request.get('/media/stub-avatar-doc/avatar?v=0123456789ab', { maxRedirects: 0 })
-    expect(response.status()).toBe(302)
-    expect(response.headers().location).toMatch(new RegExp(`^${STUB_SWITCHBOARD_URL}/__stub/s3/[0-9a-f]{64}$`))
-    expect(response.headers()['cache-control']).toBe('public, max-age=60, stale-while-revalidate=240')
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toBe('image/png')
   })
 
   for (const [label, path] of [
