@@ -1,3 +1,25 @@
+## 1.22.0 (2026-10-10)
+
+* fix(a11y): check the page under RainbowKit's wrapper and meet AA contrast in light theme ([c77e719](https://github.com/powerhouse-inc/renown/commit/c77e719))
+* fix(app-page): balanced layout, related apps in the main column, nofollow on Open app, UK dates, lab ([ef76acb](https://github.com/powerhouse-inc/renown/commit/ef76acb))
+* fix(identity): keep identity art out of the olive and brown hues ([5706eb9](https://github.com/powerhouse-inc/renown/commit/5706eb9))
+* fix(me): stop waiting for a profile read that never answers ([ca1c23b](https://github.com/powerhouse-inc/renown/commit/ca1c23b))
+* fix(og): clamp long names, handles and taglines inside the card ([c4126df](https://github.com/powerhouse-inc/renown/commit/c4126df))
+* fix(og): guarantee text contrast over covers, degrade the card when a cover fetch fails ([8ed71a0](https://github.com/powerhouse-inc/renown/commit/8ed71a0))
+* fix(og): name legacy profiles like their page, bound sharp's CPU time, never 500 when drawing fails ([5c86913](https://github.com/powerhouse-inc/renown/commit/5c86913))
+* fix(pages): server-computed identity art, safe-links-only apps, titles, descriptions, verification c ([110014d](https://github.com/powerhouse-inc/renown/commit/110014d))
+* fix(profile): keep the Share panel on screen, one canonical URL, unsafe links count as no links ([51970b5](https://github.com/powerhouse-inc/renown/commit/51970b5))
+* fix(seo): plain-text JSON-LD descriptions for profiles and apps ([56d56b1](https://github.com/powerhouse-inc/renown/commit/56d56b1))
+* feat(app-page): cover or identity art, verification, plain-language stats, publisher and related app ([31aa8b0](https://github.com/powerhouse-inc/renown/commit/31aa8b0))
+* feat(identity): deterministic identity art for profiles and apps ([6428af8](https://github.com/powerhouse-inc/renown/commit/6428af8))
+* feat(identity): link services, profile names, server-side QR codes and JSON-LD ([a3a4a2e](https://github.com/powerhouse-inc/renown/commit/a3a4a2e))
+* feat(og): draw profile and app cards on their identity art, or the app cover ([933fa17](https://github.com/powerhouse-inc/renown/commit/933fa17))
+* feat(og): draw WebP, AVIF and SVG images by converting them with sharp on the Node runtime ([0f0eeaa](https://github.com/powerhouse-inc/renown/commit/0f0eeaa))
+* feat(profile): identity-art hero, verification, sharing, owner view and activity on public profiles ([7b307a4](https://github.com/powerhouse-inc/renown/commit/7b307a4))
+* fix(og,me): shorten long handles in the OG footer; only a TimeoutError counts as a timeout ([b2cbb9b](https://github.com/powerhouse-inc/renown/commit/b2cbb9b))
+* perf(site): load the wallet stack only on wallet routes and fail the build if marketing pages ship i ([403607f](https://github.com/powerhouse-inc/renown/commit/403607f))
+* refactor(wallet): decouple analytics, revoke errors and the OIDC issuer from the wallet stack ([065574b](https://github.com/powerhouse-inc/renown/commit/065574b))
+
 ## <small>1.21.1 (2026-10-09)</small>
 
 * perf(apps): load the first row of app covers eagerly ([28fb7c4](https://github.com/powerhouse-inc/renown/commit/28fb7c4))
