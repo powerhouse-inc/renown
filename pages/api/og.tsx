@@ -41,6 +41,14 @@ function Sparkle({ size }: { size: number }) {
   )
 }
 
+/**
+ * Text cut to `lines` lines with an ellipsis; words longer than a line break
+ * anywhere. User-provided names, handles and taglines can be any length.
+ */
+function clamp(lines: number): React.CSSProperties {
+  return { display: 'block', lineClamp: lines, overflow: 'hidden', wordBreak: 'break-word' }
+}
+
 function Frame({ children, footer }: { children: React.ReactNode; footer: string }) {
   return (
     <div
@@ -62,7 +70,7 @@ function Frame({ children, footer }: { children: React.ReactNode; footer: string
         <span style={{ fontSize: 36, fontWeight: 600, letterSpacing: -1 }}>Renown</span>
       </div>
       {children}
-      <div style={{ display: 'flex', fontSize: 24, color: MUTED }}>{footer}</div>
+      <div style={{ ...clamp(1), fontSize: 24, color: MUTED }}>{footer}</div>
     </div>
   )
 }
@@ -73,6 +81,7 @@ function Monogram({ text, size, radius }: { text: string; size: number; radius: 
       style={{
         width: size,
         height: size,
+        flexShrink: 0,
         borderRadius: radius,
         display: 'flex',
         alignItems: 'center',
@@ -95,13 +104,13 @@ function render(card: OgCard) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
           {card.image ? (
             // eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>
-            <img src={card.image} width={220} height={220} alt="" style={{ borderRadius: 220, objectFit: 'cover', border: `4px solid ${BLUE}` }} />
+            <img src={card.image} width={220} height={220} alt="" style={{ flexShrink: 0, borderRadius: 220, objectFit: 'cover', border: `4px solid ${BLUE}` }} />
           ) : (
             <Monogram text={card.name} size={220} radius={220} />
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
-            <span style={{ fontSize: 72, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>{card.name}</span>
-            {card.handle && <span style={{ fontSize: 34, color: SIGNAL }}>@{card.handle}</span>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minWidth: 0 }}>
+            <span style={{ ...clamp(2), fontSize: 72, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>{card.name}</span>
+            {card.handle && <span style={{ ...clamp(1), fontSize: 34, color: SIGNAL }}>@{card.handle}</span>}
             <span style={{ fontSize: 26, color: MUTED }}>{`${card.address.slice(0, 6)}…${card.address.slice(-4)} on Renown`}</span>
           </div>
         </div>
@@ -114,14 +123,14 @@ function render(card: OgCard) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 48 }}>
           {card.logo ? (
             // eslint-disable-next-line @next/next/no-img-element -- satori renders plain <img>
-            <img src={card.logo} width={200} height={200} alt="" style={{ borderRadius: 44, objectFit: 'cover' }} />
+            <img src={card.logo} width={200} height={200} alt="" style={{ flexShrink: 0, borderRadius: 44, objectFit: 'cover' }} />
           ) : (
             <Monogram text={card.name} size={200} radius={44} />
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 760 }}>
-            {card.category && <span style={{ fontSize: 24, color: SIGNAL }}>{card.category}</span>}
-            <span style={{ fontSize: 72, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>{card.name}</span>
-            {card.tagline && <span style={{ fontSize: 32, color: MUTED, lineHeight: 1.3 }}>{card.tagline}</span>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minWidth: 0 }}>
+            {card.category && <span style={{ ...clamp(1), fontSize: 24, color: SIGNAL }}>{card.category}</span>}
+            <span style={{ ...clamp(2), fontSize: 72, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>{card.name}</span>
+            {card.tagline && <span style={{ ...clamp(2), fontSize: 32, color: MUTED, lineHeight: 1.3 }}>{card.tagline}</span>}
           </div>
         </div>
       </Frame>

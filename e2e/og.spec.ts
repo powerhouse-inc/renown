@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import sharp from 'sharp'
 import { fixtureStub } from './support/stub-switchboard-client'
 import { readFont } from '../lib/og/og-font'
 
@@ -16,6 +17,12 @@ const AVIF = '0x5e00000000000000000000000000000000000c09'
 const SVG = '0x5e00000000000000000000000000000000000c0a'
 const BAD_WEBP = '0x5e00000000000000000000000000000000000c0b'
 const BOMB = '0x5e00000000000000000000000000000000000c0c'
+const LONG_NAME = '0x5e00000000000000000000000000000000000c0d'
+const LONG_WORD = '0x5e00000000000000000000000000000000000c0e'
+const LONG_APP_DID = 'did:key:z6MkSeoLongAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
+// 120 characters of real words, and one 120-character word.
+const LONG_TEXT = 'Quarterly Treasury Reconciliation Dashboard for Decentralised Autonomous Organisations and Their Many Contributors World'
+const LONG_RUN = 'W'.repeat(120)
 const WEBP_APP_DID = 'did:key:z6MkSeoWebpAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const APP_DID = 'did:key:z6MkSeoAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const profile = (documentId: string, avatar: string | null) => ({
@@ -28,6 +35,17 @@ const profile = (documentId: string, avatar: string | null) => ({
 })
 
 test.beforeAll(async () => {
+  await fixtureStub({
+    match: 'OgProfile',
+    variables: LONG_NAME,
+    response: { data: { renownUsers: [{ ...profile('stub-webp-doc', `attachment://v1:${'c'.repeat(64)}`), displayName: LONG_TEXT, handle: 'h'.repeat(120) }] } },
+  })
+  await fixtureStub({ match: 'OgProfile', variables: LONG_WORD, response: { data: { renownUsers: [{ ...profile('seo-doc-long', null), displayName: LONG_RUN }] } } })
+  await fixtureStub({
+    match: 'OgApp',
+    variables: LONG_APP_DID,
+    response: { data: { appProfile: { documentId: 'stub-webp-doc', name: LONG_TEXT, tagline: LONG_TEXT, category: LONG_TEXT, logo: null, logoRef: `attachment://v1:${'2'.repeat(64)}` } } },
+  })
   await fixtureStub({ match: 'OgProfile', variables: ADDRESS, response: { data: { renownUsers: [profile('seo-doc-1', null)] } } })
   // Its avatar is not stored on the stub: the image fetch 404s.
   await fixtureStub({
@@ -103,6 +121,45 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, `?variant=profile&address=${BROKEN}`)).toBe('default')
     expect(await variantOf(request, '?variant=app&did=did:web:nope')).toBe('default')
     expect(await variantOf(request, '?variant=bogus')).toBe('default')
+  })
+})
+
+/**
+ * Pixels of card text (ink #F4F7FF or muted #94A3B8; every channel > 140) in the
+ * right 48 px or the bottom 40 px of the card, where no text belongs: text that
+ * runs past its box shows up there. The background and the green/blue accents
+ * have a channel <= 140.
+ */
+async function textPixelsInMargins(png: Buffer): Promise<number> {
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+  let count = 0
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      if (x < info.width - 48 && y < info.height - 40) continue
+      const i = (y * info.width + x) * 3
+      if (data[i] > 140 && data[i + 1] > 140 && data[i + 2] > 140) count++
+    }
+  }
+  return count
+}
+
+test.describe('link-preview text', () => {
+  for (const [label, query] of [
+    ['a 120-character app name, tagline and category', `?variant=app&did=${LONG_APP_DID}`],
+    ['a 120-character display name and handle', `?variant=profile&address=${LONG_NAME}`],
+    ['a 120-character name without spaces', `?variant=profile&address=${LONG_WORD}`],
+  ]) {
+    test(`clamps ${label} inside the card`, async ({ request }) => {
+      const response = await request.get(`/api/og${query}`)
+      expect(response.status()).toBe(200)
+      expect(response.headers()['x-og-variant']).not.toBe('default')
+      expect(await textPixelsInMargins(await response.body())).toBe(0)
+    })
+  }
+
+  test('a short card keeps its text margins clear too', async ({ request }) => {
+    const response = await request.get(`/api/og?variant=app&did=${APP_DID}`)
+    expect(await textPixelsInMargins(await response.body())).toBe(0)
   })
 })
 
