@@ -12,9 +12,10 @@ export const MAX_MEDIA_HOPS = 2
 /**
  * Hosts a media fetch may be redirected to, besides the switchboard: the
  * attachment storage behind the /media route's signed redirect.
- * Comma-separated hostnames in OG_MEDIA_HOSTS; the default is the production
- * bucket host (nbg1.your-objectstorage.com, seen by curling a real /media URL).
- * Storage hosts must be https.
+ * Comma-separated hosts in OG_MEDIA_HOSTS (`host` for the default port 443, or
+ * `host:port`); the default is the production bucket host
+ * (nbg1.your-objectstorage.com, seen by curling a real /media URL). Storage
+ * hosts must be https.
  */
 export function storageHosts(): string[] {
   return (process.env.OG_MEDIA_HOSTS || 'nbg1.your-objectstorage.com')
@@ -26,35 +27,34 @@ export function storageHosts(): string[] {
 /** The switchboard, any of `origins`, or an allowed https storage host. */
 export function isAllowedMediaTarget(target: URL, origins: string[] = []): boolean {
   if ([switchboardOrigin(), ...origins].some((origin) => target.origin === new URL(origin).origin)) return true
-  return target.protocol === 'https:' && storageHosts().includes(target.hostname.toLowerCase())
+  // URL.host carries the port only when it is not the scheme default, so a bare entry means port 443 only.
+  return target.protocol === 'https:' && storageHosts().includes(target.host.toLowerCase())
 }
 
 export class MediaHostNotAllowedError extends Error {}
 export class MediaTooLargeError extends Error {}
 
 /**
- * Fetches `url`, following at most MAX_MEDIA_HOPS redirects, each only to an
- * allowed target (throws MediaHostNotAllowedError otherwise). Returns the
- * first non-redirect response and the URLs visited (the request URL first).
+ * Fetches `url`, following at most `maxHops` (default MAX_MEDIA_HOPS)
+ * redirects, each only to an allowed target (throws MediaHostNotAllowedError
+ * otherwise, the request URL included). Returns the first non-redirect response.
  */
 export async function fetchAllowedMedia(
   url: string | URL,
-  { signal, origins = [] }: { signal: AbortSignal; origins?: string[] },
-): Promise<{ response: Response; visited: URL[] }> {
+  { signal, origins = [], maxHops = MAX_MEDIA_HOPS }: { signal: AbortSignal; origins?: string[]; maxHops?: number },
+): Promise<{ response: Response }> {
   let target = new URL(url)
-  const visited: URL[] = []
   for (let hop = 0; ; hop++) {
-    if (!isAllowedMediaTarget(target, origins)) throw new MediaHostNotAllowedError(`Media host not allowed: ${target.hostname}`)
-    visited.push(target)
+    if (!isAllowedMediaTarget(target, origins)) throw new MediaHostNotAllowedError(`Media host not allowed: ${target.host}`)
     const response = await fetch(target, { signal, redirect: 'manual' })
     const location = response.headers.get('location')
     if (response.status >= 300 && response.status < 400 && location) {
       await response.body?.cancel().catch(() => undefined)
-      if (hop >= MAX_MEDIA_HOPS) throw new Error('Too many media redirects')
+      if (hop >= maxHops) throw new Error('Too many media redirects')
       target = new URL(location, target)
       continue
     }
-    return { response, visited }
+    return { response }
   }
 }
 
@@ -86,6 +86,26 @@ export async function readCapped(response: Response, maxBytes: number): Promise<
     offset += chunk.byteLength
   }
   return bytes
+}
+
+/** Reads at most `limit` bytes from the start of a body, then cancels the rest (for sniffing without downloading). */
+export async function readHead(response: Response, limit = 16): Promise<Uint8Array> {
+  if (!response.body) return new Uint8Array(0)
+  const reader = response.body.getReader()
+  const out = new Uint8Array(limit)
+  let filled = 0
+  try {
+    while (filled < limit) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const take = value.subarray(0, limit - filled)
+      out.set(take, filled)
+      filled += take.length
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+  return out.subarray(0, filled)
 }
 
 /** Raster types the /media route serves, proven by their leading bytes. */
