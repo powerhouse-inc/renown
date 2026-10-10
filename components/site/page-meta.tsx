@@ -1,4 +1,5 @@
 import Head from 'next/head'
+import type { ReactNode } from 'react'
 import { canonicalUrl, DEFAULT_DESCRIPTION, ogImageUrl, SITE_NAME } from '../../utils/seo'
 
 export interface PageMetaProps {
@@ -16,6 +17,10 @@ export interface PageMetaProps {
   noindex?: boolean
   /** JSON-LD objects rendered as application/ld+json scripts. */
   jsonLd?: object[]
+  /** The whole <title> when it is not "<title> - Renown" (e.g. "Ada (@ada) on Renown"); og/twitter titles still use `title`. */
+  documentTitle?: string
+  /** Extra head tags (e.g. profile:username). */
+  children?: ReactNode
 }
 
 /** Every page's <head> SEO block: title, description, canonical, Open Graph, Twitter, JSON-LD. */
@@ -28,8 +33,10 @@ export function PageMeta({
   ogType = 'website',
   noindex = false,
   jsonLd = [],
+  documentTitle,
+  children,
 }: PageMetaProps) {
-  const fullTitle = title ? `${title} - ${SITE_NAME}` : `${SITE_NAME} - One identity for the Powerhouse network`
+  const fullTitle = documentTitle ? documentTitle : title ? `${title} - ${SITE_NAME}` : `${SITE_NAME} - One identity for the Powerhouse network`
   const url = path ? canonicalUrl(path) : null
   return (
     <Head>
@@ -55,6 +62,7 @@ export function PageMeta({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\\u003c') }}
         />
       ))}
+      {children}
     </Head>
   )
 }

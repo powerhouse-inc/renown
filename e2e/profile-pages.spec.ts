@@ -48,7 +48,12 @@ test.describe('public profile', () => {
     await expect(page.getByText('Line one')).toBeVisible()
     await expect(page.getByRole('link', { name: /Site/ })).toHaveAttribute('href', 'https://pat.example')
     await expect(page.getByRole('link', { name: /Bad/ })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Copy address' })).toContainText(ADDRESS)
+    const panel = page.getByRole('region', { name: 'Check this identity' })
+    await expect(panel).toContainText(ADDRESS)
+    await expect(panel).toContainText(`did:pkh:eip155:1:${ADDRESS}`)
+    await expect(panel.getByRole('button', { name: 'Copy address' })).toBeVisible()
+    await expect(panel.getByRole('link', { name: 'View on Etherscan' })).toHaveAttribute('href', `https://etherscan.io/address/${ADDRESS}`)
+    await expect(page).toHaveTitle('Pat Pages (@pat-pages) on Renown')
     // Server-rendered markup points at /media; client-side the stub has no bytes for
     // this doc, so the avatar then falls through to the identicon.
     expect(html).toContain(`src="/media/doc-pages-1/avatar?v=${'f'.repeat(12)}"`)

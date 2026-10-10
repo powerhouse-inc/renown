@@ -1,21 +1,26 @@
 import type { GetServerSideProps, NextPage } from 'next'
-import { ProfileStats } from '../../components/profile/profile-stats'
-import { getUserStats, type UserStatEntry } from '../../services/app-stats'
-import Head from 'next/head'
+import { ProfileHero, type ProfileFact } from '../../components/profile/profile-hero'
+import { ProfileIdentityPanel } from '../../components/profile/profile-identity-panel'
+import { ProfileAbout, ProfileActivity, ProfileApps, ProfileEmpty } from '../../components/profile/profile-sections'
+import { PageMeta } from '../../components/site/page-meta'
+import { Container } from '../../components/site/primitives'
 import { SiteLayout } from '../../components/site/site-layout'
-import { AppProfileCard } from '../../components/app/app-profile-card'
-import { getAppProfilesByPublisher, type RenownAppProfile } from '../../services/app-profiles'
 import { NotFoundPage } from '../../components/ui/not-found-page'
-import RenownCard from '../../components/ui/renown-card'
-import { CopyAddress } from '../../components/profile/copy-address'
-import { OwnProfileActions } from '../../components/profile/own-profile-actions'
-import { ProfileSummary, profileName } from '../../components/profile/profile-summary'
+import { profileJsonLd } from '../../lib/json-ld'
+import { profileCompleteness } from '../../lib/me/completeness'
+import { ADDRESS_RE, memberSince, profileDisplayName, walletDid } from '../../lib/profile-identity'
+import { qrCode, type QrCode } from '../../lib/qr'
+import { getAppProfilesByPublisher, type RenownAppProfile } from '../../services/app-profiles'
+import { getUserStats, type UserStatEntry } from '../../services/app-stats'
+import { mediaUrl } from '../../services/media'
 import { fetchProfile, type RenownProfile } from '../../services/switchboard'
 import { DEFAULT_DRIVE_ID } from '../../utils/constants'
 import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
 import { ogImageUrl } from '../../utils/seo'
 import { siteOrigin } from '../../utils/site-origin'
+import { groupUserStats } from '../../utils/stat-format'
+import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 
 interface ProfilePageProps {
   profile: RenownProfile | null
@@ -26,99 +31,94 @@ interface ProfilePageProps {
   canonicalUrl: string | null
   /** Absolute link-preview image (the generated /api/og profile card). */
   ogImage: string | null
+  /** QR code of canonicalUrl for the share menu (computed here, on the server). */
+  qr: QrCode | null
   error?: string
 }
 
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`
+}
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, stats, canonicalUrl, ogImage, error }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, stats, canonicalUrl, ogImage, qr, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!profile) {
-    return <NotFoundPage title="Profile not found" message="The profile you're looking for doesn't exist or has been removed." />
+    return <NotFoundPage title="Profile not found" message="No Renown profile has this name or address. Check the link, or browse apps to find people who publish them." />
   }
 
-  const address = profile.ethAddress ?? ''
-  const name = profileName({ displayName: profile.displayName, username: profile.username, address: address || profile.documentId })
-  const title = profile.handle ? `${name} (@${profile.handle})` : name
-  const description = profile.bio || `${name} on Renown`
+  const address = profile.ethAddress && ADDRESS_RE.test(profile.ethAddress) ? profile.ethAddress.toLowerCase() : null
+  const name = profileDisplayName(profile)
+  const ogTitle = profile.handle ? `${name} (@${profile.handle})` : name
+  const description = profile.bio?.trim() || `${name} on Renown, the identity layer of the Powerhouse network.`
+  const ensName = ensVerified && profile.username && profile.username !== name ? profile.username : null
+  const groups = groupUserStats(stats)
+  const since = memberSince(profile.createdAt)
+  const facts: ProfileFact[] = [
+    ...(since ? [{ key: 'since', icon: 'calendar' as const, text: `Member since ${since}` }] : []),
+    ...(apps.length > 0 ? [{ key: 'apps', icon: 'apps' as const, text: `${plural(apps.length, 'app', 'apps')} published` }] : []),
+    ...(groups.length > 0 ? [{ key: 'active', icon: 'activity' as const, text: `Active in ${plural(groups.length, 'app', 'apps')}` }] : []),
+  ]
+  const links = profile.links ?? []
+  const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0
+  const path = profilePath(profile)
+  const url = canonicalUrl ?? path
+  const image = profile.avatar && canonicalUrl ? mediaUrl(profile.documentId, 'avatar', new URL(canonicalUrl).origin, profile.avatar) : null
 
   return (
     <SiteLayout>
-      <Head>
-        <title>{`${title} - Renown`}</title>
-        <meta name="description" content={description} />
-        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-        <meta property="og:type" content="profile" />
-        <meta property="og:title" content={title} />
-        <meta property="og:description" content={description} />
-        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
-        {ogImage && <meta property="og:image" content={ogImage} />}
-        {profile.handle && <meta property="profile:username" content={profile.handle} />}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={title} />
-        <meta name="twitter:description" content={description} />
-        {ogImage && <meta name="twitter:image" content={ogImage} />}
-      </Head>
+      <PageMeta
+        title={ogTitle}
+        documentTitle={`${ogTitle} on Renown`}
+        description={description}
+        path={path}
+        ogType="profile"
+        {...(ogImage && { image: ogImage })}
+        jsonLd={[profileJsonLd({ profile, name, url, image, did: address ? walletDid(address) : null })]}
+      >
+        {profile.handle && <meta property="profile:username" content={profile.handle} key="profile:username" />}
+      </PageMeta>
 
-      <div className="relative flex justify-center px-4 pt-12 pb-20 md:pt-16">
-        <div className="w-full max-w-2xl">
-          <RenownCard>
-            <div className="space-y-8 p-8">
-              <ProfileSummary
-                profile={{
-                  documentId: profile.documentId,
-                  address: address || profile.documentId,
-                  displayName: profile.displayName,
-                  username: profile.username,
-                  handle: profile.handle,
-                  bio: profile.bio,
-                  links: profile.links,
-                  avatar: profile.avatar,
-                  userImage: profile.userImage,
-                  ensVerified,
-                  isPublisher: apps.length > 0,
-                }}
-              />
-              {apps.length > 0 && (
-                <section aria-labelledby="apps-published" className="space-y-3">
-                  <h2 id="apps-published" className="text-foreground px-1 text-lg font-semibold">
-                    Apps published
-                  </h2>
-                  <div className="grid gap-3">
-                    {apps.map((app) => (
-                      <AppProfileCard key={app.appDid} app={app} />
-                    ))}
-                  </div>
-                </section>
-              )}
-              <ProfileStats stats={stats} />
-              <div className="space-y-3">
-                {ADDRESS_RE.test(address) && <CopyAddress address={address} />}
-                <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 px-1 text-sm">
-                  {profile.createdAt && (
-                    <span>
-                      Member since{' '}
-                      {new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
-                    </span>
-                  )}
-                  <span className="font-mono text-xs" title="RenownID">
-                    {profile.documentId}
-                  </span>
-                </div>
-              </div>
-              {ADDRESS_RE.test(address) && <OwnProfileActions address={address} />}
-            </div>
-          </RenownCard>
+      <Container className="max-w-[1120px] pt-6 pb-20 md:pt-10">
+        <ProfileHero
+          profile={profile}
+          name={name}
+          address={address}
+          ensName={ensName}
+          facts={facts}
+          completeness={profileCompleteness(profile)}
+          shareUrl={url}
+          qr={qr}
+        />
+        <div className="mt-12 grid gap-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
+          <div className="min-w-0 space-y-12">
+            {hasContent ? (
+              <>
+                <ProfileAbout bio={profile.bio ?? null} links={links} />
+                <ProfileApps apps={apps} />
+                <ProfileActivity groups={groups} />
+              </>
+            ) : (
+              <ProfileEmpty name={name} />
+            )}
+          </div>
+          <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+            <ProfileIdentityPanel address={address} documentId={profile.documentId} />
+          </aside>
         </div>
-      </div>
+      </Container>
     </SiteLayout>
   )
+}
+
+/** A secondary read: bounded by the SSR budget; a failure or timeout drops its section. */
+function optional<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return withTimeout(promise, SSR_DATA_TIMEOUT_MS).catch(() => fallback)
 }
 
 export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (context) => {
   const id = String(context.params?.id ?? '')
   const byHandle = context.query.by === 'handle'
-  const empty = { profile: null, ensVerified: false, apps: [], stats: [], canonicalUrl: null, ogImage: null }
+  const empty = { profile: null, ensVerified: false, apps: [], stats: [], canonicalUrl: null, ogImage: null, qr: null }
   if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
   let profile: RenownProfile | null
@@ -151,27 +151,19 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   }
 
   const origin = siteOrigin(context.req.headers.host)
-  const ogImage = ADDRESS_RE.test(profile.ethAddress ?? '')
-    ? ogImageUrl({ variant: 'profile', address: profile.ethAddress ?? '' }, origin)
-    : ogImageUrl({ variant: 'default' }, origin)
-  context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   const address = profile.ethAddress ?? ''
   const wallet = ADDRESS_RE.test(address)
+  const ogImage = wallet ? ogImageUrl({ variant: 'profile', address }, origin) : ogImageUrl({ variant: 'default' }, origin)
+  context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
+  // Secondary sections: each drops out on failure or timeout; the profile always renders.
   const [ensVerified, apps, stats] = await Promise.all([
     isEnsVerified(profile.username, profile.ethAddress),
-    wallet ? getAppProfilesByPublisher(address.toLowerCase()) : Promise.resolve([]),
-    // Stats are decoration: a failed read must never break the page.
-    wallet ? getUserStats(address).catch(() => []) : Promise.resolve([]),
+    wallet ? optional(getAppProfilesByPublisher(address.toLowerCase()), []) : Promise.resolve([]),
+    wallet ? optional(getUserStats(address), []) : Promise.resolve([]),
   ])
+  const canonicalUrl = `${origin}${profilePath(profile)}`
   return {
-    props: {
-      profile,
-      ensVerified,
-      apps,
-      stats,
-      canonicalUrl: `${origin}${profilePath(profile)}`,
-      ogImage,
-    },
+    props: { profile, ensVerified, apps, stats, canonicalUrl, ogImage, qr: qrCode(canonicalUrl) },
   }
 }
 

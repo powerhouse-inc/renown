@@ -60,7 +60,7 @@ test.beforeAll(async () => {
 
 test('a profile shows its stats grouped by app', async ({ page }) => {
   expect((await page.goto('/@stats-maker'))?.status()).toBe(200)
-  await expect(page.getByRole('heading', { name: 'Stats', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: /Alpha Notes/ })).toHaveAttribute('href', `/app/${ALPHA}`)
   await expect(page.locator('img[alt="Alpha Notes logo"]')).toHaveAttribute('src', `/media/stub-app-doc/logo?v=${SHA.slice(0, 12)}`)
   const notes = page.locator(`[data-app-did="${ALPHA}"] [data-metric="notes"]`)
@@ -78,11 +78,11 @@ test('a profile shows its stats grouped by app', async ({ page }) => {
 test('a profile without stats shows no stats section', async ({ page }) => {
   expect((await page.goto('/@no-stats-maker'))?.status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Quinn Quiet' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Stats', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toHaveCount(0)
 })
 
 test('a failing stats read hides the section and the profile still renders', async ({ page }) => {
   expect((await page.goto('/@broken-stats-maker'))?.status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Bo Broken' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Stats', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Activity', exact: true })).toHaveCount(0)
 })

@@ -58,9 +58,9 @@ test.beforeAll(async () => {
   })
 })
 
-test('a publisher profile lists its apps and shows the Publisher badge', async ({ page }) => {
+test('a publisher profile lists its apps and counts them', async ({ page }) => {
   expect((await page.goto('/@app-maker'))?.status()).toBe(200)
-  await expect(page.getByText('Publisher', { exact: true })).toBeVisible()
+  await expect(page.getByText('2 apps published')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Apps published' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Alpha/ })).toHaveAttribute('href', `/app/${ALPHA}`)
   await expect(page.getByRole('link', { name: /Beta/ })).toHaveAttribute('href', `/app/${BETA}`)
@@ -74,7 +74,7 @@ test('a publisher profile lists its apps and shows the Publisher badge', async (
 test('a profile without apps shows neither', async ({ page }) => {
   expect((await page.goto('/@no-apps-maker'))?.status()).toBe(200)
   await expect(page.getByRole('heading', { name: 'Nia None' })).toBeVisible()
-  await expect(page.getByText('Publisher', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/apps? published/)).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Apps published' })).toHaveCount(0)
 })
 

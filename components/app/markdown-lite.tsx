@@ -38,10 +38,10 @@ function inline(nodes: Inline[]): ReactNode[] {
   })
 }
 
-function block(node: Block, i: number): ReactNode {
+function block(node: Block, i: number, headingBase: 2 | 3): ReactNode {
   switch (node.type) {
     case 'heading': {
-      const Tag = node.level === 1 ? 'h2' : node.level === 2 ? 'h3' : 'h4'
+      const Tag = (['h2', 'h3', 'h4', 'h5'] as const)[headingBase - 2 + node.level - 1]
       const size = node.level === 1 ? 'text-xl' : node.level === 2 ? 'text-lg' : 'text-base'
       return (
         <Tag key={i} className={`text-foreground font-semibold ${size}`}>
@@ -70,7 +70,11 @@ function block(node: Block, i: number): ReactNode {
   }
 }
 
-/** A description in the markdown subset, as React elements only (no HTML is ever injected). */
-export function MarkdownLite({ text, className = '' }: { text: string; className?: string }) {
-  return <div className={`text-foreground/90 space-y-3 break-words ${className}`}>{parseMarkdownLite(text).map(block)}</div>
+/**
+ * A description in the markdown subset, as React elements only (no HTML is ever
+ * injected). `headingBase`: the element of a level-1 heading (2 = h2), so the
+ * text's headings sit below the section heading that contains it.
+ */
+export function MarkdownLite({ text, className = '', headingBase = 2 }: { text: string; className?: string; headingBase?: 2 | 3 }) {
+  return <div className={`text-foreground/90 space-y-3 break-words ${className}`}>{parseMarkdownLite(text).map((node, i) => block(node, i, headingBase))}</div>
 }
