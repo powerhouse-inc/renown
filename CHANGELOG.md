@@ -1,3 +1,10 @@
+## <small>1.22.1 (2026-10-10)</small>
+
+* fix(media): bound the same-origin byte route ([7cd8f94](https://github.com/powerhouse-inc/renown/commit/7cd8f94))
+* perf(media): serve versioned images same-origin ([9ba479a](https://github.com/powerhouse-inc/renown/commit/9ba479a))
+* perf(pages): prioritise and preload the LCP cover ([a236afe](https://github.com/powerhouse-inc/renown/commit/a236afe))
+* refactor(og): share the allowlisted media fetch helper ([eb7fdd4](https://github.com/powerhouse-inc/renown/commit/eb7fdd4))
+
 ## 1.22.0 (2026-10-10)
 
 * fix(a11y): check the page under RainbowKit's wrapper and meet AA contrast in light theme ([c77e719](https://github.com/powerhouse-inc/renown/commit/c77e719))
