@@ -3,6 +3,7 @@
 // that cannot be decoded draws the card with its monogram instead.
 import { APP_DID_RE } from '../../services/app-profiles'
 import { mediaUrl, switchboardOrigin } from '../../services/media'
+import { fetchAllowedMedia, readCapped } from '../media-fetch'
 import { SWITCHBOARD_ENDPOINT } from '../../services/switchboard-endpoint'
 import { CARD_BOX, identityArtDataUrl } from './og-art'
 import { AVATAR_BOX, LOGO_BOX, toPngDataUrl, type ImageBox } from './og-image'
@@ -58,84 +59,26 @@ async function graphql<T>(endpoint: string, query: string, variables: Record<str
   return body.data
 }
 
-const MAX_HOPS = 2
-
-/**
- * Hosts an image fetch may be redirected to, besides the site's own origin and
- * the switchboard: the attachment storage behind the /media route's signed
- * redirect. Comma-separated hostnames in OG_MEDIA_HOSTS; the default is the
- * production bucket host (nbg1.your-objectstorage.com, seen by curling a real
- * /media URL). Storage hosts must be https.
- */
-function storageHosts(): string[] {
-  return (process.env.OG_MEDIA_HOSTS || 'nbg1.your-objectstorage.com')
-    .split(',')
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean)
-}
-
-function isAllowedTarget(target: URL, origin: string): boolean {
-  if (target.origin === new URL(origin).origin || target.origin === new URL(switchboardOrigin()).origin) return true
-  return target.protocol === 'https:' && storageHosts().includes(target.hostname.toLowerCase())
-}
-
-/** Reads a body with a hard byte cap, cancelling the stream past it. */
-async function readCapped(response: Response): Promise<Uint8Array> {
-  const declared = Number(response.headers.get('content-length'))
-  if (declared > MAX_IMAGE_BYTES) throw new Error('Image too large')
-  if (!response.body) throw new Error('Empty image body')
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > MAX_IMAGE_BYTES) {
-      await reader.cancel()
-      throw new Error('Image too large')
-    }
-    chunks.push(value)
-  }
-  const bytes = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return bytes
-}
-
 /**
  * Fetches a media image (PNG/JPEG/GIF/WebP/AVIF/SVG, at most 4 MB) as a PNG
  * data URL that fits `box`; null when the bytes cannot be decoded or the image
  * is too large to decode (the card draws its monogram); throws on anything else.
- * Redirects are followed by hand: at most two hops, each only to an allowed
- * host (see isAllowedTarget). `origin` is the site's public origin.
+ * Redirects are followed by hand: at most two hops, each only to the site's
+ * public `origin`, the switchboard or a storage host (lib/media-fetch.ts).
  */
 export async function fetchImageDataUrl(url: string, origin: string, box: ImageBox): Promise<string | null> {
   const signal = AbortSignal.timeout(OG_FETCH_TIMEOUT_MS)
-  let target = new URL(url)
-  for (let hop = 0; ; hop++) {
-    if (!isAllowedTarget(target, origin)) throw new Error(`Image host not allowed: ${target.hostname}`)
-    const response = await fetch(target, { signal, redirect: 'manual' })
-    const location = response.headers.get('location')
-    if (response.status >= 300 && response.status < 400 && location) {
-      if (hop >= MAX_HOPS) throw new Error('Too many image redirects')
-      target = new URL(location, target)
-      continue
-    }
-    if (response.status === 404 || response.status === 410) throw new ImageNotFoundError(`Image not found (${response.status})`)
-    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-    if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
-    const bytes = await readCapped(response)
-    try {
-      return await toPngDataUrl(bytes, box)
-    } catch (error) {
-      // Corrupt bytes or a decompression bomb: a valid answer, not an outage.
-      console.warn('og: image could not be converted, drawing the monogram:', error instanceof Error ? error.message : error)
-      return null
-    }
+  const { response } = await fetchAllowedMedia(url, { signal, origins: [origin] })
+  if (response.status === 404 || response.status === 410) throw new ImageNotFoundError(`Image not found (${response.status})`)
+  const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+  if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
+  const bytes = await readCapped(response, MAX_IMAGE_BYTES)
+  try {
+    return await toPngDataUrl(bytes, box)
+  } catch (error) {
+    // Corrupt bytes or a decompression bomb: a valid answer, not an outage.
+    console.warn('og: image could not be converted, drawing the monogram:', error instanceof Error ? error.message : error)
+    return null
   }
 }
 
@@ -160,7 +103,9 @@ export async function loadProfileCard(address: string, origin: string): Promise<
   const profile = data.renownUsers[0]
   if (!profile) return null
   // Only images stored with Renown (the /media route); external avatar URLs are never fetched.
-  const imageUrl = profile.avatar ? mediaUrl(profile.documentId, 'avatar', origin, profile.avatar) : null
+  // Unversioned /media URLs: the 302 to storage, not the same-origin bytes route (which serves only
+  // PNG/JPEG/WebP/GIF; the card converts more), and no cache key is needed server-side.
+  const imageUrl = profile.avatar ? mediaUrl(profile.documentId, 'avatar', origin) : null
   const [image, background] = await Promise.all([
     imageUrl ? fetchImageDataUrl(imageUrl, origin, AVATAR_BOX) : Promise.resolve(null),
     artBackground(lower),
@@ -196,8 +141,9 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
   )
   const app = data.appProfile
   if (!app) return null
-  const logoUrl = app.logoRef ? mediaUrl(app.documentId, 'logo', origin, app.logoRef) : null
-  const coverUrl = app.coverRef ? mediaUrl(app.documentId, 'cover', origin, app.coverRef) : null
+  // Unversioned, like the profile avatar above.
+  const logoUrl = app.logoRef ? mediaUrl(app.documentId, 'logo', origin) : null
+  const coverUrl = app.coverRef ? mediaUrl(app.documentId, 'cover', origin) : null
   // A missing or undecodable cover is decoration (the identity art stands in, cached normally);
   // a cover that could not be fetched (timeout, 5xx, network, disallowed host) also falls back
   // to the art but marks the card degraded so it is not cached as a success.
