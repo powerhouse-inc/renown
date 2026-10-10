@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { identityAccent } from '../../lib/identity-art'
+import { identityAccent, type IdentityArtSvgs } from '../../lib/identity-art'
 import { profileDisplayName, shortAddress } from '../../lib/profile-identity'
 import type { RenownAppProfile } from '../../services/app-profiles'
 import type { RenownProfile } from '../../services/switchboard'
@@ -15,13 +15,13 @@ export function publisherName(publisher: RenownProfile | null, address: string):
 }
 
 /** Who publishes the app: identity art strip, avatar, name and handle, linking to their profile. */
-export function PublisherCard({ publisher, address }: { publisher: RenownProfile | null; address: string }) {
+export function PublisherCard({ publisher, address, art }: { publisher: RenownProfile | null; address: string; art: IdentityArtSvgs }) {
   const name = publisherName(publisher, address)
   const href = publisher ? profilePath(publisher) : `/profile/${address}`
   return (
     <PageSection id="app-publisher" title="Publisher">
       <Link href={href} className="group border-hairline bg-surface-1 rounded-card hover:border-primary/40 block overflow-hidden border transition-colors">
-        <IdentityArt seed={address} idPrefix="publisher" width={640} height={120} className="h-16" />
+        <IdentityArt art={art} className="h-16" />
         <span className="relative block px-4 pb-4">
           <span className="bg-background -mt-7 block w-fit rounded-full p-0.5" style={{ boxShadow: `0 0 0 2px ${identityAccent(address)}` }}>
             <ProfileAvatar documentId={publisher?.documentId} avatar={publisher?.avatar} userImage={publisher?.userImage} seed={address} alt="" className="h-12 w-12" />

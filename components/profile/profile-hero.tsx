@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Completeness } from '../../lib/me/completeness'
-import { identityAccent } from '../../lib/identity-art'
+import { identityAccent, type IdentityArtSvgs } from '../../lib/identity-art'
 import { shortAddress } from '../../lib/profile-identity'
 import type { QrCode } from '../../lib/qr'
 import type { RenownProfile } from '../../services/switchboard'
@@ -20,6 +20,8 @@ export interface ProfileFact {
 export interface ProfileHeroProps {
   profile: RenownProfile
   name: string
+  /** The identity art of the address (or document id), computed on the server. */
+  art: IdentityArtSvgs
   /** Lowercase wallet address; null for a profile without one (then no art seed but the document id). */
   address: string | null
   /** The ENS name to show next to the handle (resolves to the address and differs from the name). */
@@ -37,13 +39,12 @@ const FACT_ICON: Record<ProfileFact['icon'], ReactNode> = {
 }
 
 /** The top of a public profile: identity art, avatar, name, handle, verification, facts and actions. */
-export function ProfileHero({ profile, name, address, ensName, facts, completeness, shareUrl, qr }: ProfileHeroProps) {
+export function ProfileHero({ profile, name, art, address, ensName, facts, completeness, shareUrl, qr }: ProfileHeroProps) {
   const seed = address ?? profile.documentId
   return (
     <header>
       <IdentityArt
-        seed={seed}
-        idPrefix="profile"
+        art={art}
         className="border-hairline rounded-panel h-[168px] border sm:h-[232px] lg:h-[272px]"
       />
       <div className="px-1 sm:px-8">

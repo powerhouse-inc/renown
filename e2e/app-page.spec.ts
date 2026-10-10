@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme } from './support/site'
 import { fixtureStub } from './support/stub-switchboard-client'
+import { HERO_ART, identityArtSvgs, PUBLISHER_ART } from '../lib/identity-art'
 
 // The redesigned app page (/app/[did]): cover or identity art, verification,
 // stats zero state, publisher, more apps, SEO. Fixture ids are unique to this spec.
@@ -10,6 +11,8 @@ const PLAIN = 'did:key:z6MkAppPageBareAppxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const SIBLING = 'did:key:z6MkAppPageSisterAppxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const NEIGHBOUR = 'did:key:z6MkAppPageNeighbourxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const LONELY = 'did:key:z6MkAppPageSoAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
+const UNSAFE_LINKS = 'did:key:z6MkAppPageUnsafeLinksxxxxxxxxxxxxxxxxxxxx1'
+const MARKDOWN = 'did:key:z6MkAppPageMarkdownxxxxxxxxxxxxxxxxxxxxxxx1'
 const app = (appDid: string, name: string, extra: Record<string, unknown> = {}) => ({
   appDid,
   documentId: `doc-ap-${name.replace(/\W/g, '')}`,
@@ -38,6 +41,36 @@ const PLAIN_APP = app(PLAIN, 'Plain Ledger', { description: 'Plain words.' })
 test.beforeAll(async () => {
   await fixtureStub({ match: 'appProfile(', variables: COVERED, response: { data: { appProfile: COVERED_APP } } })
   await fixtureStub({ match: 'appProfile(', variables: PLAIN, response: { data: { appProfile: PLAIN_APP } } })
+  await fixtureStub({
+    match: 'appProfile(',
+    variables: UNSAFE_LINKS,
+    response: {
+      data: {
+        appProfile: app(UNSAFE_LINKS, 'Unsafe Links', {
+          publisherDid: null,
+          category: null,
+          links: [
+            { id: 'j', label: 'Script', url: 'javascript:alert(1)' },
+            { id: 'f', label: 'Files', url: 'ftp://files.example/app' },
+          ],
+        }),
+      },
+    },
+  })
+  await fixtureStub({
+    match: 'appProfile(',
+    variables: MARKDOWN,
+    response: {
+      data: {
+        appProfile: app(MARKDOWN, 'Markdown Notes', {
+          publisherDid: null,
+          category: null,
+          tagline: null,
+          description: '# Big **news**\n\nRead [the docs](https://docs.example) and `ship` it.\n\n- fast\n- _calm_',
+        }),
+      },
+    },
+  })
   await fixtureStub({ match: 'appProfile(', variables: LONELY, response: { data: { appProfile: app(LONELY, 'Lonely', { publisherDid: null, category: null }) } } })
   await fixtureStub({
     match: 'renownUsers',
@@ -114,7 +147,10 @@ test.describe('app page', () => {
     await page.goto(`/app/${PLAIN}`)
     await page.getByRole('button', { name: 'Verified app identity' }).click()
     const panel = page.getByRole('region', { name: 'Verified app identity' })
-    await expect(panel).toContainText('only the app holding it can act for you')
+    await expect(panel).toContainText('Only the holder of that key can sign as this app.')
+    // The credential a sign-in creates names the app's key on the user's device, not the app DID (/trust "app-keys").
+    await expect(panel).toContainText('your wallet signs a credential naming a key the app creates on your device')
+    await expect(panel).not.toContainText('naming that key')
     await expect(panel.getByRole('link', { name: 'How apps prove who they are' })).toHaveAttribute('href', '/developers')
   })
 
@@ -150,6 +186,32 @@ test.describe('app page', () => {
     await expect(page.locator('[data-column="aside"]')).toHaveCount(0)
     const panel = await page.getByRole('region', { name: 'Check this app' }).boundingBox()
     expect(panel?.width).toBeLessThanOrEqual(560)
+  })
+
+  test('an app whose only links are not http(s) has no Links section and renders one column', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    expect((await page.goto(`/app/${UNSAFE_LINKS}`))?.status()).toBe(200)
+    await expect(page.locator('[data-layout="single"]')).toHaveCount(1)
+    await expect(page.locator('[data-layout="split"]')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Links', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Script|Files/ })).toHaveCount(0)
+  })
+
+  test('the meta and JSON-LD descriptions are plain text: no markdown syntax', async ({ request }) => {
+    const html = await (await request.get(`/app/${MARKDOWN}`)).text()
+    const expected = 'Big news. Read the docs and ship it. fast. calm'
+    expect(/<meta name="description" content="([^"]*)"/.exec(html)?.[1]).toBe(expected)
+    const blocks = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/g)].map((m) => JSON.parse(m[1]) as Record<string, unknown>)
+    expect(blocks.find((b) => b['@type'] === 'SoftwareApplication')?.description).toBe(expected)
+  })
+
+  test('the hero and publisher art are computed on the server and passed as props', async ({ request }) => {
+    const html = await (await request.get(`/app/${PLAIN}`)).text()
+    const data = JSON.parse(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/.exec(html)![1]) as { props: { pageProps: { art: unknown; publisherArt: unknown } } }
+    const hero = identityArtSvgs(PLAIN, { ...HERO_ART, idPrefix: 'app' })
+    const publisher = identityArtSvgs(PUBLISHER, { ...PUBLISHER_ART, idPrefix: 'publisher' })
+    expect(data.props.pageProps).toMatchObject({ art: hero, publisherArt: publisher })
+    for (const svg of [hero.light, hero.dark, publisher.light, publisher.dark]) expect(html).toContain(svg)
   })
 
   test('nothing shifts after load', async ({ page }) => {

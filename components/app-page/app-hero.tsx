@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { IdentityArtSvgs } from '../../lib/identity-art'
 import type { QrCode } from '../../lib/qr'
 import type { RenownAppProfile } from '../../services/app-profiles'
 import { ButtonLink } from '../site/primitives'
@@ -10,6 +11,8 @@ import { AppHeroCover } from './app-hero-cover'
 export interface AppHeroProps {
   app: RenownAppProfile
   name: string
+  /** The app DID's identity art (server computed), behind the cover. */
+  art: IdentityArtSvgs
   /** http(s) website and its hostname, when the app has one. */
   website: { url: string; host: string } | null
   shareUrl: string
@@ -17,11 +20,11 @@ export interface AppHeroProps {
 }
 
 /** The top of an app page: cover (or identity art), logo, name, tagline, category, verification and actions. */
-export function AppHero({ app, name, website, shareUrl, qr }: AppHeroProps) {
+export function AppHero({ app, name, art, website, shareUrl, qr }: AppHeroProps) {
   return (
     <header>
       {/* Keyed by app: a client-side hop to another app must not inherit a failed-cover state. */}
-      <AppHeroCover key={app.appDid} documentId={app.documentId} coverRef={app.coverRef} appDid={app.appDid} className="h-[168px] sm:h-[232px] lg:h-[272px]" />
+      <AppHeroCover key={app.appDid} documentId={app.documentId} coverRef={app.coverRef} art={art} className="h-[168px] sm:h-[232px] lg:h-[272px]" />
       <div className="px-1 sm:px-8">
         <div className="bg-background relative -mt-12 w-fit rounded-[22px] p-1 sm:-mt-14">
           <AppLogo
@@ -47,8 +50,9 @@ export function AppHero({ app, name, website, shareUrl, qr }: AppHeroProps) {
             )}
             <VerifiedBadge label="Verified app identity" learnMore={{ href: '/developers', label: 'How apps prove who they are' }}>
               <p>
-                This app is identified by its own key, the DID shown on this page. When you approve it, your wallet signs a credential
-                naming that key, so only the app holding it can act for you.
+                This app has its own key, identified by the DID on this page. Only the holder of that key can sign as this app.
+                Signing in is separate: your wallet signs a credential naming a key the app creates on your device, and you can
+                revoke that credential at any time.
               </p>
             </VerifiedBadge>
           </div>

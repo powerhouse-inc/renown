@@ -11,6 +11,7 @@ import { PageMeta } from '../../components/site/page-meta'
 import { Container } from '../../components/site/primitives'
 import { SiteLayout } from '../../components/site/site-layout'
 import { NotFoundPage } from '../../components/ui/not-found-page'
+import { HERO_ART, identityArtSvgs, PUBLISHER_ART, type IdentityArtSvgs } from '../../lib/identity-art'
 import { appJsonLd } from '../../lib/json-ld'
 import { qrCode, type QrCode } from '../../lib/qr'
 import { APP_DID_RE, fetchAppProfile, getAppProfilesByPublisher, listAppProfiles, type RenownAppProfile } from '../../services/app-profiles'
@@ -18,6 +19,7 @@ import { getAppStats, type AppStats } from '../../services/app-stats'
 import { mediaUrl } from '../../services/media'
 import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { linkTarget } from '../../utils/link-service'
+import { clipText, markdownPlainText } from '../../utils/markdown-lite'
 import { profilePath } from '../../utils/profile-url'
 import { canonicalUrl as siteCanonicalUrl, ogImageUrl } from '../../utils/seo'
 import { siteOrigin } from '../../utils/site-origin'
@@ -25,6 +27,10 @@ import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 
 interface AppPageProps {
   app: RenownAppProfile | null
+  /** The hero's identity art (both themes), computed here so the browser never recomputes it. */
+  art: IdentityArtSvgs | null
+  /** The publisher card's art; null without a publisher. */
+  publisherArt: IdentityArtSvgs | null
   /** Public stats; null when the stats read failed or timed out (the section drops out). */
   stats: AppStats | null
   /** The publisher's Renown profile, when it has one. */
@@ -45,12 +51,13 @@ interface AppPageProps {
 
 const PKH_RE = /^did:pkh:eip155:\d+:(0x[0-9a-fA-F]{40})$/
 
-const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, error }) => {
+const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
-  if (!app) return <NotFoundPage title="App not found" message="No app on Renown has this identity. Check the link, or browse the directory." />
+  if (!app || !art) return <NotFoundPage title="App not found" message="No app on Renown has this identity. Check the link, or browse the directory." />
 
   const name = app.name?.trim() || 'Untitled app'
-  const description = app.tagline || `${name}, an app with a verified identity on Renown.`
+  const description =
+    clipText(app.tagline ?? '') || markdownPlainText(app.description ?? '') || `${name}, an app with a verified identity on Renown.`
   const target = app.website ? linkTarget(app.website) : null
   const website = app.website && target ? { url: app.website, host: target.host } : null
   const path = `/app/${app.appDid}`
@@ -61,16 +68,18 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
   const publisherLd =
     publisherAddress && pubName ? { name: pubName, url: `${origin}${publisher ? profilePath(publisher) : `/profile/${publisherAddress}`}` } : null
 
-  const hasOverview = Boolean(app.description) || app.links.length > 0
+  // Only http(s) links are ever shown; the rest count as no links at all.
+  const links = app.links.filter((link) => linkTarget(link.url))
+  const hasOverview = Boolean(app.description) || links.length > 0
   const hasRelated = Boolean(app.category) && moreInCategory.length > 0
   const hasMain = hasOverview || stats !== null || hasRelated
   const overview = hasOverview && (
     // "Overview" when there is prose; a section of only links is titled for what it holds.
     <PageSection id="app-overview" title={app.description ? 'Overview' : 'Links'}>
       {app.description && <MarkdownLite text={app.description} headingBase={3} className="max-w-[68ch] text-[1.0625rem] leading-7" />}
-      {app.links.length > 0 && (
+      {links.length > 0 && (
         <div className={app.description ? 'mt-6' : undefined}>
-          <LinkChips links={app.links} />
+          <LinkChips links={links} />
         </div>
       )}
     </PageSection>
@@ -88,7 +97,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
   )
   const sideSections = (
     <>
-      {publisherAddress && <PublisherCard publisher={publisher} address={publisherAddress} />}
+      {publisherAddress && publisherArt && <PublisherCard publisher={publisher} address={publisherAddress} art={publisherArt} />}
       {pubName && <MoreByPublisher apps={moreByPublisher} name={pubName} />}
       <AppIdentityPanel appDid={app.appDid} />
     </>
@@ -106,7 +115,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
       />
 
       <Container className="max-w-[1120px] pt-6 pb-20 md:pt-10">
-        <AppHero app={app} name={name} website={website} shareUrl={url} qr={qr} />
+        <AppHero app={app} name={name} art={art} website={website} shareUrl={url} qr={qr} />
         {hasMain ? (
           <div data-layout="split" className="mt-12 grid gap-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
             <div data-column="main" className="min-w-0 space-y-12">
@@ -138,6 +147,8 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
   const did = String(context.params?.did ?? '')
   const empty: AppPageProps = {
     app: null,
+    art: null,
+    publisherArt: null,
     stats: null,
     publisher: null,
     publisherAddress: null,
@@ -180,6 +191,8 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
   return {
     props: {
       app,
+      art: identityArtSvgs(app.appDid, { ...HERO_ART, idPrefix: 'app' }),
+      publisherArt: publisherAddress ? identityArtSvgs(publisherAddress, { ...PUBLISHER_ART, idPrefix: 'publisher' }) : null,
       stats,
       publisher,
       publisherAddress,

@@ -252,3 +252,22 @@ export function identityArt(seed: string, { width, height, theme, idPrefix = 'ia
 export function identityAccent(seed: string): string {
   return oklchHex(0.66, 0.15, identityHues(seed).a)
 }
+
+/** Both theme variants of a seed's art, as SVG strings (computed on the server and passed to IdentityArt as props). */
+export interface IdentityArtSvgs {
+  light: string
+  dark: string
+}
+
+/** The light and dark art for `seed` at `width` x `height`. */
+export function identityArtSvgs(seed: string, { width, height, idPrefix }: Omit<IdentityArtOptions, 'theme'>): IdentityArtSvgs {
+  return {
+    light: identityArt(seed, { width, height, theme: 'light', idPrefix }),
+    dark: identityArt(seed, { width, height, theme: 'dark', idPrefix }),
+  }
+}
+
+/** The page-hero art (profile and app pages). */
+export const HERO_ART = { width: 1200, height: 320 } as const
+/** The publisher card's art strip on app pages. */
+export const PUBLISHER_ART = { width: 640, height: 120 } as const

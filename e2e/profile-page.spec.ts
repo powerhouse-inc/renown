@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme } from './support/site'
 import { fixtureStub } from './support/stub-switchboard-client'
+import { HERO_ART, identityArtSvgs } from '../lib/identity-art'
 
 // The redesigned public profile (/@handle): hero, share, verification, owner
 // view, sections and SEO. Fixture ids are unique to this spec.
@@ -8,6 +9,7 @@ const RICH = '0x5e00000000000000000000000000000000000f11'
 const MINIMAL = '0x5e00000000000000000000000000000000000f12'
 const LONG = '0x5e00000000000000000000000000000000000f13'
 const UNSAFE = '0x5e00000000000000000000000000000000000f14'
+const CASED = '0x5e00000000000000000000000000000000000f15'
 const APP_DID = 'did:key:z6MkRuthNotesAppxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
 const LONG_WORD = 'W'.repeat(120)
 const profile = (handle: string, address: string, extra: Record<string, unknown> = {}) => ({
@@ -43,6 +45,7 @@ test.beforeAll(async () => {
     variables: '"unsafe-una"',
     response: users(profile('unsafe-una', UNSAFE, { links: [{ id: 'u1', label: 'Script', url: 'javascript:alert(1)' }] })),
   })
+  await fixtureStub({ match: 'renownUsers', variables: '"case-cora"', response: users(profile('case-cora', CASED, { displayName: 'Case-Cora' })) })
   await fixtureStub({
     match: 'renownUsers',
     variables: '"long-lars"',
@@ -189,6 +192,41 @@ test.describe('profile page', () => {
       identifier: `did:pkh:eip155:1:${RICH}`,
       sameAs: ['https://github.com/ruth', 'https://ruth.example/blog'],
     })
+  })
+
+  test('titles add the handle only when it differs from the name (case-insensitively)', async ({ request }) => {
+    const titles = async (path: string) => {
+      const html = await (await request.get(path)).text()
+      return { og: /<meta property="og:title" content="([^"]*)"/.exec(html)?.[1], doc: /<title[^>]*>([^<]*)<\/title>/.exec(html)?.[1] }
+    }
+    expect(await titles('/@rich-ruth')).toEqual({ og: 'Ruth Rich (@rich-ruth)', doc: 'Ruth Rich (@rich-ruth) on Renown' })
+    expect(await titles('/@min-mo')).toEqual({ og: 'min-mo', doc: 'min-mo on Renown' })
+    expect(await titles('/@case-cora')).toEqual({ og: 'Case-Cora', doc: 'Case-Cora on Renown' })
+  })
+
+  test('the meta and JSON-LD descriptions are the bio as plain text, cut to about 160 characters', async ({ request }) => {
+    const describe = async (path: string) => {
+      const html = await (await request.get(path)).text()
+      const meta = /<meta name="description" content="([^"]*)"/.exec(html)?.[1]
+      const blocks = [...html.matchAll(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/g)].map((m) => JSON.parse(m[1]) as Record<string, unknown>)
+      const ld = (blocks.find((b) => b['@type'] === 'ProfilePage') as { mainEntity: { description?: string } }).mainEntity.description
+      return { meta, ld }
+    }
+    const rich = 'Builds tools for open organisations. Read my notes. Second paragraph.'
+    expect(await describe('/@rich-ruth')).toEqual({ meta: rich, ld: rich })
+    const long = await describe('/@long-lars')
+    expect(long.meta).toBe(long.ld)
+    expect(long.meta!.length).toBeLessThanOrEqual(160)
+    expect(long.meta!.endsWith('…')).toBe(true)
+  })
+
+  test('the hero art is computed on the server and passed as props: the page never recomputes it', async ({ request }) => {
+    const html = await (await request.get('/@rich-ruth')).text()
+    const data = JSON.parse(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/.exec(html)![1]) as { props: { pageProps: { art: unknown } } }
+    const expected = identityArtSvgs(RICH, { ...HERO_ART, idPrefix: 'profile' })
+    expect(data.props.pageProps.art).toEqual(expected)
+    expect(html).toContain(expected.light)
+    expect(html).toContain(expected.dark)
   })
 
   test('a 120-character name without spaces and a very long bio stay inside the page', async ({ page }) => {

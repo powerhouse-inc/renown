@@ -7,6 +7,7 @@ import { Container } from '../../components/site/primitives'
 import { SiteLayout } from '../../components/site/site-layout'
 import { NotFoundPage } from '../../components/ui/not-found-page'
 import { profileJsonLd } from '../../lib/json-ld'
+import { HERO_ART, identityArtSvgs, type IdentityArtSvgs } from '../../lib/identity-art'
 import { profileCompleteness } from '../../lib/me/completeness'
 import { ADDRESS_RE, memberSince, profileDisplayName, walletDid } from '../../lib/profile-identity'
 import { qrCode, type QrCode } from '../../lib/qr'
@@ -19,6 +20,7 @@ import { isEnsVerified } from '../../utils/ens'
 import { profilePath } from '../../utils/profile-url'
 import { canonicalUrl as siteCanonicalUrl, ogImageUrl } from '../../utils/seo'
 import { linkTarget } from '../../utils/link-service'
+import { markdownPlainText } from '../../utils/markdown-lite'
 import { siteOrigin } from '../../utils/site-origin'
 import { groupUserStats } from '../../utils/stat-format'
 import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
@@ -26,6 +28,8 @@ import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 interface ProfilePageProps {
   profile: RenownProfile | null
   ensVerified: boolean
+  /** The hero's identity art (both themes), computed here so the browser never recomputes it. */
+  art: IdentityArtSvgs | null
   apps: RenownAppProfile[]
   stats: UserStatEntry[]
   /** Absolute canonical URL of this profile. */
@@ -41,16 +45,17 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, stats, canonicalUrl, ogImage, qr, error }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, apps, stats, canonicalUrl, ogImage, qr, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
-  if (!profile) {
+  if (!profile || !art) {
     return <NotFoundPage title="Profile not found" message="No Renown profile has this name or address. Check the link, or browse apps to find people who publish them." />
   }
 
   const address = profile.ethAddress && ADDRESS_RE.test(profile.ethAddress) ? profile.ethAddress.toLowerCase() : null
   const name = profileDisplayName(profile)
-  const ogTitle = profile.handle ? `${name} (@${profile.handle})` : name
-  const description = profile.bio?.trim() || `${name} on Renown, the identity layer of the Powerhouse network.`
+  // "frank (@frank)" says the same thing twice: the handle is added only when the name differs from it.
+  const ogTitle = profile.handle && profile.handle.toLowerCase() !== name.toLowerCase() ? `${name} (@${profile.handle})` : name
+  const description = markdownPlainText(profile.bio ?? '') || `${name} on Renown, the identity layer of the Powerhouse network.`
   const ensName = ensVerified && profile.username && profile.username !== name ? profile.username : null
   const groups = groupUserStats(stats)
   const since = memberSince(profile.createdAt)
@@ -84,6 +89,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, apps, s
         <ProfileHero
           profile={profile}
           name={name}
+          art={art}
           address={address}
           ensName={ensName}
           facts={facts}
@@ -120,7 +126,7 @@ function optional<T>(promise: Promise<T>, fallback: T): Promise<T> {
 export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (context) => {
   const id = String(context.params?.id ?? '')
   const byHandle = context.query.by === 'handle'
-  const empty = { profile: null, ensVerified: false, apps: [], stats: [], canonicalUrl: null, ogImage: null, qr: null }
+  const empty = { profile: null, ensVerified: false, art: null, apps: [], stats: [], canonicalUrl: null, ogImage: null, qr: null }
   if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
   let profile: RenownProfile | null
@@ -166,7 +172,17 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   // The same URL as <link rel=canonical> (PageMeta), so share, QR and JSON-LD agree with it.
   const canonicalUrl = siteCanonicalUrl(profilePath(profile))
   return {
-    props: { profile, ensVerified, apps, stats, canonicalUrl, ogImage, qr: qrCode(canonicalUrl) },
+    props: {
+      profile,
+      ensVerified,
+      // Seeded like ProfileHero: the lowercase wallet, else the document id.
+      art: identityArtSvgs(wallet ? address.toLowerCase() : profile.documentId, { ...HERO_ART, idPrefix: 'profile' }),
+      apps,
+      stats,
+      canonicalUrl,
+      ogImage,
+      qr: qrCode(canonicalUrl),
+    },
   }
 }
 
