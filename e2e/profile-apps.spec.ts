@@ -88,6 +88,8 @@ test('a logo that 404s falls back to the monogram on the card and the app page',
   await page.goto(`/app/${GAMMA}`)
   await expect(page.getByRole('heading', { level: 1, name: 'Alpha' })).toBeVisible()
   await expect(page.locator('img[alt="Alpha logo"]')).toHaveCount(0)
-  await expect(page.locator('article').getByText('A', { exact: true })).toBeVisible()
-  await expect(page.locator('article img')).toHaveCount(0)
+  await expect(page.locator('main header').getByText('A', { exact: true })).toBeVisible()
+  // No logo and no cover image: the cover is identity art (inline SVG), the logo its monogram.
+  await expect(page.locator('main header img')).toHaveCount(0)
+  await expect(page.locator('main header .rn-art svg')).toHaveCount(2)
 })

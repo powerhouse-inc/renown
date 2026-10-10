@@ -1,4 +1,4 @@
-import type { MetricAggregation, UserStatEntry } from '../services/app-stats'
+import type { UserStatEntry } from '../services/app-stats'
 
 /** 1,234 · 12.5K · 1.2M · 0.13 — compact from 10,000 on. Same output on server and client. */
 export function formatStatValue(value: number): string {
@@ -10,14 +10,6 @@ export function formatStatValue(value: number): string {
 /** "Oct 9, 2026" in UTC, so server and client render the same text. */
 export function formatStatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
-}
-
-/** How a tile names its aggregation. */
-export const AGGREGATION_CAPTION: Record<MetricAggregation, string> = {
-  SUM: 'Total',
-  MAX: 'Highest',
-  AVG: 'Average',
-  COUNT_USERS: 'Users',
 }
 
 export interface AppStatGroup {
