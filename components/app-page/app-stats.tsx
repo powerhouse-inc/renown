@@ -84,7 +84,7 @@ export function AppStatsSection({ stats, appName }: { stats: AppStats; appName: 
           <p className="text-ink font-semibold">No activity reported yet</p>
           <p className="text-ink-muted mt-1.5 max-w-[52ch] text-sm leading-6">
             When people use {appName}, the numbers it reports appear here
-            {stats.metrics.length > 0 ? `, starting with ${stats.metrics.map((m) => m.label.toLowerCase()).join(', ')}` : ''}.
+            {stats.metrics.length > 0 ? `, starting with ${stats.metrics.map((m) => m.label).join(', ')}` : ''}.
           </p>
         </div>
       ) : (

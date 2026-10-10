@@ -7,9 +7,9 @@ export function formatStatValue(value: number): string {
   return new Intl.NumberFormat('en-US', options).format(value)
 }
 
-/** "Oct 9, 2026" in UTC, so server and client render the same text. */
+/** "9 Oct 2026" in UTC, so server and client render the same text. */
 export function formatStatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return new Date(iso).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 export interface AppStatGroup {

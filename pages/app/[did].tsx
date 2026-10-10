@@ -61,6 +61,39 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
   const publisherLd =
     publisherAddress && pubName ? { name: pubName, url: `${origin}${publisher ? profilePath(publisher) : `/profile/${publisherAddress}`}` } : null
 
+  const hasOverview = Boolean(app.description) || app.links.length > 0
+  const hasRelated = Boolean(app.category) && moreInCategory.length > 0
+  const hasMain = hasOverview || stats !== null || hasRelated
+  const overview = hasOverview && (
+    // "Overview" when there is prose; a section of only links is titled for what it holds.
+    <PageSection id="app-overview" title={app.description ? 'Overview' : 'Links'}>
+      {app.description && <MarkdownLite text={app.description} headingBase={3} className="max-w-[68ch] text-[1.0625rem] leading-7" />}
+      {app.links.length > 0 && (
+        <div className={app.description ? 'mt-6' : undefined}>
+          <LinkChips links={app.links} />
+        </div>
+      )}
+    </PageSection>
+  )
+  const related = hasRelated && (
+    <PageSection id="more-in-category" title={`More in ${app.category}`}>
+      <ul className="grid gap-5 sm:grid-cols-2">
+        {moreInCategory.map((other) => (
+          <li key={other.appDid}>
+            <AppTile app={other} />
+          </li>
+        ))}
+      </ul>
+    </PageSection>
+  )
+  const sideSections = (
+    <>
+      {publisherAddress && <PublisherCard publisher={publisher} address={publisherAddress} />}
+      {pubName && <MoreByPublisher apps={moreByPublisher} name={pubName} />}
+      <AppIdentityPanel appDid={app.appDid} />
+    </>
+  )
+
   return (
     <SiteLayout>
       <PageMeta
@@ -74,36 +107,22 @@ const AppPage: NextPage<AppPageProps> = ({ app, stats, publisher, publisherAddre
 
       <Container className="max-w-[1120px] pt-6 pb-20 md:pt-10">
         <AppHero app={app} name={name} website={website} shareUrl={url} qr={qr} />
-        <div className="mt-12 grid gap-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
-          <div className="min-w-0 space-y-12">
-            {(app.description || app.links.length > 0) && (
-              <PageSection id="app-overview" title="Overview">
-                {app.description && <MarkdownLite text={app.description} headingBase={3} className="max-w-[68ch] text-[1.0625rem] leading-7" />}
-                {app.links.length > 0 && (
-                  <div className={app.description ? 'mt-6' : undefined}>
-                    <LinkChips links={app.links} />
-                  </div>
-                )}
-              </PageSection>
-            )}
-            {stats && <AppStatsSection stats={stats} appName={name} />}
+        {hasMain ? (
+          <div data-layout="split" className="mt-12 grid gap-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
+            <div data-column="main" className="min-w-0 space-y-12">
+              {overview}
+              {stats && <AppStatsSection stats={stats} appName={name} />}
+              {related}
+            </div>
+            <aside data-column="aside" className="min-w-0 space-y-10">
+              {sideSections}
+            </aside>
           </div>
-          <aside className="min-w-0 space-y-10">
-            {publisherAddress && <PublisherCard publisher={publisher} address={publisherAddress} />}
-            {pubName && <MoreByPublisher apps={moreByPublisher} name={pubName} />}
-            <AppIdentityPanel appDid={app.appDid} />
-          </aside>
-        </div>
-        {app.category && moreInCategory.length > 0 && (
-          <PageSection id="more-in-category" title={`More in ${app.category}`} className="mt-16 sm:px-8">
-            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {moreInCategory.map((other) => (
-                <li key={other.appDid}>
-                  <AppTile app={other} />
-                </li>
-              ))}
-            </ul>
-          </PageSection>
+        ) : (
+          // Nothing for a main column: one calm column instead of an empty half page.
+          <div data-layout="single" className="mt-12 max-w-[560px] space-y-10 sm:px-8">
+            {sideSections}
+          </div>
         )}
       </Container>
     </SiteLayout>

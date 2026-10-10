@@ -70,7 +70,7 @@ test.describe('app page', () => {
     await expect(page.getByRole('main').getByRole('link', { name: /Bad/ })).toHaveCount(0)
     const open = page.getByRole('main').getByRole('link', { name: 'Open app' })
     await expect(open).toHaveAttribute('href', 'https://vault.example')
-    await expect(open).toHaveAttribute('rel', /noopener/)
+    await expect(open).toHaveAttribute('rel', 'noopener noreferrer nofollow')
     await expect(page.getByRole('main').getByText('vault.example', { exact: true })).toBeVisible()
     await expect(page.locator('img[alt="Vault Pages logo"]')).toHaveAttribute('src', '/media/stub-app-doc/logo?v=111111111111')
     await expect(page.locator('img[src="/media/stub-app-doc/cover?v=222222222222"]')).toHaveCount(1)

@@ -84,7 +84,7 @@ test.describe('app page', () => {
     await expect(page.getByRole('link', { name: 'Open app' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Stats', exact: true })).toBeVisible()
     await expect(page.getByText('No activity reported yet')).toBeVisible()
-    await expect(page.getByText(/starting with entries booked/)).toBeVisible()
+    await expect(page.getByText(/starting with Entries booked/)).toBeVisible()
     await expect(page.locator('[data-metric="entries"]')).toHaveCount(0)
   })
 
@@ -129,6 +129,27 @@ test.describe('app page', () => {
       sameAs: ['https://discord.gg/ledger'],
       publisher: { '@type': 'Person', name: 'Pia Publisher' },
     })
+  })
+
+  test('at desktop width a short app keeps both columns balanced, related apps in the main column', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(`/app/${COVERED}`)
+    await expect(page.locator('[data-layout="split"]')).toHaveCount(1)
+    const main = page.locator('[data-column="main"]')
+    await expect(main.getByRole('region', { name: 'More in Ledgers' })).toBeVisible()
+    await expect(main.getByRole('heading', { name: 'Links', exact: true })).toBeVisible()
+    const mainBox = await main.boundingBox()
+    const asideBox = await page.locator('[data-column="aside"]').boundingBox()
+    expect(mainBox && asideBox && mainBox.height / asideBox.height).toBeGreaterThan(0.6)
+  })
+
+  test('an app with nothing for a main column renders one column', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(`/app/${LONELY}`)
+    await expect(page.locator('[data-layout="single"]')).toHaveCount(1)
+    await expect(page.locator('[data-column="aside"]')).toHaveCount(0)
+    const panel = await page.getByRole('region', { name: 'Check this app' }).boundingBox()
+    expect(panel?.width).toBeLessThanOrEqual(560)
   })
 
   test('nothing shifts after load', async ({ page }) => {

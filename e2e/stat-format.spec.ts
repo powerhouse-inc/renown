@@ -25,7 +25,7 @@ test('formats stat values compactly and dates in UTC', () => {
   expect(formatStatValue(1234)).toBe('1,234')
   expect(formatStatValue(12500)).toBe('12.5K')
   expect(formatStatValue(1234567)).toBe('1.2M')
-  expect(formatStatDate('2026-10-09T23:30:00.000Z')).toBe('Oct 9, 2026')
+  expect(formatStatDate('2026-10-09T23:30:00.000Z')).toBe('9 Oct 2026')
 })
 
 test('groups declared stats by app, in first-seen order, dropping undeclared metrics', () => {

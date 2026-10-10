@@ -54,7 +54,7 @@ export function AppHero({ app, name, website, shareUrl, qr }: AppHeroProps) {
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
             {website && (
-              <ButtonLink href={website.url}>
+              <ButtonLink href={website.url} rel="noopener noreferrer nofollow">
                 Open app
                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M7 17 17 7M8 7h9v9" />

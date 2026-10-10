@@ -28,14 +28,16 @@ export interface ButtonLinkProps {
   variant?: ButtonVariant
   size?: ButtonSize
   className?: string
+  /** rel of an external link; nofollow for URLs a third party supplied. */
+  rel?: string
 }
 
 /** A link styled as a button; absolute http(s) URLs open as plain external links. */
-export function ButtonLink({ href, children, variant = 'primary', size = 'md', className }: ButtonLinkProps) {
+export function ButtonLink({ href, children, variant = 'primary', size = 'md', className, rel = 'noopener noreferrer' }: ButtonLinkProps) {
   const classes = buttonClasses(variant, size, className)
   if (/^https?:\/\//.test(href)) {
     return (
-      <a href={href} className={classes} target="_blank" rel="noopener noreferrer">
+      <a href={href} className={classes} target="_blank" rel={rel}>
         {children}
       </a>
     )

@@ -78,7 +78,7 @@ test.describe('app page stats', () => {
   test('shows tiles, active users and top contributors', async ({ page }) => {
     expect((await page.goto(`/app/${APP_DID}`))?.status()).toBe(200)
     await expect(page.getByRole('heading', { name: 'Stats', exact: true })).toBeVisible()
-    await expect(page.getByText('Updated Oct 9, 2026')).toBeVisible()
+    await expect(page.getByText('Updated 9 Oct 2026')).toBeVisible()
 
     const notes = page.locator('[data-metric="notes"]')
     await expect(notes).toHaveAttribute('data-value', '1234')
