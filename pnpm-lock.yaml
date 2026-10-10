@@ -29,7 +29,7 @@ importers:
         version: 1.5.1(next@16.2.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@powerhousedao/reactor-browser':
         specifier: 6.2.3
-        version: 6.2.3(a13b42573b448fcbdffd849ff780af63)
+        version: 6.2.3(aa5614e3066d88fbb5e10a612518504d)
       '@privy-io/react-auth':
         specifier: ^3.25.0
         version: 3.25.0(@solana-program/system@0.10.0(@solana/kit@5.5.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana-program/token@0.9.0(@solana/kit@5.5.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10)))(@solana/kit@5.5.1(bufferutil@4.0.9)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/sysvars@5.5.1(typescript@5.9.3))(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@19.2.6))(@types/react@19.2.14)(bufferutil@4.0.9)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)(use-sync-external-store@1.4.0(react@19.2.6))(utf-8-validate@5.0.10)(zod@4.1.11)
@@ -69,6 +69,9 @@ importers:
       shiki:
         specifier: 4.4.3
         version: 4.4.3
+      uqr:
+        specifier: 0.1.2
+        version: 0.1.2
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -6761,6 +6764,9 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
+  uqr@0.1.2:
+    resolution: {integrity: sha512-MJu7ypHq6QasgF5YRTjqscSzQp/W11zoUk6kvmlH+fmWEs63Y0Eib13hYFwAzagRJcVY8WVnlV+eBDUGMJ5IbA==}
+
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
@@ -8591,7 +8597,7 @@ snapshots:
       - supports-color
       - zod
 
-  '@powerhousedao/reactor-browser@6.2.3(a13b42573b448fcbdffd849ff780af63)':
+  '@powerhousedao/reactor-browser@6.2.3(aa5614e3066d88fbb5e10a612518504d)':
     dependencies:
       '@ai-sdk/openai-compatible': 3.0.37(zod@4.3.6)
       '@powerhousedao/analytics-engine-browser': 6.2.3(@sentry/node-core@10.53.1(@opentelemetry/api@1.9.0)(@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1))
@@ -8608,7 +8614,7 @@ snapshots:
       graphql: 16.11.0
       graphql-request: 7.4.0(graphql@16.11.0)
       graphql-tag: 2.12.6(graphql@16.11.0)
-      graphql-ws: 6.0.7(crossws@0.3.5)(graphql@16.11.0)(ws@8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))
+      graphql-ws: 6.0.7(crossws@0.3.5)(graphql@16.11.0)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10))
       kysely: 0.28.16
       kysely-pglite-dialect: 1.2.0(@electric-sql/pglite@0.3.15)(kysely@0.28.16)
       lodash.isequal: 4.5.0
@@ -14168,12 +14174,12 @@ snapshots:
       http-errors: 2.0.1
       object-path: 0.11.8
 
-  graphql-ws@6.0.7(crossws@0.3.5)(graphql@16.11.0)(ws@8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)):
+  graphql-ws@6.0.7(crossws@0.3.5)(graphql@16.11.0)(ws@8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)):
     dependencies:
       graphql: 16.11.0
     optionalDependencies:
       crossws: 0.3.5
-      ws: 8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      ws: 8.18.3(bufferutil@4.0.9)(utf-8-validate@5.0.10)
 
   graphql@16.11.0: {}
 
@@ -17062,6 +17068,8 @@ snapshots:
       browserslist: 4.28.2
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.2: {}
 
   uri-js@4.4.1:
     dependencies:
