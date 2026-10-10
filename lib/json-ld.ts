@@ -1,8 +1,10 @@
 // schema.org JSON-LD for the public profile and app pages. Pure; rendered by
-// PageMeta (which escapes "<"). Only public, already-shown facts.
+// PageMeta (which escapes "<"). Only public, already-shown facts; descriptions
+// are plain text (markdown syntax stripped).
 import type { RenownAppProfile } from '../services/app-profiles'
 import type { RenownProfile } from '../services/switchboard'
 import { linkTarget } from '../utils/link-service'
+import { clipText, markdownPlainText } from '../utils/markdown-lite'
 
 function safeUrls(links: readonly { url: string }[] | undefined): string[] {
   return (links ?? []).filter((link) => linkTarget(link.url)).map((link) => link.url)
@@ -22,6 +24,7 @@ export interface ProfileJsonLdInput {
 /** ProfilePage whose main entity is the Person. */
 export function profileJsonLd({ profile, name, url, image, did }: ProfileJsonLdInput): object {
   const sameAs = safeUrls(profile.links)
+  const description = markdownPlainText(profile.bio ?? '')
   return {
     '@context': 'https://schema.org',
     '@type': 'ProfilePage',
@@ -34,7 +37,7 @@ export function profileJsonLd({ profile, name, url, image, did }: ProfileJsonLdI
       url,
       ...(profile.handle && { alternateName: `@${profile.handle}` }),
       ...(did && { identifier: did }),
-      ...(profile.bio?.trim() && { description: profile.bio.trim() }),
+      ...(description && { description }),
       ...(image && { image }),
       ...(sameAs.length > 0 && { sameAs }),
     },
@@ -54,13 +57,14 @@ export interface AppJsonLdInput {
 export function appJsonLd({ app, name, url, image, publisher }: AppJsonLdInput): object {
   const sameAs = safeUrls(app.links)
   const website = app.website && linkTarget(app.website) ? app.website : null
+  const description = clipText(app.tagline ?? '') || markdownPlainText(app.description ?? '')
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name,
     url,
     identifier: app.appDid,
-    ...((app.tagline || app.description) && { description: app.tagline || app.description }),
+    ...(description && { description }),
     ...(app.category && { applicationCategory: app.category }),
     ...(image && { image }),
     ...(website && { installUrl: website }),

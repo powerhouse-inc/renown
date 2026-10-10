@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { parseMarkdownLite, safeHref } from '../utils/markdown-lite'
+import { clipText, markdownPlainText, parseMarkdownLite, safeHref } from '../utils/markdown-lite'
 
 // Runs in the Playwright worker (Node): the description parser behind /app/<did>.
 const text = (t: string) => ({ type: 'text', text: t })
@@ -59,5 +59,24 @@ test.describe('markdown-lite', () => {
     expect(safeHref('javascript:alert(1)')).toBeNull()
     expect(safeHref('data:text/html,hi')).toBeNull()
     expect(safeHref('/relative')).toBeNull()
+  })
+})
+
+test.describe('plain-text descriptions', () => {
+  test('strip markdown syntax, keep link labels, run blocks together as sentences', () => {
+    expect(markdownPlainText('# About **me**\n\nI build [tools](https://x.example) for `DAOs`.\nNew line.\n\n> quoted\n\n1. one\n2. two!')).toBe(
+      'About me. I build tools for DAOs. New line. quoted. one. two!',
+    )
+    expect(markdownPlainText('An [unsafe](javascript:void0) link and *stars*')).toBe('An unsafe link and stars')
+    expect(markdownPlainText('   \n\n  ')).toBe('')
+  })
+
+  test('collapse whitespace and cut long text at a word with an ellipsis', () => {
+    expect(clipText('  a\n\tb   c ')).toBe('a b c')
+    const long = markdownPlainText(`**${'word '.repeat(60)}**`)
+    expect(long.length).toBeLessThanOrEqual(160)
+    expect(long).toMatch(/word…$/)
+    expect(clipText('W'.repeat(300), 160)).toBe(`${'W'.repeat(159)}…`)
+    expect(clipText('snake_case_tool')).toBe('snake_case_tool')
   })
 })

@@ -131,3 +131,36 @@ export function parseMarkdownLite(source: string): Block[] {
   }
   return blocks
 }
+
+function inlineText(nodes: Inline[]): string {
+  return nodes
+    .map((node) => {
+      if (node.type === 'text' || node.type === 'code') return node.text
+      if (node.type === 'break') return ' '
+      return inlineText(node.children)
+    })
+    .join('')
+}
+
+/**
+ * Plain text of a markdown-lite source, for meta descriptions and JSON-LD: no
+ * syntax (link labels kept, URLs dropped), blocks and list items run together
+ * as sentences, whitespace collapsed, at most `max` characters (cut at a word,
+ * with an ellipsis).
+ */
+export function markdownPlainText(source: string, max = 160): string {
+  const parts = parseMarkdownLite(source)
+    .flatMap((block) => (block.type === 'list' ? block.items.map(inlineText) : [inlineText(block.children)]))
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  return clipText(parts.map((part, i) => (i < parts.length - 1 && !/[.!?:;…]$/.test(part) ? `${part}.` : part)).join(' '), max)
+}
+
+/** Plain text with whitespace collapsed, at most `max` characters (cut at a word, with an ellipsis). */
+export function clipText(source: string, max = 160): string {
+  const text = source.replace(/\s+/g, ' ').trim()
+  if (text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s.,;:!?-]+$/, '')}…`
+}
