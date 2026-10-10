@@ -18,10 +18,19 @@ export async function useTheme(page: Page, theme: Theme): Promise<void> {
 
 /** Fails on serious or critical axe violations (WCAG 2.x A/AA rules). */
 export async function expectNoSeriousA11yViolations(page: Page): Promise<void> {
+  // Third-party wallet modals are not part of the page under test. RainbowKit
+  // marks both its modals (portals on <body>) and its provider's wrapper with
+  // [data-rk], and the wrapper holds page content: skip only the [data-rk]
+  // elements that neither sit in nor wrap the page's <main>.
+  await page.evaluate(() => {
+    const main = document.querySelector('main')
+    for (const el of Array.from(document.querySelectorAll('[data-rk]'))) {
+      if (!main || (!main.contains(el) && !el.contains(main))) el.setAttribute('data-axe-skip', '')
+    }
+  })
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'])
-    // Third-party wallet modals are not part of the page under test.
-    .exclude('[data-rk]')
+    .exclude('[data-axe-skip]')
     .analyze()
   const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   expect(

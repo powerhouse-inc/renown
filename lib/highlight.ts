@@ -15,7 +15,7 @@ let highlighter: Promise<HighlighterCore> | null = null
 
 function getHighlighter(): Promise<HighlighterCore> {
   highlighter ??= createHighlighterCore({
-    themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark-default.mjs')],
+    themes: [import('shiki/themes/github-light-high-contrast.mjs'), import('shiki/themes/github-dark-default.mjs')],
     langs: [import('shiki/langs/typescript.mjs'), import('shiki/langs/bash.mjs'), import('shiki/langs/graphql.mjs')],
     engine: createJavaScriptRegexEngine(),
   })
@@ -29,7 +29,7 @@ export async function highlight(code: string, lang: CodeLang): Promise<Highlight
   const shiki = await getHighlighter()
   const html = shiki.codeToHtml(code.trim(), {
     lang: LANG[lang],
-    themes: { light: 'github-light', dark: 'github-dark-default' },
+    themes: { light: 'github-light-high-contrast', dark: 'github-dark-default' },
     defaultColor: false,
   })
   return { code: code.trim(), html }

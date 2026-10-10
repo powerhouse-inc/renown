@@ -14,7 +14,8 @@
     --muted-foreground-light: #7C878E;
     --accent: #3E90F0;
     --accent-foreground: #FFFFFF;
-    --destructive: #EA4335;
+    /* Darker than the dark theme's red: 5.8:1 on white (WCAG AA for text). */
+    --destructive: #C5221F;
     --destructive-foreground: #FFFFFF;
     --success: #16a34a;
     --success-foreground: #FFFFFF;
@@ -37,7 +38,7 @@
     --ink-muted: #5F6670;
     --primary-strong: #0066D6;
     --primary-ink: #0062C9;
-    --signal: #007A57;
+    --signal: #006B4C;
     --grad-from: #21FFB4;
     --grad-to: #0080FF;
     --glow-primary: 0 0 0 1px rgba(0, 132, 255, 0.18), 0 24px 60px -28px rgba(0, 102, 214, 0.45);
