@@ -96,6 +96,29 @@ test.describe('public profile', () => {
   })
 })
 
+test.describe('phone bottom sheets', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  // A sheet is position: fixed; inside a backdrop-filtered/transformed ancestor it would be
+  // positioned against that ancestor instead of the screen. It must sit 16 px above the bottom.
+  for (const [button, region] of [
+    ['Share', 'Share'],
+    ['Verified Renown identity', 'Verified Renown identity'],
+  ] as const) {
+    test(`the ${button} sheet is pinned to the bottom of the screen`, async ({ page }) => {
+      await page.goto('/@pat-pages')
+      await page.getByRole('button', { name: button, exact: false }).first().click()
+      const sheet = page.getByRole('region', { name: region }).first()
+      await expect(sheet).toBeVisible()
+      const box = (await sheet.boundingBox())!
+      expect(box.y).toBeGreaterThanOrEqual(0)
+      expect(Math.abs(box.y + box.height - (844 - 16))).toBeLessThan(2)
+      expect(box.x).toBeGreaterThanOrEqual(15)
+      expect(box.width).toBeGreaterThan(390 - 34)
+    })
+  }
+})
+
 test.describe('/media', () => {
   test('redirects a set avatar to the signed storage URL with the public cache policy', async ({ request }) => {
     const response = await request.get('/media/stub-avatar-doc/avatar', { maxRedirects: 0 })
