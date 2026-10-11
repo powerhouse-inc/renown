@@ -25,16 +25,21 @@ function fromBase64Url(value: string): string | null {
   }
 }
 
+/** Longest share fragment built or read; a longer paste is not shareable by link. */
+export const MAX_SHARE_FRAGMENT_LENGTH = 16_384
+
 /** "#v=<base64url JSON>": the fragment of a share link. */
-export function shareFragment(input: SharedInput): string {
+export function shareFragment(input: SharedInput): string | null {
   const payload: Record<string, string> = { t: input.text }
   if (input.documentId) payload.d = input.documentId
   if (input.branch && input.branch !== 'main') payload.b = input.branch
-  return `#v=${toBase64Url(JSON.stringify(payload))}`
+  const fragment = `#v=${toBase64Url(JSON.stringify(payload))}`
+  return fragment.length > MAX_SHARE_FRAGMENT_LENGTH ? null : fragment
 }
 
 /** The input a share link carries, or null for any other fragment. */
 export function readShareFragment(hash: string): SharedInput | null {
+  if (hash.length > MAX_SHARE_FRAGMENT_LENGTH) return null
   const match = /^#v=([A-Za-z0-9_-]+)$/.exec(hash)
   if (!match) return null
   const json = fromBase64Url(match[1])

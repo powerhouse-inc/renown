@@ -11,6 +11,13 @@ const P256_PREFIX = [0x80, 0x24]
 const P = BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff')
 const B = BigInt('0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b')
 
+/**
+ * A P-256 did:key body is 35 bytes (2-byte multicodec + 33-byte compressed
+ * point) = at most 49 base58 characters. Anything longer than this cap is
+ * refused before decoding, because base58 decoding is quadratic in length.
+ */
+const MAX_BASE58_LENGTH = 60
+
 export class DidKeyError extends Error {
   constructor(message: string) {
     super(message)
@@ -20,6 +27,7 @@ export class DidKeyError extends Error {
 
 /** base58btc to bytes; null on a character outside the alphabet. */
 export function base58Decode(input: string): Uint8Array | null {
+  if (input.length > MAX_BASE58_LENGTH) return null
   let value = BigInt(0)
   for (const char of input) {
     const digit = BASE58.indexOf(char)
@@ -96,6 +104,7 @@ export function isP256DidKey(did: string): boolean {
  */
 export function p256PublicKey(did: string): Uint8Array {
   if (!did.startsWith('did:key:z')) throw new DidKeyError('not a base58btc did:key')
+  if (did.length - 'did:key:z'.length > MAX_BASE58_LENGTH) throw new DidKeyError('too long for a P-256 did:key')
   const decoded = base58Decode(did.slice('did:key:z'.length))
   if (!decoded || decoded.length !== 35) throw new DidKeyError('not a compressed P-256 key')
   if (decoded[0] !== P256_PREFIX[0] || decoded[1] !== P256_PREFIX[1]) throw new DidKeyError('not a P-256 key')

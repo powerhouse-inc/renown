@@ -42,14 +42,34 @@ test.describe('/verify detection', () => {
     const input = { text: '{"x":"é ✓"}', documentId: 'doc-1', branch: 'draft' }
     const fragment = shareFragment(input)
     expect(fragment).toMatch(/^#v=[A-Za-z0-9_-]+$/)
-    expect(readShareFragment(fragment)).toEqual(input)
-    expect(readShareFragment(shareFragment({ text: 'did:key:z', documentId: '', branch: 'main' }))).toEqual({ text: 'did:key:z', documentId: '', branch: 'main' })
+    expect(readShareFragment(fragment!)).toEqual(input)
+    expect(shareFragment({ text: 'x'.repeat(20_000), documentId: '', branch: 'main' })).toBeNull()
+    expect(readShareFragment(`#v=${'A'.repeat(20_000)}`)).toBeNull()
+    expect(readShareFragment(shareFragment({ text: 'did:key:z', documentId: '', branch: 'main' })!)).toEqual({ text: 'did:key:z', documentId: '', branch: 'main' })
     expect(readShareFragment('#v=%%%')).toBeNull()
     expect(readShareFragment('#section')).toBeNull()
   })
 })
 
+// Fixed public vectors (generated once with node:crypto): compressed prefix 03 (odd y) and 02 (even y).
+const ODD = {
+  did: 'did:key:zDnaeoJM8YCAwUKnxCiUwpKnYrS19q3dxz7qmnUU5rNVvahwF',
+  x: '53c91fbc47e54365ba8af8c4e4087b94be969b482f5bf340b51ecf0fe2ff46a2',
+  y: 'b14cff2c6aa23da2b1fae1e770f64f2fa987daeee833701f83d2f9a3f4f3d3b9',
+}
+const EVEN = {
+  did: 'did:key:zDnaeUumZ3bZwJ2Bp8t2rjDTTre4pxjZx4dw8goGsAg5E1RKv',
+  x: '428e03ecb36792e715ba8d39073f212ceeee04d5571143da30215847b46e8a39',
+  y: '24d72f9c7dccd5c8b2235ab6e9443d4b1505b0a16c83229ab9c302d4c59b20b4',
+}
+
 test.describe('/verify P-256 app keys', () => {
+  test('decompresses odd-y and even-y keys to the known points', () => {
+    for (const v of [ODD, EVEN]) {
+      expect(Buffer.from(p256PublicKey(v.did)).toString('hex')).toBe(`04${v.x}${v.y}`)
+    }
+  })
+
   test('decodes a did:key and verifies its WebCrypto signatures, and nothing else', async () => {
     const key = await makeAppKey()
     expect(p256PublicKey(key.did)).toHaveLength(65)
@@ -60,6 +80,21 @@ test.describe('/verify P-256 app keys', () => {
     expect(await verifyP256((await makeAppKey()).did, signature, message)).toBe(false)
     expect(await verifyP256(key.did, signature.slice(0, 63), message)).toBe(false)
     expect(base58Decode('0OIl')).toBeNull()
+    for (const bad of [
+      'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK', // Ed25519 multicodec
+      'did:key:zDnaeQRy3dcKsKa1zmKtVKsTy3m2HYoQnFnfKuxD6HfSTQgYg', // x = 1 is not on the curve
+      `${ODD.did}1`, // trailing character
+      `${ODD.did}${'1'.repeat(100_000)}`,
+    ]) {
+      expect(isP256DidKey(bad)).toBe(false)
+      expect(await verifyP256(bad, signature, message)).toBe(false)
+    }
+    const started = performance.now()
+    const huge = `did:key:z${'z'.repeat(100_000)}`
+    expect(isP256DidKey(huge)).toBe(false)
+    expect(await verifyP256(huge, signature, message)).toBe(false)
+    expect(base58Decode('z'.repeat(100_000))).toBeNull()
+    expect(performance.now() - started).toBeLessThan(50)
     expect(() => p256PublicKey('did:pkh:eip155:1:0x0')).toThrow('not a base58btc did:key')
   })
 })
