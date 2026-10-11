@@ -1,3 +1,9 @@
+## <small>1.22.2 (2026-10-11)</small>
+
+* fix(home): calm, continuous final call-to-action panel ([9676cbe](https://github.com/powerhouse-inc/renown/commit/9676cbe))
+* fix(site): render the mobile menu outside the blurred header so it covers the screen ([ada56b7](https://github.com/powerhouse-inc/renown/commit/ada56b7))
+* test(identity): pin the phone bottom sheets to the screen edge ([3140c6c](https://github.com/powerhouse-inc/renown/commit/3140c6c))
+
 ## <small>1.22.1 (2026-10-10)</small>
 
 * fix(media): bound the same-origin byte route ([7cd8f94](https://github.com/powerhouse-inc/renown/commit/7cd8f94))
