@@ -45,14 +45,14 @@ function redirect(res: NextApiResponse, location: string): void {
   res.redirect(302, location)
 }
 
-/** Headers of every image answered from this origin: proven type, no sniffing, no document context, no cross-site embedding. */
+/** Headers of every image answered from this origin: proven type, no sniffing, no document context; embeddable cross-site (public profile images are shown on vetra.io and other apps). */
 function setImageHeaders(res: NextApiResponse, type: string, cacheControl: string, length: number | null): void {
   res.setHeader('Cache-Control', cacheControl)
   res.setHeader('Content-Type', type)
   if (length !== null) res.setHeader('Content-Length', String(length))
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-site')
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   res.setHeader('Content-Disposition', 'inline')
 }
 

@@ -37,11 +37,11 @@ function expectSameOriginImage(headers: Record<string, string>, type: string, ca
   expect(headers['cache-control']).toBe(cacheControl)
   expect(headers['x-content-type-options']).toBe('nosniff')
   expect(headers['content-security-policy']).toBe("default-src 'none'; sandbox")
-  expect(headers['cross-origin-resource-policy']).toBe('same-site')
+  expect(headers['cross-origin-resource-policy']).toBe('cross-origin')
   expect(headers['content-disposition']).toBe('inline')
 }
 
-test('a matching version is served same-origin: immutable, nosniff, sandboxed, same-site', async ({ request }) => {
+test('a matching version is served same-origin: immutable, nosniff, sandboxed, cross-origin', async ({ request }) => {
   const sha = await storedHash(request, 'stub-avatar-doc', 'avatar')
   for (const path of [`/media/stub-avatar-doc/avatar?v=${sha.slice(0, 12)}`, `/media/stub-app-doc/cover?v=${sha}`]) {
     const response = await request.get(path, { maxRedirects: 0 })
