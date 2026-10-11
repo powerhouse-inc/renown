@@ -26,13 +26,14 @@ export function ListedSwitch({ checked, onChange }: ListedSwitchProps) {
         aria-describedby="listed-hint"
         onClick={() => onChange(!checked)}
         className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
-          checked ? 'bg-primary border-primary' : 'bg-muted border-input'
+          checked ? 'bg-primary border-primary' : 'bg-background border-ink-muted'
         }`}
       >
         <span
           aria-hidden="true"
-          className={`bg-background inline-block h-5 w-5 rounded-full shadow-sm transition-transform motion-reduce:transition-none ${
-            checked ? 'translate-x-5' : 'translate-x-0.5'
+          data-testid="listed-thumb"
+          className={`inline-block h-5 w-5 rounded-full shadow-sm transition-transform motion-reduce:transition-none ${
+            checked ? 'bg-background translate-x-5' : 'bg-ink-muted translate-x-0.5'
           }`}
         />
       </button>

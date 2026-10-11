@@ -651,7 +651,7 @@ test.describe('profile editor', () => {
           json: {
             data: {
               renownUsers: [
-                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null, ...(query.includes('listed') ? { listed: false } : {}), ...saved },
+                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null, ...(query.includes('listed') ? { listed: false, ...saved } : saved) },
               ],
             },
           },
@@ -737,6 +737,48 @@ test.describe('profile editor', () => {
     // Saved: the switch stays on and there is nothing left to save.
     await expect(toggle).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('button', { name: 'Save profile' })).toBeDisabled()
+  })
+
+  test('the off switch is visible: track border and thumb reach 3:1 in both themes', async ({ page }) => {
+    await openEditor(page)
+    const toggle = page.getByRole('switch', { name: 'List me in people search' })
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await page.addStyleTag({ content: '*{transition:none!important}' })
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((t) => document.documentElement.classList.toggle('dark', t === 'dark'), theme)
+      const ratio = await toggle.evaluate((el) => {
+        const ctx = document.createElement('canvas').getContext('2d')!
+        const rgb = (css: string) => {
+          ctx.clearRect(0, 0, 1, 1)
+          ctx.fillStyle = '#000'
+          ctx.fillStyle = css
+          ctx.fillRect(0, 0, 1, 1)
+          const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+          return { r, g, b, a: a / 255 }
+        }
+        const lum = ({ r, g, b }: { r: number; g: number; b: number }) => {
+          const f = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+        }
+        const cr = (a: ReturnType<typeof rgb>, b: ReturnType<typeof rgb>) => {
+          const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+          return (hi + 0.05) / (lo + 0.05)
+        }
+        let surface = rgb('rgba(0,0,0,0)')
+        for (let n: HTMLElement | null = el.parentElement; n && surface.a < 1; n = n.parentElement) {
+          const c = rgb(getComputedStyle(n).backgroundColor)
+          if (c.a === 1) surface = c
+        }
+        const track = getComputedStyle(el)
+        const thumb = getComputedStyle(el.querySelector('[data-testid="listed-thumb"]')!)
+        return {
+          border: cr(rgb(track.borderTopColor), surface),
+          thumb: cr(rgb(thumb.backgroundColor), rgb(track.backgroundColor)),
+        }
+      })
+      expect(ratio.border, `${theme} track border vs surface`).toBeGreaterThanOrEqual(3)
+      expect(ratio.thumb, `${theme} thumb vs track`).toBeGreaterThanOrEqual(3)
+    }
   })
 
   test('shows a saved opt-in, and turning it off signs listed: false', async ({ page }) => {
