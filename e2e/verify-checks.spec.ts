@@ -611,3 +611,41 @@ test.describe('/verify fix round 1: live dependencies', () => {
     expect(Date.now() - started).toBeLessThan(2_000)
   })
 })
+
+// Fix round 2: a revoked credential for the key wins over any other, whatever the stated signing time.
+
+/** The v2 action re-signed with a tuple time of `at` (the signer chooses it; nothing else changes). */
+async function backdated(action: Record<string, unknown>, key: AppKey, at: Date): Promise<Record<string, unknown>> {
+  const shared = await import('@powerhousedao/shared/document-model')
+  const signer = (action.context as { signer: { signatures: string[][] } }).signer
+  const [, k, hash, prev] = signer.signatures[0]
+  const timestamp = String(Math.floor(at.getTime() / 1000))
+  const signature = await key.sign(shared.buildOperationSignatureMessage([timestamp, k, hash, prev]))
+  return { ...action, context: { signer: { ...signer, signatures: [[timestamp, k, hash, prev, `0x${Buffer.from(signature).toString('hex')}`]] } } }
+}
+
+test.describe('/verify fix round 2: revocation wins', () => {
+  test('I6: an old unrevoked credential does not cover an operation backdated into its window once a newer one is revoked', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const old = await makeCredential({ wallet, subject: key.did, issuedAt: new Date(Date.now() - 30 * DAY), expiresAt: new Date(Date.now() - 10 * DAY) })
+    const newer = await makeCredential({ wallet, subject: key.did, issuedAt: new Date(Date.now() - 5 * DAY) })
+    const revokedAt = new Date(Date.now() - DAY).toISOString()
+    const registry = { credentials: [stored(old), stored(newer, { revoked: true, revokedAt })], profiles: {} }
+    const action = await backdated(await makeV2Action({ key, address: wallet.address, documentId: 'doc-1' }), key, new Date(Date.now() - 20 * DAY))
+    const report = await verifyOperation(action, { documentId: 'doc-1', branch: 'main' }, deps(registry))
+    expect(status(report)).toMatchObject({ binding: 'pass', signature: 'pass', delegation: 'fail' })
+    expect(report.verdict).toBe('revoked')
+    expect(report.summary).toContain("The signing time is the signer's own claim, so it cannot show the operation came before that.")
+  })
+
+  test('I6: a single revoked credential stays revoked for an operation dated after its expiry', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const credential = await makeCredential({ wallet, subject: key.did, issuedAt: new Date(Date.now() - 10 * DAY), expiresAt: new Date(Date.now() - 5 * DAY) })
+    const registry = { credentials: [stored(credential, { revoked: true, revokedAt: new Date(Date.now() - 6 * DAY).toISOString() })], profiles: {} }
+    const action = await makeV2Action({ key, address: wallet.address, documentId: 'doc-1' })
+    const report = await verifyOperation(action, { documentId: 'doc-1', branch: 'main' }, deps(registry))
+    expect(report.verdict).toBe('revoked')
+  })
+})

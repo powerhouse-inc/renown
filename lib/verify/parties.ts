@@ -48,8 +48,10 @@ function short(address: string): string {
  * Whether a stored Renown credential of `address` delegates to `appDid`.
  * Issuance and expiry are judged at `at` (now for a token, the signing time
  * the operation states for an operation), with SKEW_MS for issuance. A
- * revocation counts whenever it happened: an operation's signing time is the
- * signer's own claim, so it cannot show the signature came before it.
+ * revocation of any credential for this key and address wins over everything
+ * else, whenever it happened: an operation's signing time is the signer's own
+ * claim, so neither it nor an older unrevoked credential can show the
+ * signature came before the revocation.
  */
 export async function checkDelegation(
   lookups: VerifyLookups,
@@ -68,13 +70,22 @@ export async function checkDelegation(
       check: { id, label, status: 'unknown', detail: 'Renown could not be reached to look up the credential that authorises this key.' },
     }
   }
+  const revoked = found.value.find((c) => c.revoked)
+  if (revoked) {
+    const revokedOn = revoked.revokedAt && isoOrNull(revoked.revokedAt) !== null ? ` on ${formatDay(revoked.revokedAt)}` : ''
+    return {
+      outcome: 'revoked',
+      credential: revoked,
+      check: { id, label, status: 'fail', detail: `${short(address)} revoked a credential that authorised this app key${revokedOn}.` },
+    }
+  }
   const t = at.getTime()
   const issuedBy = found.value.filter((c) => (isoOrNull(c.issuanceDate) ?? Infinity) <= t + SKEW_MS)
   const live = issuedBy.filter((c) => {
     const expires = isoOrNull(c.expirationDate)
     return expires === null || expires > t
   })
-  const valid = live.find((c) => !c.revoked)
+  const valid = live[0]
   const atText = when === 'now' ? '' : ' at the signing time the operation states'
   if (valid) {
     return {
@@ -86,14 +97,6 @@ export async function checkDelegation(
         status: 'pass',
         detail: `A Renown credential from ${short(address)} authorised this app key${atText}.`,
       },
-    }
-  }
-  if (live.length > 0) {
-    const revokedAt = live[0].revokedAt && isoOrNull(live[0].revokedAt) !== null ? ` on ${formatDay(live[0].revokedAt)}` : ''
-    return {
-      outcome: 'revoked',
-      credential: live[0],
-      check: { id, label, status: 'fail', detail: `${short(address)} revoked the credential that authorised this app key${revokedAt}.` },
     }
   }
   if (issuedBy.length > 0) {
