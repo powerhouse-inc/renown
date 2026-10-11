@@ -1,3 +1,23 @@
+## 1.24.0 (2026-10-11)
+
+* docs(verify): the example registration creates a bare profile on first run ([2bac5d0](https://github.com/powerhouse-inc/renown/commit/2bac5d0))
+* test(e2e): make renown-writes safe beside other copies of itself ([c2ead50](https://github.com/powerhouse-inc/renown/commit/c2ead50))
+* test(e2e): register /verify and /people in the layout invariants ([fe911e7](https://github.com/powerhouse-inc/renown/commit/fe911e7))
+* fix(people): keep focus after load more, count code points, test stale answers ([ed9a3c8](https://github.com/powerhouse-inc/renown/commit/ed9a3c8))
+* fix(people): never store search result pages ([aa27d78](https://github.com/powerhouse-inc/renown/commit/aa27d78))
+* fix(profile): make the people-search switch visible when off ([b1b96a9](https://github.com/powerhouse-inc/renown/commit/b1b96a9))
+* fix(verify): any revoked credential for an app key makes its operations and tokens revoked ([498aad9](https://github.com/powerhouse-inc/renown/commit/498aad9))
+* fix(verify): cap did:key and share-fragment lengths, add fixed key vectors ([9d36aad](https://github.com/powerhouse-inc/renown/commit/9d36aad))
+* fix(verify): claim no more than was checked ([73da955](https://github.com/powerhouse-inc/renown/commit/73da955))
+* fix(verify): recompute legacy hashes, name apps from credentials, tighten token and revocation verdi ([2d5b387](https://github.com/powerhouse-inc/renown/commit/2d5b387))
+* fix(verify): strip share links opened in an open tab, scrub them from analytics, honest date verdict ([1e98821](https://github.com/powerhouse-inc/renown/commit/1e98821))
+* feat(people): opt-in people search ([f736968](https://github.com/powerhouse-inc/renown/commit/f736968))
+* feat(profile): sign and save the people-search opt-in ([caf0aa9](https://github.com/powerhouse-inc/renown/commit/caf0aa9))
+* feat(site): People in the nav, /verify and /people in the sitemap and the wallet check ([cb6e874](https://github.com/powerhouse-inc/renown/commit/cb6e874))
+* feat(verify): /verify page with examples, verdict seal and private share links ([cc9335a](https://github.com/powerhouse-inc/renown/commit/cc9335a))
+* feat(verify): check credentials, tokens, signed operations and DIDs client-side ([a13b933](https://github.com/powerhouse-inc/renown/commit/a13b933))
+* feat(verify): detect pastes, decode P-256 app keys, share links in the fragment ([b8369b1](https://github.com/powerhouse-inc/renown/commit/b8369b1))
+
 ## 1.23.0 (2026-10-11)
 
 * fix(identity): accent colour from the server; popover placement resets and follows resizes ([d87c463](https://github.com/powerhouse-inc/renown/commit/d87c463))
