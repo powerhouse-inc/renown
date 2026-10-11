@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { IdentityArtSvgs } from '../../lib/identity-art'
 import { cx } from '../../utils/cx'
 
@@ -9,6 +10,8 @@ export interface IdentityArtProps {
    */
   art: IdentityArtSvgs
   className?: string
+  /** Inline style for the box (e.g. a mask). */
+  style?: CSSProperties
 }
 
 /**
@@ -16,10 +19,10 @@ export interface IdentityArtProps {
  * rendered and CSS shows the one for the current theme, so nothing changes
  * after hydration (no layout shift, no flash). Decorative.
  */
-export function IdentityArt({ art, className }: IdentityArtProps) {
+export function IdentityArt({ art, className, style }: IdentityArtProps) {
   return (
     // className gives the box its size (and position, e.g. "absolute inset-0"); both variants fill it.
-    <div aria-hidden="true" className={cx('rn-art overflow-hidden', className)}>
+    <div aria-hidden="true" className={cx('rn-art overflow-hidden', className)} style={style}>
       {/* Trusted: identityArt() emits numbers and fixed markup only; the seed is never echoed. */}
       <div className="h-full w-full dark:hidden" dangerouslySetInnerHTML={{ __html: art.light }} />
       <div className="hidden h-full w-full dark:block" dangerouslySetInnerHTML={{ __html: art.dark }} />

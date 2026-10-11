@@ -1,3 +1,4 @@
+import type { IdentityArtSvgs } from '../../lib/identity-art'
 import type { HighlightedCode } from '../../lib/highlight'
 import type { RenownAppProfile } from '../../services/app-profiles'
 
@@ -19,4 +20,6 @@ export interface HomePageData {
   pulse?: NetworkPulse | null
   /** The developers-teaser code sample, highlighted server-side. */
   teaser: HighlightedCode
+  /** The final call-to-action's constellation (seed 'renown-id': mint to blue, the brand's own arc), both themes, rendered on the server. */
+  ctaArt: IdentityArtSvgs
 }

@@ -271,3 +271,5 @@ export function identityArtSvgs(seed: string, { width, height, idPrefix }: Omit<
 export const HERO_ART = { width: 1200, height: 320 } as const
 /** The publisher card's art strip on app pages. */
 export const PUBLISHER_ART = { width: 640, height: 120 } as const
+/** The homepage's closing call-to-action panel (a fixed seed). */
+export const CTA_ART = { width: 1200, height: 480 } as const

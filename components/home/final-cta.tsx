@@ -1,31 +1,32 @@
-import { PhMotif } from '../site/ph-motif'
+import type { IdentityArtSvgs } from '../../lib/identity-art'
+import { IdentityArt } from '../identity/identity-art'
 import { Container, Reveal } from '../site/primitives'
 import { HeroCta } from './hero-cta'
 
-export function FinalCta() {
+// A continuous frame: brand gradient there and back again, softened towards the
+// hairline border colour so it reads as a premium edge, not a neon tube.
+const FRAME =
+  'conic-gradient(from 210deg at 50% 50%, color-mix(in oklab, var(--grad-from) 70%, var(--border)), color-mix(in oklab, var(--grad-to) 75%, var(--border)) 30%, color-mix(in oklab, var(--grad-to) 35%, var(--border)) 50%, color-mix(in oklab, var(--grad-to) 75%, var(--border)) 70%, color-mix(in oklab, var(--grad-from) 70%, var(--border)))'
+
+// The glow sits around the heading and is fully transparent before every edge of the panel.
+const GLOW = 'radial-gradient(ellipse 48% 42% at 50% 44%, color-mix(in oklab, var(--grad-to) 20%, transparent), transparent)'
+
+// The constellation shows towards the edges and fades out behind the centred copy.
+const ART_MASK = 'radial-gradient(ellipse 70% 75% at 50% 48%, transparent 40%, rgba(0, 0, 0, 0.5) 75%, black 100%)'
+
+export function FinalCta({ art }: { art: IdentityArtSvgs }) {
   return (
     <section aria-labelledby="final-cta-title" className="pt-8 pb-24 md:pb-32">
       <Container>
         <Reveal className="rounded-panel relative isolate overflow-hidden p-[1px]">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 -z-10"
-            style={{ background: 'linear-gradient(120deg, var(--grad-from), var(--grad-to) 45%, transparent 80%)' }}
-          />
+          <div aria-hidden="true" className="absolute inset-0 -z-10" style={{ background: FRAME }} />
           <div className="bg-background rounded-panel relative isolate overflow-hidden px-6 py-14 text-center md:px-12 md:py-20">
-            <div
-              aria-hidden="true"
-              className="absolute inset-x-0 -top-1/2 -z-10 h-full"
-              style={{ background: 'radial-gradient(50% 60% at 50% 100%, color-mix(in oklab, var(--grad-to) 26%, transparent), transparent)' }}
+            <IdentityArt
+              art={art}
+              className="absolute inset-0 -z-10 opacity-35 md:opacity-50 dark:opacity-45 md:dark:opacity-60"
+              style={{ maskImage: ART_MASK, WebkitMaskImage: ART_MASK }}
             />
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 -z-10 hidden md:block"
-              style={{ maskImage: 'radial-gradient(ellipse 58% 75% at 50% 50%, transparent 55%, black 100%)', WebkitMaskImage: 'radial-gradient(ellipse 58% 75% at 50% 50%, transparent 55%, black 100%)' }}
-            >
-              <PhMotif className="-right-72 -bottom-80 opacity-40 dark:opacity-70" />
-              <PhMotif className="-top-96 -left-72 rotate-180 opacity-30 dark:opacity-50" />
-            </div>
+            <div aria-hidden="true" className="absolute inset-0 -z-10" style={{ background: GLOW }} />
             <h2 id="final-cta-title" className="text-ink text-h1 mx-auto max-w-[18ch] text-balance">
               Bring your identity to every app
             </h2>

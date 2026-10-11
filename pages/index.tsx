@@ -15,6 +15,7 @@ import { PageMeta } from '../components/site/page-meta'
 import { SiteLayout } from '../components/site/site-layout'
 import { withLazyWalletShell } from '../components/wallet/lazy-wallet-shell'
 import { useIsClient } from '../hooks/useIsClient'
+import { CTA_ART, identityArtSvgs } from '../lib/identity-art'
 import { listAppProfiles } from '../services/app-profiles'
 import { fetchNetworkStats } from '../services/network-stats'
 import { listingCacheControl } from '../utils/cache-control'
@@ -75,7 +76,7 @@ function jsonLd(origin: string): object[] {
   ]
 }
 
-function MarketingHome({ featuredApps, pulse, teaser }: HomePageData) {
+function MarketingHome({ featuredApps, pulse, teaser, ctaArt }: HomePageData) {
   return (
     <SiteLayout>
       <PageMeta path="/" jsonLd={jsonLd(publicOrigin())} />
@@ -86,7 +87,7 @@ function MarketingHome({ featuredApps, pulse, teaser }: HomePageData) {
       <NetworkPulseSection pulse={pulse} />
       <DevelopersTeaser code={teaser} />
       <EcosystemStrip />
-      <FinalCta />
+      <FinalCta art={ctaArt} />
     </SiteLayout>
   )
 }
@@ -95,7 +96,7 @@ const Home: NextPage<HomeProps> = (props) => {
   const router = useRouter()
   const inAuthFlow = Boolean(router.query['app'] || router.query['connect'])
   if (inAuthFlow || props.mode === 'auth') return <AuthHome />
-  return <MarketingHome featuredApps={props.featuredApps} pulse={props.pulse} teaser={props.teaser} />
+  return <MarketingHome featuredApps={props.featuredApps} pulse={props.pulse} teaser={props.teaser} ctaArt={props.ctaArt} />
 }
 
 export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query, res }) => {
@@ -125,7 +126,8 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ query,
   ])
   // An outage must not be cached at the edge: the next visitor retries.
   res.setHeader('Cache-Control', listingCacheControl(!featuredFailed && !pulseFailed))
-  return { props: { mode: 'site', featuredApps, pulse, teaser } }
+  const ctaArt = identityArtSvgs('renown-id', { ...CTA_ART, idPrefix: 'cta' })
+  return { props: { mode: 'site', featuredApps, pulse, teaser, ctaArt } }
 }
 
 export default Home
