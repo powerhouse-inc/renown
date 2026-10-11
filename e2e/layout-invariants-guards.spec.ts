@@ -56,6 +56,16 @@ test('an open panel: viewport cover, content inside, opaque background, not cove
   expect(await surfaceProblems(page, { panel: page.locator('#panel') })).toContain('text "Apps" is covered by <div>')
 })
 
+test('a panel that scrolls by itself is fine; one too short for its content is not', async ({ page }) => {
+  const rows = Array.from({ length: 40 }, (_, i) => `<p>Row ${i}</p>`).join('')
+  const dialog = (style: string) => `<div id="overlay" style="position: fixed; inset: 0"><div id="panel" style="position: absolute; left: 16px; right: 16px; top: 40px; background: #050a1a; padding: 16px; ${style}">${rows}</div></div>`
+  const spec = { panel: page.locator('#panel'), overlay: page.locator('#overlay') }
+  await show(page, dialog('max-height: 70vh; overflow-y: auto'))
+  expect(await surfaceProblems(page, spec)).toEqual([])
+  await show(page, dialog('height: 100px'))
+  expect(await surfaceProblems(page, spec)).toContain('panel is 100 px tall but its content needs 1016 px'.replace('1016', String(await page.locator('#panel').evaluate((e) => e.scrollHeight))))
+})
+
 test('decorative layers stay inside a clipping panel (the 9676cbe tiles and glow)', async ({ page }) => {
   const panel = (layer: string) => `<div style="margin: 40px 16px; height: 300px; position: relative; overflow: hidden; border-radius: 28px">${layer}<h2>Call to action</h2></div>`
   await show(page, panel('<div aria-hidden="true" style="position: absolute; right: -288px; bottom: -320px; width: 600px; height: 600px; background: #0080ff"></div>'))

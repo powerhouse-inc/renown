@@ -1,4 +1,4 @@
-// Geometric layout guards (e2e/layout-invariants.spec.ts). Each check returns
+// Geometric layout guards (the page suite built on them, and e2e/layout-invariants-guards.spec.ts). Each check returns
 // human-readable problems (empty = fine) instead of asserting, so one test can
 // report every broken rule of a page at once. No pixel baselines: the checks
 // read boxes and computed styles, and the two paint checks compare the page
@@ -100,7 +100,10 @@ export async function surfaceProblems(page: Page, { panel, overlay }: SurfaceSpe
     const found: string[] = []
     const rootBox = root.getBoundingClientRect()
     const vh = window.innerHeight
-    if (root.scrollHeight > root.clientHeight + slack && rootBox.height < vh - slack) {
+    // A panel that scrolls by itself (max-height + overflow-y: auto) legitimately has more content than box.
+    const rootStyle = getComputedStyle(root)
+    const scrolls = (rootStyle.overflowY === 'auto' || rootStyle.overflowY === 'scroll') && root.scrollHeight > root.clientHeight + slack
+    if (!scrolls && root.scrollHeight > root.clientHeight + slack && rootBox.height < vh - slack) {
       found.push(`panel is ${Math.round(rootBox.height)} px tall but its content needs ${root.scrollHeight} px`)
     }
     // Computed colours come as rgb(), rgba(), or oklch()/color() with an optional "/ alpha".
@@ -127,6 +130,8 @@ export async function surfaceProblems(page: Page, { panel, overlay }: SurfaceSpe
         const b = up.getBoundingClientRect()
         clip = { left: Math.max(clip.left, b.left), right: Math.min(clip.right, b.right), top: Math.max(clip.top, b.top), bottom: Math.min(clip.bottom, b.bottom) }
       }
+      // Rows scrolled out of view inside the panel's own scroll box only count where they show.
+      if (scrolls) clip = { ...clip, top: Math.max(clip.top, rootBox.top), bottom: Math.min(clip.bottom, rootBox.bottom) }
       const range = document.createRange()
       range.selectNodeContents(node)
       for (const r of Array.from(range.getClientRects())) {
@@ -363,9 +368,18 @@ export async function decorativePaintProblems(page: Page): Promise<string[]> {
   for (const probe of probes) {
     const layer = page.locator(`[data-layout-probe="${probe.id}"]`)
     const shown = await rgb(await page.screenshot({ clip: probe.clip, fullPage: true, animations: 'disabled' }))
-    await layer.evaluate((el) => (el as HTMLElement).style.setProperty('opacity', '0', 'important'))
+    const previous = await layer.evaluate((el) => {
+      const style = (el as HTMLElement).style
+      const before = { value: style.getPropertyValue('opacity'), priority: style.getPropertyPriority('opacity') }
+      style.setProperty('opacity', '0', 'important')
+      return before
+    })
     const hidden = await rgb(await page.screenshot({ clip: probe.clip, fullPage: true, animations: 'disabled' }))
-    await layer.evaluate((el) => (el as HTMLElement).style.removeProperty('opacity'))
+    await layer.evaluate((el, before) => {
+      const style = (el as HTMLElement).style
+      if (before.value) style.setProperty('opacity', before.value, before.priority)
+      else style.removeProperty('opacity')
+    }, previous)
     const diff = (x: number, y: number) => {
       const i = (y * shown.width + x) * 3
       return (Math.abs(shown.data[i] - hidden.data[i]) + Math.abs(shown.data[i + 1] - hidden.data[i + 1]) + Math.abs(shown.data[i + 2] - hidden.data[i + 2])) / 3
