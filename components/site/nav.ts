@@ -13,6 +13,7 @@ export interface FooterColumn {
 /** Primary navigation (header and mobile drawer). */
 export const SITE_NAV: NavLink[] = [
   { label: 'Apps', href: '/apps' },
+  { label: 'People', href: '/people' },
   { label: 'Developers', href: '/developers' },
   { label: 'Trust', href: '/trust' },
   { label: 'Ecosystem', href: '/ecosystem' },
@@ -31,7 +32,9 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Product',
     links: [
       { label: 'Apps', href: '/apps' },
+      { label: 'People', href: '/people' },
       { label: 'Your Renown', href: '/me' },
+      { label: 'Verify a signature', href: '/verify' },
       { label: 'Trust', href: '/trust' },
     ],
   },

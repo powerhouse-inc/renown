@@ -9,6 +9,7 @@ test.describe('site header', () => {
     const nav = page.getByRole('banner').getByRole('navigation', { name: 'Main' })
     for (const [label, href] of [
       ['Apps', '/apps'],
+      ['People', '/people'],
       ['Developers', '/developers'],
       ['Trust', '/trust'],
       ['Ecosystem', '/ecosystem'],
