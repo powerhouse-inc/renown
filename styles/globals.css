@@ -47,6 +47,8 @@
     --code-bg: #F6F8FB;
     --danger: #C42B1C;
     --danger-ink: #B42318;
+    /* Revoked, expired or not valid yet: genuine, but not valid now (/verify). */
+    --caution-ink: #8A5000;
 }
 
 .dark {
@@ -87,6 +89,7 @@
     --code-bg: #0A1226;
     --danger: #C42B1C;
     --danger-ink: #FF8F80;
+    --caution-ink: #FFC46B;
 }
 
 @theme inline {
@@ -128,6 +131,7 @@
     --color-code: var(--code-bg);
     --color-danger: var(--danger);
     --color-danger-ink: var(--danger-ink);
+    --color-caution-ink: var(--caution-ink);
     --shadow-glow: var(--glow-primary);
     --shadow-card: var(--shadow-card);
 
@@ -457,5 +461,21 @@ button:not(:disabled),
     }
     50% {
         opacity: 0.35;
+    }
+}
+
+/* /verify: the verdict seal's ring draws itself once, tick by tick. */
+@keyframes verify-tick-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .verify-seal-tick {
+        animation: verify-tick-in 380ms ease-out both;
     }
 }

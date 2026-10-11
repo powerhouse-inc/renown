@@ -17,8 +17,11 @@ export interface Check {
   detail: string
 }
 
-/** The banner. 'identity' is the DID report: a DID is a name, not a signed claim. */
-export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'unchecked' | 'identity'
+/**
+ * The banner. 'identity' is the DID report: a DID is a name, not a signed claim.
+ * 'not-yet-valid': a genuine credential whose validity starts in the future.
+ */
+export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'not-yet-valid' | 'unchecked' | 'identity'
 
 export interface SignerParty {
   address: string

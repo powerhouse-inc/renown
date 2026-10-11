@@ -589,6 +589,8 @@ test.describe('/verify fix round 1: credentials', () => {
     const credential = await makeCredential({ wallet: makeWallet(), subject: key.did, issuedAt: new Date(Date.now() + DAY) })
     const report = await verifyCredential(credential, deps({ credentials: [], profiles: {} }))
     expect(status(report).validity).toBe('fail')
+    // Not "expired": its validity has not started yet.
+    expect(report.verdict).toBe('not-yet-valid')
     expect(report.summary).not.toMatch(/no longer in date/)
     expect(report.summary).toMatch(/dated in the future/)
   })

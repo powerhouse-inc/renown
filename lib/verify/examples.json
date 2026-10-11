@@ -1,0 +1,76 @@
+{
+  "address": "0x72d3075e4423cec6aec722074a2e815cf1d7b8af",
+  "appDid": "did:key:zDnaeUvThTsNuuxe22T8n8jFJHdPKd1uSGwX1jLnqfmgGrvM7",
+  "credential": {
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1"
+    ],
+    "type": [
+      "VerifiableCredential",
+      "RenownCredential"
+    ],
+    "id": "urn:uuid:4bd669b9-4136-4971-9c42-5f8a6cdf8f7b",
+    "issuer": {
+      "id": "did:pkh:eip155:1:0x72d3075e4423cec6aec722074a2e815cf1d7b8af",
+      "ethereumAddress": "0x72d3075e4423CeC6AEc722074a2e815Cf1D7b8Af"
+    },
+    "credentialSubject": {
+      "id": "did:key:zDnaeUvThTsNuuxe22T8n8jFJHdPKd1uSGwX1jLnqfmgGrvM7",
+      "app": "Renown verify example"
+    },
+    "credentialSchema": {
+      "id": "https://renown.id/schemas/renown-credential/v1",
+      "type": "JsonSchemaValidator2018"
+    },
+    "issuanceDate": "2026-10-11T09:00:00.000Z",
+    "expirationDate": "2036-10-11T09:00:00.000Z",
+    "proof": {
+      "type": "EthereumEip712Signature2021",
+      "created": "2026-10-11T09:00:00.000Z",
+      "verificationMethod": "did:pkh:eip155:1:0x72d3075e4423cec6aec722074a2e815cf1d7b8af",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "0x0defae85cd2c7ab6f8dd0bdb759571955ba4e2b3943cf125041f13dbe783f893758049ce47f17154936a16f0843044abc26f4d8c31b0ab97228b8d29cd2aac3c1b",
+      "ethereumAddress": "0x72d3075e4423CeC6AEc722074a2e815Cf1D7b8Af",
+      "eip712": {
+        "domain": {
+          "version": "1",
+          "chainId": 1
+        },
+        "primaryType": "VerifiableCredential"
+      }
+    }
+  },
+  "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2YyI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImNoYWluSWQiOjEsIm5ldHdvcmtJZCI6ImVpcDE1NSIsImFkZHJlc3MiOiIweDcyZDMwNzVlNDQyM0NlQzZBRWM3MjIwNzRhMmU4MTVDZjFEN2I4QWYifX0sInN1YiI6ImRpZDprZXk6ekRuYWVVdlRoVHNOdXV4ZTIyVDhuOGpGSkhkUEtkMXVTR3dYMWpMbnFmbWdHcnZNNyIsImlzcyI6ImRpZDprZXk6ekRuYWVVdlRoVHNOdXV4ZTIyVDhuOGpGSkhkUEtkMXVTR3dYMWpMbnFmbWdHcnZNNyJ9._fa1HsXVqg0Qs_e8Q2hI2-0KEa4MKzMwiYRehZrseVouPRFmmKOpwSDT_eX4QB5Ez0UOaHHkCuEe-lV8amGJeQ",
+  "operation": {
+    "id": "d991f27e-10a1-4b01-9650-eef208f6692f",
+    "type": "SET_NAME",
+    "timestampUtcMs": "2026-10-11T09:32:44.886Z",
+    "input": {
+      "name": "Signed with Renown"
+    },
+    "scope": "global",
+    "context": {
+      "signer": {
+        "user": {
+          "address": "0x72d3075e4423CeC6AEc722074a2e815Cf1D7b8Af",
+          "networkId": "eip155",
+          "chainId": 1
+        },
+        "app": {
+          "name": "Renown verify example",
+          "key": "did:key:zDnaeUvThTsNuuxe22T8n8jFJHdPKd1uSGwX1jLnqfmgGrvM7"
+        },
+        "signatures": [
+          [
+            "1791711165",
+            "did:key:zDnaeUvThTsNuuxe22T8n8jFJHdPKd1uSGwX1jLnqfmgGrvM7",
+            "v2:fph1l-Ls8pZWHIgk8Iib7pWSi3ppHt2kyTQ5GHLrzb4",
+            "",
+            "0xa357f8215b60937888c175f378875306ce6143152ae0d6a1e28c725c35fe1586a455d78b442b0c332cb243a91dfeca5f0b087776d5c7808474901bc615eb7ed4"
+          ]
+        ]
+      }
+    }
+  },
+  "documentId": "renown-verify-example"
+}

@@ -1,12 +1,31 @@
 'use client'
 
 import { OpenPanelComponent } from '@openpanel/nextjs'
+import Router from 'next/router'
 import { useSyncExternalStore } from 'react'
 import { ANALYTICS_APP, readProfileHint } from '../../services/analytics'
 import { AnalyticsIdentity } from './analytics-identity'
 
-// The cookie is read once per render; nothing needs to re-render when it changes.
-const noSubscribe = () => () => {}
+/** A /verify share link: its fragment carries what someone pasted and must never be recorded. */
+function hasPrivateFragment(): boolean {
+  return window.location.hash.startsWith('#v=')
+}
+
+// Re-read after each route or hash change: /verify drops its share fragment
+// with router.replace, which Next treats as a hash change.
+function subscribe(onChange: () => void): () => void {
+  Router.events.on('routeChangeComplete', onChange)
+  Router.events.on('hashChangeComplete', onChange)
+  return () => {
+    Router.events.off('routeChangeComplete', onChange)
+    Router.events.off('hashChangeComplete', onChange)
+  }
+}
+
+/** The cookies, or null while the URL holds a private fragment (OpenPanel records the full URL). */
+function clientSnapshot(): string | null {
+  return hasPrivateFragment() ? null : document.cookie
+}
 
 /**
  * Mounts OpenPanel analytics for Renown.
@@ -25,7 +44,8 @@ const noSubscribe = () => () => {}
 export function Analytics() {
   const clientId = process.env.NEXT_PUBLIC_OPENPANEL_CLIENT_ID
   // null on the server and during hydration; the browser's cookies afterwards.
-  const cookies = useSyncExternalStore(noSubscribe, () => document.cookie, () => null)
+  // Also null while a /verify share fragment is in the URL: mounting waits until it is gone.
+  const cookies = useSyncExternalStore(subscribe, clientSnapshot, () => null)
 
   if (!clientId || cookies === null) return null
   const profileId = readProfileHint(cookies)

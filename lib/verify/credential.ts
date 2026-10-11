@@ -166,11 +166,11 @@ async function checkSignature(credential: CredentialForSignature, deps: VerifyDe
   return 'invalid'
 }
 
-function verdictOf(checks: Check[]): Verdict {
+function verdictOf(checks: Check[], notInDate: 'unreadable' | 'future' | 'expired' | null): Verdict {
   const byId = (id: string) => checks.find((c) => c.id === id)
   if (checks.some((c) => (c.id === 'signature' || c.id === 'shape') && c.status === 'fail')) return 'not-genuine'
   if (byId('revocation')?.status === 'fail') return 'revoked'
-  if (byId('validity')?.status === 'fail') return 'expired'
+  if (byId('validity')?.status === 'fail') return notInDate === 'future' ? 'not-yet-valid' : 'expired'
   if (checks.some((c) => c.status === 'unknown')) return 'unchecked'
   return 'genuine'
 }
@@ -289,7 +289,7 @@ export async function verifyCredential(
         },
   )
 
-  const verdict = verdictOf(checks)
+  const verdict = verdictOf(checks, notInDate)
   const who = signerName(signer)
   const what = appName(app)
   // When the signature could not be checked, nothing may say the wallet signed it.
@@ -313,6 +313,7 @@ export async function verifyCredential(
       ? `${signedBy}. The issuer has revoked it, so it no longer authorises anything.`
       : `${signedBy}, then revoked it. It no longer authorises anything.`,
     expired: signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
+    'not-yet-valid': signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
     unchecked: !signatureUnknown
       ? 'Part of this credential could not be checked just now. Nothing below says it is forged; try again in a moment.'
       : stored
