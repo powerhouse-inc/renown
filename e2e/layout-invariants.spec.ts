@@ -3,6 +3,7 @@ import {
   decorativePaintProblems,
   horizontalOverflow,
   overlappingText,
+  settle,
   strayDecorativeLayers,
   surfaceProblems,
   trappedFixedElements,
@@ -189,21 +190,19 @@ const WIDTHS = [390, 1280] as const
 const THEMES: Theme[] = ['light', 'dark']
 
 /** Every page-wide rule, plus the surface's when one is open. */
-async function layoutProblems(page: Page, surface?: SurfaceSpec): Promise<string[]> {
+// Pages whose decorative layers the paint check must find (the home call-to-action's glow and frame).
+const PAINT_PROBED = new Set(['home'])
+
+async function layoutProblems(page: Page, surface?: SurfaceSpec, pageName?: string): Promise<string[]> {
   return [
     ...(await horizontalOverflow(page)),
     ...(await trappedFixedElements(page)),
     ...(await strayDecorativeLayers(page)),
-    ...(surface ? await surfaceProblems(page, surface) : await decorativePaintProblems(page)),
+    ...(surface
+      ? await surfaceProblems(page, surface)
+      : await decorativePaintProblems(page, { expectProbes: pageName !== undefined && PAINT_PROBED.has(pageName) })),
     ...(await overlappingText(page, surface?.panel)),
   ]
-}
-
-async function settle(page: Page): Promise<void> {
-  await page.evaluate(() => document.fonts.ready)
-  await page.waitForLoadState('networkidle')
-  // Let entry animations (reduced motion still runs short fades) finish.
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))))
 }
 
 test.describe('layout invariants', () => {
@@ -219,7 +218,7 @@ test.describe('layout invariants', () => {
           await useTheme(page, theme)
           await target.open(page)
           await settle(page)
-          const problems = await layoutProblems(page)
+          const problems = await layoutProblems(page, undefined, target.name)
           await testInfo.attach(`${target.name}-${width}-${theme}.png`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
           expect(problems).toEqual([])
         })

@@ -3,6 +3,7 @@ import {
   decorativePaintProblems,
   horizontalOverflow,
   overlappingText,
+  settle,
   strayDecorativeLayers,
   surfaceProblems,
   trappedFixedElements,
@@ -91,6 +92,23 @@ test('a glow that ends inside its panel must have faded out; a frame must show a
   expect(await decorativePaintProblems(page)).toEqual([expect.stringMatching(/frame .* fades out along \d+ % of its edge/)])
   await show(page, frame('linear-gradient(120deg, #21ffb4, #0080ff)'))
   expect(await decorativePaintProblems(page)).toEqual([])
+})
+
+test('the paint check can be told it must find a layer, so markup changes cannot make it vacuous', async ({ page }) => {
+  await show(page, '<div style="margin: 40px 16px; height: 300px; position: relative; overflow: hidden"><h2>No layer</h2></div>')
+  expect(await decorativePaintProblems(page)).toEqual([])
+  expect(await decorativePaintProblems(page, { expectProbes: true })).toEqual([expect.stringContaining('found no decorative layer to check')])
+})
+
+test('settle waits for finite animations and ignores infinite ones', async ({ page }) => {
+  test.setTimeout(15_000)
+  await show(page, '<div id="spin">Loading</div><div id="fade">Hello</div>')
+  await page.evaluate(() => {
+    document.getElementById('spin')!.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500, iterations: Infinity })
+    document.getElementById('fade')!.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, fill: 'forwards' })
+  })
+  await settle(page)
+  expect(await page.evaluate(() => document.getElementById('fade')!.getAnimations()[0].playState)).toBe('finished')
 })
 
 test('text boxes never overlap; truncated text counts only where it shows', async ({ page }) => {

@@ -297,8 +297,10 @@ interface PaintProbe {
  *   like the old final call-to-action's half-height glow);
  * - a frame (a layer that shows only as a 1-2 px ring around an opaque inner
  *   panel) must be visible all the way round (not fade to nothing).
+ * With `expectProbes`, finding no layer to check is itself a problem, so a page
+ * known to have one cannot pass vacuously after a markup change.
  */
-export async function decorativePaintProblems(page: Page): Promise<string[]> {
+export async function decorativePaintProblems(page: Page, { expectProbes = false }: { expectProbes?: boolean } = {}): Promise<string[]> {
   const probes = await page.evaluate(() => {
     const out: PaintProbe[] = []
     const clips = (el: Element) => {
@@ -365,6 +367,7 @@ export async function decorativePaintProblems(page: Page): Promise<string[]> {
   })
 
   const problems: string[] = []
+  if (expectProbes && probes.length === 0) problems.push('the paint check found no decorative layer to check on this page')
   for (const probe of probes) {
     const layer = page.locator(`[data-layout-probe="${probe.id}"]`)
     const shown = await rgb(await page.screenshot({ clip: probe.clip, fullPage: true, animations: 'disabled' }))
@@ -406,4 +409,22 @@ export async function decorativePaintProblems(page: Page): Promise<string[]> {
   }
   await page.evaluate(() => document.querySelectorAll('[data-layout-probe]').forEach((el) => el.removeAttribute('data-layout-probe')))
   return problems
+}
+
+/** Fonts loaded, network idle, and entry animations (reduced motion still runs short fades) finished. */
+export async function settle(page: Page): Promise<void> {
+  await page.evaluate(() => document.fonts.ready)
+  await page.waitForLoadState('networkidle')
+  // Only finite ones: an infinite animation (a spinner, a pulse) never finishes and would hang the test.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => {
+          const timing = a.effect?.getComputedTiming()
+          return timing !== undefined && timing.endTime !== Infinity && timing.iterations !== Infinity
+        })
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  )
 }
