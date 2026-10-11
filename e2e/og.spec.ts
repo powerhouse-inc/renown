@@ -4,7 +4,7 @@ import { fixtureStub } from './support/stub-switchboard-client'
 import { profileFooter } from '../lib/og/og-footer'
 import { profileCardText } from '../lib/og/og-profile-text'
 import { fetchImageDataUrl } from '../lib/og/og-data'
-import { AVATAR_BOX, toPngDataUrl } from '../lib/og/og-image'
+import { AVATAR_BOX, SHARP_TIMEOUT_SECONDS, toPngDataUrl } from '../lib/og/og-image'
 import { drawWithFallback, STATIC_CARD_PNG } from '../lib/og/og-fallback'
 import { readFont } from '../lib/og/og-font'
 
@@ -376,6 +376,16 @@ test.describe('link-preview images are never rendered from SVG', () => {
       globalThis.fetch = realFetch
     }
   })
+})
+
+test('a conversion that runs past SHARP_TIMEOUT_SECONDS is stopped and fails', async () => {
+  // SVG was the natural slow input and is now refused before the pipeline, so the
+  // pipeline is made slow instead: an allowed PNG with a blur far past what covers
+  // use (about 10 s of work on this machine).
+  const png = await sharp({ create: { width: 1200, height: 1200, channels: 3, background: '#3366cc' } }).png().toBuffer()
+  const started = Date.now()
+  await expect(toPngDataUrl(png, { width: 1200, height: 630 }, { blur: 1000 })).rejects.toThrow(/timeout/)
+  expect(Date.now() - started).toBeLessThan((SHARP_TIMEOUT_SECONDS + 2) * 1000)
 })
 
 test.describe('link-preview drawing failures never fail the route', () => {
