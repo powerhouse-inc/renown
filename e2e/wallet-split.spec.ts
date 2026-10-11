@@ -87,3 +87,18 @@ test('when the wallet code cannot be downloaded, the sign-in page says so and of
   await expect(page.getByRole('alert').filter({ hasText: 'Sign-in could not load' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'Reload' })).toBeVisible()
 })
+
+for (const path of ['/me', '/?app=did:web:split.example']) {
+  test(`when the wallet code throws while rendering, ${path} says sign-in could not load and keeps the page`, async ({ page }) => {
+    // NEXT_PUBLIC_E2E_AUTH=1 only: makes the body inside the wallet shell throw on render.
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eWalletRenderError?: boolean }).__renownE2eWalletRenderError = true
+    })
+    await page.goto(path)
+    const alert = page.getByRole('main').getByRole('alert').filter({ hasText: 'Sign-in could not load' })
+    await expect(alert).toBeVisible({ timeout: 30_000 })
+    await expect(alert.getByRole('button', { name: 'Reload' })).toBeVisible()
+    // The rest of the page still renders around it.
+    await expect(page.getByRole('main')).toBeVisible()
+  })
+}
