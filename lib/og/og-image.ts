@@ -41,7 +41,7 @@ export interface ConvertOptions {
  */
 export async function toPngDataUrl(bytes: Uint8Array, box: ImageBox, { blur }: ConvertOptions = {}): Promise<string> {
   const image = sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-  // metadata() reads the header only: nothing is decoded or rendered yet.
+  // metadata() decodes no pixels (an SVG is parsed in full, but never rendered): the format is checked before any decode.
   const { format } = await image.metadata()
   if (!format || !RASTER_FORMATS.has(format)) throw new Error(`Image format not allowed: ${format ?? 'unknown'}`)
   let pipeline = image
