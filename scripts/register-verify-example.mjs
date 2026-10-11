@@ -6,7 +6,10 @@
 //
 // renown_issueCredential is self-authenticating (the switchboard checks the
 // EIP-712 proof) and idempotent, so running it twice is harmless. No key is
-// needed: the signed credential is all it takes. It seeds no profile.
+// needed: the signed credential is all it takes. On the first run the
+// switchboard also creates a bare profile (a renown-user document holding
+// only the address) for the example address if it has none, as it does for
+// any new issuer; later runs change nothing.
 import { readFileSync } from 'node:fs'
 
 const endpoint = process.argv[2]
