@@ -100,6 +100,8 @@ async function standInSwitchedWallet(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>
     w.__renownE2eSession = { address: '0x5e00000000000000000000000000000000001a02', calls: [] }
+    // This browser's wallet was seen on the session's account before (components/site/account-switch-prompt.tsx).
+    localStorage.setItem('renown:injected-session:0x5e00000000000000000000000000000000001a02', '1')
     w.ethereum = {
       request: async () => ['0x5e00000000000000000000000000000000001a03'],
       on: () => undefined,
@@ -189,10 +191,10 @@ const STATES: LayoutState[] = [
 const WIDTHS = [390, 1280] as const
 const THEMES: Theme[] = ['light', 'dark']
 
-/** Every page-wide rule, plus the surface's when one is open. */
 // Pages whose decorative layers the paint check must find (the home call-to-action's glow and frame).
 const PAINT_PROBED = new Set(['home'])
 
+/** Every page-wide rule, plus the surface's when one is open. */
 async function layoutProblems(page: Page, surface?: SurfaceSpec, pageName?: string): Promise<string[]> {
   return [
     ...(await horizontalOverflow(page)),
