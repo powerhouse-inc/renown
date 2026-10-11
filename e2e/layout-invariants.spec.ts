@@ -9,6 +9,7 @@ import {
   trappedFixedElements,
   type SurfaceSpec,
 } from './support/layout-invariants'
+import { EXAMPLE_DATA } from '../lib/verify/examples'
 import { useTheme, type Theme } from './support/site'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 import { signInTestWallet } from './support/test-session'
@@ -130,6 +131,8 @@ const PAGES: LayoutPage[] = [
   { name: 'profile', open: visit('/@lena-layout', 'Lena Layout') },
   { name: 'app', open: visit(`/app/${APP_DID}`, 'Layout Ledger') },
   { name: 'me', open: openSignedInMe },
+  { name: 'verify', open: visit('/verify', 'Check who signed it') },
+  { name: 'people', open: visit('/people', 'People on Renown') },
 ]
 
 interface LayoutState {
@@ -139,6 +142,8 @@ interface LayoutState {
   widths: readonly number[]
   /** Runs before the page loads (init scripts). */
   prepare?: (page: Page) => Promise<void>
+  /** The state is content in the page, not an overlay: the surface rules (opaque panel, overlay) do not apply, only the page-wide ones. */
+  inline?: boolean
   /** Opens the surface and returns what it must satisfy. */
   open: (page: Page) => Promise<SurfaceSpec>
 }
@@ -150,7 +155,137 @@ const openSheet = (button: string, region: string) => async (page: Page): Promis
   return { panel }
 }
 
+/** The example credential as the registry stores it, so the page's lookups find it (genuine). */
+function storedExample() {
+  const c = EXAMPLE_DATA.credential as unknown as {
+    id: string
+    '@context': string[]
+    type: string[]
+    issuer: { id: string; ethereumAddress: string }
+    credentialSubject: { id: string; app: string }
+    credentialSchema: { id: string; type: string }
+    issuanceDate: string
+    expirationDate: string
+    proof: { proofValue: string; ethereumAddress: string; eip712: { domain: unknown } }
+  }
+  return {
+    credentialId: c.id,
+    issuerEthereumAddress: c.issuer.ethereumAddress,
+    credentialSubjectId: c.credentialSubject.id,
+    credentialSubjectApp: c.credentialSubject.app,
+    issuanceDate: c.issuanceDate,
+    expirationDate: c.expirationDate,
+    revoked: false,
+    revokedAt: null,
+    revocationReason: null,
+    context: c['@context'],
+    type: c.type,
+    issuerId: c.issuer.id,
+    credentialSchemaId: c.credentialSchema.id,
+    credentialSchemaType: c.credentialSchema.type,
+    proofValue: c.proof.proofValue,
+    proofEthereumAddress: c.proof.ethereumAddress,
+    proofEip712Domain: JSON.stringify(c.proof.eip712.domain),
+  }
+}
+
+/** /verify's public lookups, answered in the browser: the registry holds the example credential, or is down. */
+const serveRegistry = (down = false) => async (page: Page) => {
+  await page.route(`${STUB_SWITCHBOARD_URL}/graphql**`, async (route: Route) => {
+    const body = route.request().postDataJSON() as { query: string; variables: Record<string, string> }
+    if (down) return route.fulfill({ status: 500, body: 'down' })
+    if (body.query.includes('VerifyCredentialById')) {
+      return route.fulfill({ json: { data: { renownCredentials: [storedExample()].filter((c) => c.credentialId === body.variables.id) } } })
+    }
+    if (body.query.includes('VerifyDelegation')) return route.fulfill({ json: { data: { renownCredentials: [storedExample()] } } })
+    return route.continue()
+  })
+}
+
+const verifyInput = (page: Page) => page.getByRole('textbox', { name: 'Paste a DID, credential, token or signed operation' })
+
+/** Pastes `text`, checks it, and returns the report region that shows the verdict. */
+const checkText = (text: string, verdict: string) => async (page: Page): Promise<SurfaceSpec> => {
+  // Typing before hydration is lost, and Check enables only once React saw the text (the header's Sign in button hides in the drawer at 390).
+  await expect(async () => {
+    await verifyInput(page).fill(text)
+    await expect(page.getByRole('button', { name: 'Check', exact: true })).toBeEnabled({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Check', exact: true }).click()
+  const heading = page.locator('#verify-verdict')
+  await expect(heading).toHaveText(verdict, { timeout: 30_000 })
+  return { panel: page.locator('section[data-kind]').filter({ has: heading }) }
+}
+
+const longPeople = [
+  { handle: 'a-very-long-handle-of-forty-characters-x', displayName: 'Bartholomew Maximilian Featherstonehaugh-Cholmondeley the Third' },
+  { handle: 'short', displayName: 'Short Name' },
+].map((p, i) => ({
+  documentId: `doc-layout-person-${i}`,
+  ethAddress: `0x5e0000000000000000000000000000000000${String(i).padStart(4, '0')}`,
+  username: null,
+  bio: 'A long bio that goes on for a while so the card has to clamp it to two lines instead of growing, on every screen size we support.',
+  avatar: null,
+  userImage: null,
+  ...p,
+}))
+
+/** /people's browser-side search, answered here: every query finds the long-handle people. */
+async function servePeopleSearch(page: Page): Promise<void> {
+  await page.route(`${STUB_SWITCHBOARD_URL}/graphql**`, async (route: Route) => {
+    const { query } = route.request().postDataJSON() as { query: string }
+    if (!query.includes('renownUserSearch')) return route.continue()
+    return route.fulfill({ json: { data: { renownUserSearch: { items: longPeople, next: null } } } })
+  })
+}
+
+const searchPeople = (text: string) => async (page: Page): Promise<SurfaceSpec> => {
+  await expect(page.getByRole('button', { name: 'Sign in to list yourself' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('searchbox', { name: 'Search people by name or handle' }).fill(text)
+  const list = page.getByRole('list', { name: 'People' })
+  await expect(list.getByRole('listitem')).toHaveCount(longPeople.length)
+  return { panel: list }
+}
+
+const openMenu = async (page: Page): Promise<SurfaceSpec> => {
+  await page.getByRole('button', { name: 'Open menu' }).click()
+  const panel = page.getByRole('dialog', { name: 'Menu' })
+  await expect(panel).toBeVisible()
+  return { panel, overlay: panel.locator('xpath=..') }
+}
+
 const STATES: LayoutState[] = [
+  { name: 'mobile menu open', page: 'verify', widths: [390], open: openMenu },
+  { name: 'mobile menu open', page: 'people', widths: [390], open: openMenu },
+  {
+    name: 'genuine result',
+    inline: true,
+    page: 'verify',
+    widths: [390, 1280],
+    prepare: serveRegistry(),
+    open: (page) => checkText(JSON.stringify(EXAMPLE_DATA.credential, null, 2), 'Genuine')(page),
+  },
+  {
+    name: 'not genuine result',
+    inline: true,
+    page: 'verify',
+    widths: [390, 1280],
+    prepare: serveRegistry(),
+    open: (page) => {
+      const forged = { ...EXAMPLE_DATA.credential, credentialSubject: { ...EXAMPLE_DATA.credential.credentialSubject, app: 'Something else' } }
+      return checkText(JSON.stringify(forged), 'Not genuine')(page)
+    },
+  },
+  {
+    name: 'could not check result',
+    inline: true,
+    page: 'verify',
+    widths: [390, 1280],
+    prepare: serveRegistry(true),
+    open: (page) => checkText(JSON.stringify(EXAMPLE_DATA.credential), 'Could not check')(page),
+  },
+  { name: 'results with long handles',
+    inline: true, page: 'people', widths: [390, 1280], prepare: servePeopleSearch, open: searchPeople('long') },
   {
     name: 'mobile menu open',
     page: 'home',
@@ -195,12 +330,12 @@ const THEMES: Theme[] = ['light', 'dark']
 const PAINT_PROBED = new Set(['home'])
 
 /** Every page-wide rule, plus the surface's when one is open. */
-async function layoutProblems(page: Page, surface?: SurfaceSpec, pageName?: string): Promise<string[]> {
+async function layoutProblems(page: Page, surface?: SurfaceSpec, pageName?: string, inline = false): Promise<string[]> {
   return [
     ...(await horizontalOverflow(page)),
     ...(await trappedFixedElements(page)),
     ...(await strayDecorativeLayers(page)),
-    ...(surface
+    ...(surface && !inline
       ? await surfaceProblems(page, surface)
       : await decorativePaintProblems(page, { expectProbes: pageName !== undefined && PAINT_PROBED.has(pageName) })),
     ...(await overlappingText(page, surface?.panel)),
@@ -240,7 +375,7 @@ test.describe('layout invariants', () => {
           await settle(page)
           const surface = await state.open(page)
           await settle(page)
-          const problems = await layoutProblems(page, surface)
+          const problems = await layoutProblems(page, surface, undefined, state.inline)
           await testInfo.attach(`${target.name}-${state.name.replace(/ /g, '-')}-${width}-${theme}.png`, { body: await page.screenshot(), contentType: 'image/png' })
           expect(problems).toEqual([])
         })
