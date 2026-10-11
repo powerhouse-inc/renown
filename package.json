@@ -26,6 +26,7 @@
     "@iconify/react": "^6.0.2",
     "@openpanel/nextjs": "^1.5.1",
     "@powerhousedao/reactor-browser": "6.2.3",
+    "@powerhousedao/shared": "6.2.3",
     "@privy-io/react-auth": "^3.25.0",
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@renown/sdk": "6.2.3",
