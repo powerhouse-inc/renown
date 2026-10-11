@@ -1,4 +1,4 @@
-// Geometric layout guards (the page suite built on them, and e2e/layout-invariants-guards.spec.ts). Each check returns
+// Geometric layout guards (used by e2e/layout-invariants.spec.ts, the page suite, and proven by e2e/layout-invariants-guards.spec.ts). Each check returns
 // human-readable problems (empty = fine) instead of asserting, so one test can
 // report every broken rule of a page at once. No pixel baselines: the checks
 // read boxes and computed styles, and the two paint checks compare the page
