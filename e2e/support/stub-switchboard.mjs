@@ -149,6 +149,7 @@ const DEFAULT_DATA = {
   appProfile: null,
   appProfilesByPublisher: [],
   appProfiles: { items: [], next: null },
+  renownUserSearch: { items: [], next: null },
   appProfileCategories: [],
   renownNetworkStats: null,
   appStats: null,
