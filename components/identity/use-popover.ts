@@ -14,7 +14,9 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * returns to the button) or a click/focus outside. Not modal: no focus trap.
  * On wider screens the panel opens below its button, or above it when only
  * there it fits the viewport (decided before paint, so it never jumps); if it
- * fits neither way the page scrolls just enough to show it.
+ * fits neither way the page scrolls just enough to show it. Every opening
+ * starts from "below" again, however the panel was closed, and a resize while
+ * open picks the side again (no scrolling then).
  */
 export function usePopover() {
   const [open, setOpen] = useState(false)
@@ -30,10 +32,11 @@ export function usePopover() {
     if (restoreFocus) buttonRef.current?.focus()
   }, [])
 
-  useIsoLayoutEffect(() => {
+  /** Picks the side the panel fits on; `scroll` lets it scroll the page when it fits neither. */
+  const place = useCallback((scroll: boolean) => {
     const button = buttonRef.current
     const panel = panelRef.current
-    if (!open || !button || !panel || window.matchMedia(SHEET_QUERY).matches) return
+    if (!button || !panel || window.matchMedia(SHEET_QUERY).matches) return
     const anchor = button.getBoundingClientRect()
     const height = panel.offsetHeight
     // A sticky site header covers the top of the viewport.
@@ -42,12 +45,17 @@ export function usePopover() {
       .reduce((max, el) => Math.max(max, el.getBoundingClientRect().bottom), 0)
     const fitsBelow = anchor.bottom + GAP + height <= window.innerHeight
     const fitsAbove = anchor.top - GAP - height >= Math.max(top, 0)
-    if (!fitsBelow && fitsAbove) {
-      setPlacement('above')
-    } else if (!fitsBelow) {
-      panel.scrollIntoView({ block: 'nearest' })
-    }
-  }, [open])
+    setPlacement(!fitsBelow && fitsAbove ? 'above' : 'below')
+    if (!fitsBelow && !fitsAbove && scroll) panel.scrollIntoView({ block: 'nearest' })
+  }, [])
+
+  useIsoLayoutEffect(() => {
+    if (!open) return
+    place(true)
+    const onResize = () => place(false)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [open, place])
 
   useEffect(() => {
     if (!open) return
@@ -75,7 +83,8 @@ export function usePopover() {
       type: 'button' as const,
       'aria-expanded': open,
       'aria-controls': `${id}-panel`,
-      onClick: () => setOpen((value) => !value),
+      // Closing through the toggle resets the placement like every other way of closing.
+      onClick: () => (open ? close(false) : setOpen(true)),
     },
     panelId: `${id}-panel`,
     panelRef,

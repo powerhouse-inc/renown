@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme } from './support/site'
 import { fixtureStub } from './support/stub-switchboard-client'
-import { HERO_ART, identityArtSvgs, PUBLISHER_ART } from '../lib/identity-art'
+import { HERO_ART, identityAccent, identityArtSvgs, PUBLISHER_ART } from '../lib/identity-art'
 
 // The redesigned app page (/app/[did]): cover or identity art, verification,
 // stats zero state, publisher, more apps, SEO. Fixture ids are unique to this spec.
@@ -214,6 +214,20 @@ test.describe('app page', () => {
     for (const svg of [hero.light, hero.dark, publisher.light, publisher.dark]) expect(html).toContain(svg)
   })
 
+  test('the accent colours are computed on the server too: the browser never loads the art module', async ({ page }) => {
+    const scripts: string[] = []
+    page.on('response', async (response) => {
+      if (response.request().resourceType() === 'script') scripts.push(await response.text().catch(() => ''))
+    })
+    await page.goto(`/app/${PLAIN}`)
+    const ring = page.getByRole('region', { name: 'Publisher', exact: true }).locator('[style*="box-shadow"]')
+    await expect(ring).toHaveCSS('box-shadow', `${hexToRgb(identityAccent(PUBLISHER))} 0px 0px 0px 2px`)
+    await page.waitForLoadState('networkidle')
+    expect(scripts.length).toBeGreaterThan(0)
+    // next dev names each module by its path in the chunk that carries it.
+    expect(scripts.some((js) => js.includes('(pages-dir-browser)/./lib/identity-art.ts')), 'lib/identity-art.ts is in a browser chunk').toBe(false)
+  })
+
   test('nothing shifts after load', async ({ page }) => {
     await page.goto(`/app/${COVERED}`)
     expect(await layoutShift(page)).toBeLessThan(0.01)
@@ -235,4 +249,10 @@ for (const theme of ['light', 'dark'] as const) {
       await attachScreenshots(page, testInfo, `app-${label.replace(' ', '-')}-${theme}`)
     })
   }
+}
+
+/** "#rrggbb" as getComputedStyle spells it. */
+function hexToRgb(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `rgb(${r}, ${g}, ${b})`
 }

@@ -253,17 +253,24 @@ export function identityAccent(seed: string): string {
   return oklchHex(0.66, 0.15, identityHues(seed).a)
 }
 
-/** Both theme variants of a seed's art, as SVG strings (computed on the server and passed to IdentityArt as props). */
+/**
+ * Both theme variants of a seed's art, as SVG strings, and its accent colour
+ * (computed on the server and passed to IdentityArt and the avatar rings as
+ * props, so the browser never loads this module).
+ */
 export interface IdentityArtSvgs {
   light: string
   dark: string
+  /** identityAccent(seed): "#rrggbb". */
+  accent: string
 }
 
-/** The light and dark art for `seed` at `width` x `height`. */
+/** The light and dark art for `seed` at `width` x `height`, with the seed's accent. */
 export function identityArtSvgs(seed: string, { width, height, idPrefix }: Omit<IdentityArtOptions, 'theme'>): IdentityArtSvgs {
   return {
     light: identityArt(seed, { width, height, theme: 'light', idPrefix }),
     dark: identityArt(seed, { width, height, theme: 'dark', idPrefix }),
+    accent: identityAccent(seed),
   }
 }
 

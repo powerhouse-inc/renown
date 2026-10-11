@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Completeness } from '../../lib/me/completeness'
-import { identityAccent, type IdentityArtSvgs } from '../../lib/identity-art'
+import type { IdentityArtSvgs } from '../../lib/identity-art'
 import { shortAddress } from '../../lib/profile-identity'
 import type { QrCode } from '../../lib/qr'
 import type { RenownProfile } from '../../services/switchboard'
@@ -20,7 +20,7 @@ export interface ProfileFact {
 export interface ProfileHeroProps {
   profile: RenownProfile
   name: string
-  /** The identity art of the address (or document id), computed on the server. */
+  /** The identity art and accent of the address (or document id), computed on the server. */
   art: IdentityArtSvgs
   /** Lowercase wallet address; null for a profile without one (then no art seed but the document id). */
   address: string | null
@@ -49,7 +49,7 @@ export function ProfileHero({ profile, name, art, address, ensName, facts, compl
       />
       <div className="px-1 sm:px-8">
         <div className="-mt-14 flex items-end justify-between gap-4 sm:-mt-[68px]">
-          <div className="bg-background relative shrink-0 rounded-full p-1" style={{ boxShadow: `0 0 0 2px ${identityAccent(seed)}` }}>
+          <div className="bg-background relative shrink-0 rounded-full p-1" style={{ boxShadow: `0 0 0 2px ${art.accent}` }}>
             <ProfileAvatar
               documentId={profile.documentId}
               avatar={profile.avatar}

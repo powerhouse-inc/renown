@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { identicon } from '../utils/identicon'
+import { identityAccent } from '../lib/identity-art'
 import { mediaUrl, mediaVersion } from '../services/media'
 import { avatarSources } from '../utils/avatar-sources'
 import { cancelsOnKey } from '../utils/image-crop'
@@ -96,6 +97,19 @@ test.describe('public profile', () => {
   })
 })
 
+test('the avatar ring takes the accent computed on the server; the art module never reaches the browser', async ({ page }) => {
+  const scripts: string[] = []
+  page.on('response', async (response) => {
+    if (response.request().resourceType() === 'script') scripts.push(await response.text().catch(() => ''))
+  })
+  await page.goto('/@pat-pages')
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(identityAccent(ADDRESS).slice(i, i + 2), 16))
+  await expect(page.locator('main header [style*="box-shadow"]').first()).toHaveCSS('box-shadow', `rgb(${r}, ${g}, ${b}) 0px 0px 0px 2px`)
+  await page.waitForLoadState('networkidle')
+  expect(scripts.length).toBeGreaterThan(0)
+  expect(scripts.some((js) => js.includes('(pages-dir-browser)/./lib/identity-art.ts')), 'lib/identity-art.ts is in a browser chunk').toBe(false)
+})
+
 test.describe('phone bottom sheets', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
@@ -117,6 +131,53 @@ test.describe('phone bottom sheets', () => {
       expect(box.width).toBeGreaterThan(390 - 34)
     })
   }
+})
+
+test.describe('popover placement on wider screens', () => {
+  // The Share panel opens below its button, or above it when only there it fits.
+  // A viewport just too short for "below": the button's bottom + 8 px gap + the panel
+  // height, minus 40 px. Measured first at a tall viewport, where it opens below.
+  async function measure(page: import('@playwright/test').Page) {
+    await page.setViewportSize({ width: 1280, height: 1200 })
+    await page.goto('/@pat-pages')
+    const button = page.getByRole('button', { name: 'Share', exact: true })
+    await button.click()
+    const panel = page.getByRole('region', { name: 'Share' })
+    await expect(panel).toBeVisible()
+    const b = (await button.boundingBox())!
+    const p = (await panel.boundingBox())!
+    expect(p.y).toBeGreaterThan(b.y + b.height) // below
+    await button.click()
+    await expect(panel).toHaveCount(0)
+    return { button, panel, short: Math.round(b.y + b.height + 8 + p.height - 40) }
+  }
+  const isAbove = async (button: import('@playwright/test').Locator, panel: import('@playwright/test').Locator) => {
+    const b = (await button.boundingBox())!
+    const p = (await panel.boundingBox())!
+    return p.y + p.height <= b.y
+  }
+
+  test('reopening with the toggle after the viewport grew opens below again', async ({ page }) => {
+    const { button, panel, short } = await measure(page)
+    await page.setViewportSize({ width: 1280, height: short })
+    await button.click()
+    expect(await isAbove(button, panel)).toBe(true)
+    await button.click() // closed with the toggle
+    await page.setViewportSize({ width: 1280, height: 1200 })
+    await button.click()
+    await expect(panel).toBeVisible()
+    expect(await isAbove(button, panel)).toBe(false)
+  })
+
+  test('while open, a resize moves the panel to the side where it fits', async ({ page }) => {
+    const { button, panel, short } = await measure(page)
+    await button.click()
+    expect(await isAbove(button, panel)).toBe(false)
+    await page.setViewportSize({ width: 1280, height: short })
+    await expect.poll(() => isAbove(button, panel)).toBe(true)
+    await page.setViewportSize({ width: 1280, height: 1200 })
+    await expect.poll(() => isAbove(button, panel)).toBe(false)
+  })
 })
 
 test.describe('/media', () => {

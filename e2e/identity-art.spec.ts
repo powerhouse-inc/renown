@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import sharp from 'sharp'
-import { identityAccent, identityArt, identityHues, oklchHex } from '../lib/identity-art'
+import { identityAccent, identityArt, identityArtSvgs, identityHues, oklchHex } from '../lib/identity-art'
 
 // lib/identity-art.ts: pure, so these run without a page.
 const A = '0x2bbea0145d6fb9c6709a74c1179ca0be71bb3ac6'
@@ -75,6 +75,7 @@ test('hues avoid the olive/brown band, stay apart, and no used colour (or glow m
     }
   }
   expect(identityAccent(A)).toMatch(/^#[0-9a-f]{6}$/)
+  expect(identityArtSvgs(A, SIZE).accent).toBe(identityAccent(A))
   expect(oklchHex(1, 0, 0)).toBe('#ffffff')
   expect(oklchHex(0, 0, 0)).toBe('#000000')
 })
