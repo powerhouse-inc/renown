@@ -4,7 +4,9 @@ import { verifyMessage } from 'viem'
 import { profileMessage, revokeMessage, type ProfileFields } from '../services/renown-signed-messages'
 import { installInjectedWallet, type InjectedWallet } from './support/injected-wallet'
 import {
+  fixtureStub,
   graphqlError,
+  removeFixture,
   resetStub,
   scriptStub,
   stubRequests,
@@ -56,6 +58,21 @@ async function signedRevoke(credentialId: string, key = generatePrivateKey()) {
 
 test.beforeEach(async () => {
   await resetStub()
+})
+
+// Standing answers keyed by values only this test uses (a fresh wallet, a
+// fresh credential ID). Unlike scriptStub, they survive resetStub, so a
+// browser flow keeps its answers even when another copy of this file runs at
+// the same time (--repeat-each runs the repeats of a serial file in parallel,
+// and each one's beforeEach resets the shared stub). Dropped after the test.
+const standing: string[] = []
+async function standingAnswer(entry: Parameters<typeof fixtureStub>[0]): Promise<void> {
+  const id = uniqueId('writes-fixture')
+  standing.push(id)
+  await fixtureStub({ ...entry, id })
+}
+test.afterEach(async () => {
+  await Promise.all(standing.splice(0).map((id) => removeFixture(id)))
 })
 
 test.describe('DELETE /api/credential/renown', () => {
@@ -479,7 +496,7 @@ async function authorize(page: import('@playwright/test').Page): Promise<Flow> {
     if (r.method() === 'DELETE') deletes.push(r.url())
     if (r.url().includes('/api/profile/update')) profileUpdates.push(r.url())
   })
-  await scriptStub({
+  await standingAnswer({
     match: 'renown_issueCredential',
     variables: wallet.address.toLowerCase(),
     response: { data: { renown_issueCredential: uniqueId('doc-ui') } },
@@ -527,7 +544,7 @@ test.describe('web flow credential revocation', () => {
 
   test('a revoke the switchboard refuses is reported, not shown as done', async ({ page }) => {
     const flow = await authorize(page)
-    await scriptStub({
+    await standingAnswer({
       match: 'renown_revokeCredential',
       variables: flow.credentialId(),
       response: graphqlError('Forbidden', 'FORBIDDEN'),
@@ -541,7 +558,7 @@ test.describe('web flow credential revocation', () => {
 
   test('a signed revoke reaches the switchboard with a signature by the wallet', async ({ page }) => {
     const flow = await authorize(page)
-    await scriptStub({
+    await standingAnswer({
       match: 'renown_revokeCredential',
       variables: flow.credentialId(),
       response: { data: { renown_revokeCredential: true } },
