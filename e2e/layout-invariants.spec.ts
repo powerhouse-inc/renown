@@ -94,6 +94,19 @@ async function openSignedInMe(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 2, name: 'Connected apps' })).toBeVisible({ timeout: 30_000 })
 }
 
+/** A Renown session stand-in (NEXT_PUBLIC_E2E_AUTH=1) whose browser wallet shows another account. */
+async function standInSwitchedWallet(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>
+    w.__renownE2eSession = { address: '0x5e00000000000000000000000000000000001a02', calls: [] }
+    w.ethereum = {
+      request: async () => ['0x5e00000000000000000000000000000000001a03'],
+      on: () => undefined,
+      removeListener: () => undefined,
+    }
+  })
+}
+
 interface LayoutPage {
   name: string
   /** Loads the page and waits until it shows its content. */
@@ -155,6 +168,17 @@ const STATES: LayoutState[] = [
     open: async (page) => {
       await page.getByRole('region', { name: 'Connected apps' }).getByRole('button', { name: /^Revoke Layout Ledger/ }).click()
       const panel = page.getByRole('dialog', { name: 'Revoke Layout Ledger?' })
+      await expect(panel).toBeVisible()
+      return { panel }
+    },
+  },
+  {
+    name: 'account switch prompt',
+    page: 'trust',
+    widths: [390, 1280],
+    prepare: (page) => standInSwitchedWallet(page),
+    open: async (page) => {
+      const panel = page.getByRole('region', { name: 'Wallet account changed' })
       await expect(panel).toBeVisible()
       return { panel }
     },

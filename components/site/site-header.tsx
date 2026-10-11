@@ -3,13 +3,14 @@ import { useRouter } from 'next/router'
 import { cx } from '../../utils/cx'
 import RenownLogo from '../ui/renown-logo'
 import ThemeToggle from '../ui/theme-toggle'
+import { AccountSwitchPrompt } from './account-switch-prompt'
 import { AuthSlot } from './auth-slot'
 import { MobileNav } from './mobile-nav'
 import { isActivePath, SITE_NAV } from './nav'
 import { Container } from './primitives'
 import { useSiteAuth } from './use-site-auth'
 
-/** Sticky, translucent site header: logo, primary nav, theme toggle, auth (drawer below 768 px). */
+/** Sticky, translucent site header: logo, primary nav, theme toggle, auth (drawer below 768 px), and the wallet account-switch prompt. */
 export function SiteHeader() {
   const { pathname } = useRouter()
   const auth = useSiteAuth()
@@ -48,6 +49,7 @@ export function SiteHeader() {
           <MobileNav auth={auth} />
         </div>
       </Container>
+      <AccountSwitchPrompt auth={auth} />
     </header>
   )
 }
