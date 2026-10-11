@@ -94,11 +94,19 @@ for (const path of ['/me', '/?app=did:web:split.example']) {
     await page.addInitScript(() => {
       ;(window as { __renownE2eWalletRenderError?: boolean }).__renownE2eWalletRenderError = true
     })
+    const logged: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error' && message.text().startsWith('Wallet code failed to render:')) logged.push(message.text())
+    })
     await page.goto(path)
     const alert = page.getByRole('main').getByRole('alert').filter({ hasText: 'Sign-in could not load' })
     await expect(alert).toBeVisible({ timeout: 30_000 })
     await expect(alert.getByRole('button', { name: 'Reload' })).toBeVisible()
-    // The rest of the page still renders around it.
-    await expect(page.getByRole('main')).toBeVisible()
+    // The rest of the page still renders around it: the chrome outside main (the boundary sits inside main).
+    const toggle = page.getByRole('button', { name: 'Toggle theme' })
+    await expect(toggle).toBeVisible()
+    await expect(page.getByRole('main').getByRole('button', { name: 'Toggle theme' })).toHaveCount(0)
+    // Logged as name and a short message, never the stack.
+    expect(logged).toEqual(['Wallet code failed to render: Error: E2E: wallet render error'])
   })
 }

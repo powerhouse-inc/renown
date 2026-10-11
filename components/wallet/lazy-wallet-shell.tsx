@@ -25,8 +25,9 @@ class WalletErrorBoundary extends Component<BoundaryProps, { error: Error | null
   }
 
   componentDidCatch(error: unknown): void {
-    // Only the name: wallet errors can carry addresses or session details.
-    console.error('Wallet code failed to render:', error instanceof Error ? error.name : 'error')
+    // Name and a short message, never the stack (wallet errors can carry session details at length).
+    const summary = error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : 'non-error thrown'
+    console.error(`Wallet code failed to render: ${summary}`)
   }
 
   render(): ReactNode {
@@ -36,7 +37,8 @@ class WalletErrorBoundary extends Component<BoundaryProps, { error: Error | null
 
 // Playwright runs the dev server with NEXT_PUBLIC_E2E_AUTH=1: a test can then
 // make the body throw on render by setting window.__renownE2eWalletRenderError.
-// Inert in every other build (the constant is inlined and the probe removed).
+// Inert in every other build: the probe still ships, but never renders (the
+// env var is unset there, so E2E_AUTH is false).
 const E2E_AUTH = process.env.NEXT_PUBLIC_E2E_AUTH === '1'
 function E2eRenderErrorProbe(): null {
   if ((window as { __renownE2eWalletRenderError?: boolean }).__renownE2eWalletRenderError) {
