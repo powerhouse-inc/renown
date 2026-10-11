@@ -13,11 +13,11 @@ export type SiteAuth =
       avatarUrl: string | null
       profile: RenownProfile | null
       logout: () => void
-      /** Signs out, then starts the sign-in again (with the account the wallet now has). */
-      switchAccount: () => void
+      /** Signs out, then starts the sign-in again (with the account the wallet now has). Rejects, without starting the sign-in, when signing out fails. */
+      switchAccount: () => Promise<void>
     }
 
-/** Ends the session, then starts a new sign-in: never the other way round. */
+/** Ends the session, then starts a new sign-in: never the other way round. If signing out fails, rejects and does not sign in. */
 export async function signInAgain(logout: () => Promise<void> | void, login: () => void): Promise<void> {
   await logout()
   login()
@@ -31,6 +31,8 @@ const E2E_AUTH = process.env.NEXT_PUBLIC_E2E_AUTH === '1'
 interface E2eSession {
   address: string
   calls: string[]
+  /** Sign-out rejects (after being recorded). */
+  logoutFails?: boolean
 }
 const noSubscribe = () => () => {}
 const e2eSession = () => (E2E_AUTH ? ((window as { __renownE2eSession?: E2eSession }).__renownE2eSession ?? null) : null)
@@ -50,7 +52,14 @@ export function useSiteAuth(): SiteAuth {
       avatarUrl: null,
       profile,
       logout: record('logout'),
-      switchAccount: () => void signInAgain(record('logout'), record('login')),
+      switchAccount: () =>
+        signInAgain(
+          async () => {
+            testSession.calls.push('logout')
+            if (testSession.logoutFails) throw new Error('E2E: sign-out failed')
+          },
+          record('login'),
+        ),
     }
   }
   if (status === undefined || status === 'loading' || status === 'checking') return { state: 'loading' }
@@ -62,6 +71,6 @@ export function useSiteAuth(): SiteAuth {
     avatarUrl: avatarUrl ?? null,
     profile,
     logout: () => void logout(),
-    switchAccount: () => void signInAgain(logout, () => void login()),
+    switchAccount: () => signInAgain(logout, () => void login()),
   }
 }

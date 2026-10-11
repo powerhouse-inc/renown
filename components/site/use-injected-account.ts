@@ -27,8 +27,10 @@ export function useInjectedAccount(enabled: boolean): string | null {
   const [account, setAccount] = useState<string | null>(null)
 
   useEffect(() => {
+    // Not even window.ethereum is read until someone is signed in.
+    if (!enabled) return
     const provider = (window as { ethereum?: InjectedProvider }).ethereum
-    if (!enabled || !provider || typeof provider.request !== 'function') return
+    if (!provider || typeof provider.request !== 'function') return
     let active = true
     const update = (accounts: unknown) => {
       if (active) setAccount(selectedAccount(accounts))

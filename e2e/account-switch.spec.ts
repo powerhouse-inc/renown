@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { expectNoSeriousA11yViolations } from './support/site'
 
 // The header notices when the browser wallet (window.ethereum) switches to
 // another account than the Renown session's, and offers to sign in as it or
@@ -15,20 +16,26 @@ interface Setup {
   session?: string
   /** The wallet's accounts; null = no injected wallet. */
   accounts: string[] | null
+  /** This browser's wallet was already seen on the session's account (an earlier visit). */
+  paired?: boolean
+  /** The session's sign-out rejects. */
+  logoutFails?: boolean
 }
 
 /** A minimal EIP-1193 wallet whose account the test can switch, plus the session stand-in. */
-async function setUp(page: Page, { session, accounts }: Setup): Promise<void> {
+async function setUp(page: Page, { session, accounts, paired, logoutFails }: Setup): Promise<void> {
   await page.addInitScript(
-    ({ session, accounts }) => {
+    ({ session, accounts, paired, logoutFails }) => {
       type Listener = (accounts: string[]) => void
       const w = window as unknown as Record<string, unknown>
       w.__walletCalls = 0
-      if (session) w.__renownE2eSession = { address: session, calls: [] as string[] }
+      w.__ethereumReads = 0
+      if (session) w.__renownE2eSession = { address: session, calls: [] as string[], logoutFails }
+      if (session && paired) localStorage.setItem(`renown:injected-session:${session.toLowerCase()}`, '1')
       if (!accounts) return
       let current = accounts
       const listeners: Listener[] = []
-      w.ethereum = {
+      const ethereum = {
         request: async ({ method }: { method: string }) => {
           w.__walletCalls = (w.__walletCalls as number) + 1
           if (method === 'eth_accounts') return current
@@ -40,6 +47,13 @@ async function setUp(page: Page, { session, accounts }: Setup): Promise<void> {
           if (i >= 0) listeners.splice(i, 1)
         },
       }
+      Object.defineProperty(window, 'ethereum', {
+        configurable: true,
+        get: () => {
+          w.__ethereumReads = (w.__ethereumReads as number) + 1
+          return ethereum
+        },
+      })
       // Switches silently (no event), like a wallet changed while the tab was in the background.
       w.__setAccounts = (next: string[]) => (current = next)
       w.__switchAccounts = (next: string[]) => {
@@ -47,7 +61,7 @@ async function setUp(page: Page, { session, accounts }: Setup): Promise<void> {
         listeners.forEach((listener) => listener(next))
       }
     },
-    { session, accounts },
+    { session, accounts, paired, logoutFails },
   )
 }
 
@@ -77,11 +91,14 @@ test('switching accounts in the wallet asks, and never signs out by itself', asy
 })
 
 test('Stay keeps the session and hides the prompt for that account, also after a reload', async ({ page }) => {
-  await setUp(page, { session: OLD, accounts: [NEW] })
+  // The wallet was seen on the session's account on an earlier visit, and has switched since.
+  await setUp(page, { session: OLD, accounts: [NEW], paired: true })
   await ready(page)
   await expect(prompt(page)).toBeVisible() // checked on mount, no event needed
   await prompt(page).getByRole('button', { name: `Stay as ${short(OLD)}` }).click()
   await expect(prompt(page)).toHaveCount(0)
+  // Focus goes back to the header, not to the page body.
+  await expect(page.getByRole('banner').getByRole('button', { name: /^Account menu for / })).toBeFocused()
   expect(await calls(page)).toEqual([])
   await page.reload()
   await expect(page.getByRole('banner').getByRole('button', { name: /^Account menu for / })).toBeVisible({ timeout: 30_000 })
@@ -90,6 +107,47 @@ test('Stay keeps the session and hides the prompt for that account, also after a
   // A different account asks again.
   await page.evaluate((next) => (window as unknown as { __switchAccounts: (a: string[]) => void }).__switchAccounts([next]), OTHER)
   await expect(prompt(page)).toContainText(`You switched to ${short(OTHER)}`)
+})
+
+test('a session made with another wallet never prompts: the wallet was never seen on its account', async ({ page }) => {
+  // e.g. signed in with email (Privy) while MetaMask still has this site authorised for another account.
+  await setUp(page, { session: OLD, accounts: [NEW] })
+  await ready(page)
+  await page.waitForTimeout(500)
+  await expect(prompt(page)).toHaveCount(0)
+  await page.evaluate((next) => (window as unknown as { __switchAccounts: (a: string[]) => void }).__switchAccounts([next]), OTHER)
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await page.waitForTimeout(500)
+  await expect(prompt(page)).toHaveCount(0)
+  // A new tab of the same browser does not prompt either.
+  await page.reload()
+  await expect(page.getByRole('banner').getByRole('button', { name: /^Account menu for / })).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(500)
+  await expect(prompt(page)).toHaveCount(0)
+})
+
+test('once seen on the session account, a later switch also asks in a new tab', async ({ page }) => {
+  await setUp(page, { session: OLD, accounts: [OLD] })
+  await ready(page)
+  await page.evaluate((next) => (window as unknown as { __setAccounts: (a: string[]) => void }).__setAccounts([next]), NEW)
+  const other = await page.context().newPage()
+  await setUp(other, { session: OLD, accounts: [NEW] })
+  await ready(other)
+  await expect(prompt(other)).toContainText(`You switched to ${short(NEW)}`)
+})
+
+test('when signing out fails, the prompt says so and does not start a sign-in', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await setUp(page, { session: OLD, accounts: [OLD], logoutFails: true })
+  await ready(page)
+  await page.evaluate((next) => (window as unknown as { __switchAccounts: (a: string[]) => void }).__switchAccounts([next]), NEW)
+  await prompt(page).getByRole('button', { name: `Sign in as ${short(NEW)}` }).click()
+  await expect(prompt(page)).toContainText('Could not sign out. Try again.')
+  await expectNoSeriousA11yViolations(page)
+  await page.waitForTimeout(300)
+  expect(await calls(page)).toEqual(['logout'])
+  expect(errors).toEqual([])
 })
 
 test('a switch made while the tab was in the background shows when the window regains focus', async ({ page }) => {
@@ -124,4 +182,5 @@ test('signed-out visitors: the wallet is not even asked', async ({ page }) => {
   await page.waitForTimeout(500)
   await expect(prompt(page)).toHaveCount(0)
   expect(await page.evaluate(() => (window as unknown as { __walletCalls: number }).__walletCalls)).toBe(0)
+  expect(await page.evaluate(() => (window as unknown as { __ethereumReads: number }).__ethereumReads)).toBe(0)
 })
