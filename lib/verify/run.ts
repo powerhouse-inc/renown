@@ -28,8 +28,11 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The dependencies the browser uses. */
-export function liveDeps(now = new Date()): VerifyDeps {
+/**
+ * The dependencies the browser uses. `now` is read when a check runs (the SDK
+ * reads Date.now() too), unless a fixed time is given.
+ */
+export function liveDeps(fixedNow?: Date): VerifyDeps {
   return {
     lookups: switchboardLookups(),
     async eoaSignature(credential) {
@@ -41,11 +44,15 @@ export function liveDeps(now = new Date()): VerifyDeps {
       return quietly(async () => (await verifyAuthBearerToken(jwt, audience ? { audience } : undefined)) !== false)
     },
     contractSignature: contractSignatureOnChain,
-    now,
+    get now() {
+      return fixedNow ?? new Date()
+    },
   }
 }
 
-export async function runVerify(input: CheckableInput, target: OperationTarget, deps: VerifyDeps): Promise<Report> {
+export async function runVerify(input: CheckableInput, target: OperationTarget, liveOrFixed: VerifyDeps): Promise<Report> {
+  // One clock reading for the whole check.
+  const deps: VerifyDeps = { ...liveOrFixed, now: liveOrFixed.now }
   switch (input.kind) {
     case 'did-pkh':
       return verifyWalletDid(input.did, input.address, input.chainId, deps)

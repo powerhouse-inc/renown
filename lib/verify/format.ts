@@ -32,7 +32,7 @@ export function signerName(signer: SignerParty): string {
   return p?.displayName?.trim() || (p?.handle ? `@${p.handle}` : '') || shortAddress(signer.address)
 }
 
-/** How a report names its app: profile name, then the name the signature carries, then "an app". */
+/** How a report names its app: profile name, then the name its credential carries, then "an unnamed app". */
 export function appName(app: AppParty): string {
   if (app.session) return 'a CLI or other session'
   return app.profile?.name?.trim() || app.claimedName?.trim() || 'an unnamed app'

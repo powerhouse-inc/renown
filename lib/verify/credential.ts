@@ -244,13 +244,17 @@ export async function verifyCredential(
   const now = deps.now.getTime()
   const issued = Date.parse(credential.issuanceDate)
   const expires = Date.parse(credential.expirationDate)
+  let notInDate: 'unreadable' | 'future' | 'expired' | null = null
   if (forged) {
     checks.push({ id: 'validity', label: 'In date', status: 'neutral', detail: SKIPPED_DETAIL })
   } else if (Number.isNaN(issued) || Number.isNaN(expires)) {
+    notInDate = 'unreadable'
     checks.push({ id: 'validity', label: 'In date', status: 'fail', detail: 'Its issue or expiry date is not a date.' })
   } else if (issued > now + SKEW_MS) {
+    notInDate = 'future'
     checks.push({ id: 'validity', label: 'In date', status: 'fail', detail: `It is dated in the future (${formatInstant(credential.issuanceDate)}).` })
   } else if (expires <= now) {
+    notInDate = 'expired'
     checks.push({ id: 'validity', label: 'In date', status: 'fail', detail: `It expired on ${formatInstant(credential.expirationDate)}.` })
   } else {
     checks.push({ id: 'validity', label: 'In date', status: 'pass', detail: `Valid until ${formatInstant(credential.expirationDate)}.` })
@@ -288,18 +292,32 @@ export async function verifyCredential(
   const verdict = verdictOf(checks)
   const who = signerName(signer)
   const what = appName(app)
+  // When the signature could not be checked, nothing may say the wallet signed it.
+  const signatureUnknown = checks[0].status === 'unknown'
+  const signedBy = signatureUnknown
+    ? `This credential claims to be signed by ${who} for ${what}, but its signature could not be checked`
+    : `${who} signed this credential for ${what}`
+  const dateProblem =
+    notInDate === 'future'
+      ? 'it is dated in the future, so it is not valid yet'
+      : notInDate === 'unreadable'
+        ? 'its dates cannot be read'
+        : 'it is no longer in date'
   const summary: Record<Verdict, string> = {
     genuine:
       checks.find((c) => c.id === 'revocation')?.status === 'pass'
         ? `${who} signed this credential for ${what}. It is in date and has not been revoked.`
         : `${who} signed this credential for ${what} and it is in date. Renown has no record of it.`,
     'not-genuine': `This credential was not signed by the wallet it names, so it proves nothing about ${shortAddress(issuer)}.`,
-    revoked: `${who} signed this credential for ${what}, then revoked it. It no longer authorises anything.`,
-    expired: `${who} signed this credential for ${what}, but it is no longer in date.`,
-    unchecked:
-      checks.find((c) => c.id === 'signature')?.status === 'unknown' && stored
+    revoked: signatureUnknown
+      ? `${signedBy}. The issuer has revoked it, so it no longer authorises anything.`
+      : `${signedBy}, then revoked it. It no longer authorises anything.`,
+    expired: signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
+    unchecked: !signatureUnknown
+      ? 'Part of this credential could not be checked just now. Nothing below says it is forged; try again in a moment.'
+      : stored
         ? 'Renown has this credential, but its signature could not be re-checked from the stored copy. Paste the full credential to check it.'
-        : 'Part of this credential could not be checked just now. Nothing below says it is forged; try again in a moment.',
+        : `${signedBy}: it is not from a plain wallet, and chain ${chainId} could not be asked whether a smart wallet at ${shortAddress(issuer)} made it.`,
     identity: '',
   }
   const revokedAt = rows?.find((r) => r.revoked && r.revokedAt && r.issuerEthereumAddress.toLowerCase() === issuer)?.revokedAt

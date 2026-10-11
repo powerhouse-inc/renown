@@ -39,7 +39,7 @@ export interface PartyProfile {
 
 export interface AppParty {
   did: string
-  /** The app name a credential or signature carries (credentialSubject.app, signer.app.name). */
+  /** The app name the authorising credential carries (credentialSubject.app), never the unsigned signer.app.name. */
   claimedName: string | null
   profile: AppPartyProfile | null
   looked: boolean

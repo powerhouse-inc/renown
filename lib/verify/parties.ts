@@ -1,6 +1,7 @@
 // Who signed and for which app: the identity and app cards of a report, and
 // the delegation check tokens and operations share. Pure apart from the
 // injected lookups.
+import { formatDay } from './format'
 import type { AppParty, Check, SignerParty, StoredCredential, VerifyLookups } from './types'
 
 /** Clock skew tolerated between a signer's clock and a credential's issuance time. */
@@ -44,9 +45,11 @@ function short(address: string): string {
 }
 
 /**
- * Whether a stored Renown credential of `address` delegates to `appDid` at
- * `at` (now for a token, the signing time for an operation): issued by then
- * (within SKEW_MS), not expired by then, and not revoked before then.
+ * Whether a stored Renown credential of `address` delegates to `appDid`.
+ * Issuance and expiry are judged at `at` (now for a token, the signing time
+ * the operation states for an operation), with SKEW_MS for issuance. A
+ * revocation counts whenever it happened: an operation's signing time is the
+ * signer's own claim, so it cannot show the signature came before it.
  */
 export async function checkDelegation(
   lookups: VerifyLookups,
@@ -71,8 +74,8 @@ export async function checkDelegation(
     const expires = isoOrNull(c.expirationDate)
     return expires === null || expires > t
   })
-  const valid = live.find((c) => !c.revoked || (isoOrNull(c.revokedAt) ?? -Infinity) > t)
-  const atText = when === 'now' ? '' : ' when it was signed'
+  const valid = live.find((c) => !c.revoked)
+  const atText = when === 'now' ? '' : ' at the signing time the operation states'
   if (valid) {
     return {
       outcome: 'authorised',
@@ -86,10 +89,11 @@ export async function checkDelegation(
     }
   }
   if (live.length > 0) {
+    const revokedAt = live[0].revokedAt && isoOrNull(live[0].revokedAt) !== null ? ` on ${formatDay(live[0].revokedAt)}` : ''
     return {
       outcome: 'revoked',
       credential: live[0],
-      check: { id, label, status: 'fail', detail: `${short(address)} revoked the credential that authorised this app key.` },
+      check: { id, label, status: 'fail', detail: `${short(address)} revoked the credential that authorised this app key${revokedAt}.` },
     }
   }
   if (issuedBy.length > 0) {
@@ -100,7 +104,7 @@ export async function checkDelegation(
         id,
         label,
         status: 'fail',
-        detail: `The credential that authorised this app key had expired${when === 'now' ? '' : ' before it was signed'}.`,
+        detail: `The credential that authorised this app key had expired${when === 'now' ? '' : ' by the signing time the operation states'}.`,
       },
     }
   }

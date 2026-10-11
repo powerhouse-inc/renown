@@ -55,25 +55,44 @@ export function readTokenClaims(jwt: string): TokenClaims | null {
   }
 }
 
-/** The app key's ES256 signature over header.payload, checked offline. Null when the key is not P-256. */
+/**
+ * The app key's ES256 signature over header.payload, checked offline. Renown
+ * tokens are ES256 only, so any other alg (none, HS256, ...) is a forgery.
+ * Null when the key is not P-256, which only the SDK can check.
+ */
 async function signatureByIssuer(jwt: string, iss: string): Promise<boolean | null> {
   const header = decodePart(jwt.split('.')[0])
-  if (!isRecord(header) || header.alg !== 'ES256' || !isP256DidKey(iss)) return null
+  if (!isRecord(header) || header.alg !== 'ES256') return false
+  if (!isP256DidKey(iss)) return null
   const [h, p, s] = jwt.split('.')
   const signature = base64UrlToBytes(s)
   if (!signature) return false
   return verifyP256(iss, signature, new TextEncoder().encode(`${h}.${p}`))
 }
 
-function verdictOf(checks: Check[], expired: boolean, delegation: string): Verdict {
-  if (checks.some((c) => (c.id === 'signature' || c.id === 'shape') && c.status === 'fail')) return 'not-genuine'
-  if (expired) return 'expired'
-  if (checks.some((c) => c.id === 'validity' && c.status === 'fail')) return 'not-genuine'
-  if (delegation === 'revoked') return 'revoked'
-  if (delegation === 'expired') return 'expired'
-  if (delegation === 'none') return 'not-genuine'
-  if (checks.some((c) => c.status === 'unknown')) return 'unchecked'
-  return 'genuine'
+type Reason =
+  | 'signature'
+  | 'shape'
+  | 'never-authorised'
+  | 'not-yet'
+  | 'revoked'
+  | 'token-expired'
+  | 'credential-expired'
+  | 'unknown'
+  | 'genuine'
+
+/** The verdict and the check that decided it, so the summary names what actually failed. */
+function decide(checks: Check[], expired: boolean, notYet: boolean, delegation: string): { verdict: Verdict; reason: Reason } {
+  const failed = (id: string) => checks.some((c) => c.id === id && c.status === 'fail')
+  if (failed('signature')) return { verdict: 'not-genuine', reason: 'signature' }
+  if (failed('shape')) return { verdict: 'not-genuine', reason: 'shape' }
+  if (delegation === 'none' && failed('delegation')) return { verdict: 'not-genuine', reason: 'never-authorised' }
+  if (notYet && !expired) return { verdict: 'not-genuine', reason: 'not-yet' }
+  if (delegation === 'revoked') return { verdict: 'revoked', reason: 'revoked' }
+  if (expired) return { verdict: 'expired', reason: 'token-expired' }
+  if (delegation === 'expired') return { verdict: 'expired', reason: 'credential-expired' }
+  if (checks.some((c) => c.status === 'unknown')) return { verdict: 'unchecked', reason: 'unknown' }
+  return { verdict: 'genuine', reason: 'genuine' }
 }
 
 export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report> {
@@ -138,25 +157,26 @@ export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report
     // A token carries no app name; the credential that authorised its key does.
     appParty(deps.lookups, claims.iss, delegation.credential?.credentialSubjectApp || null),
   ])
-  const verdict = verdictOf(checks, expired, delegation.outcome)
+  const { verdict, reason } = decide(checks, expired, notYet, delegation.outcome)
   const who = signerName(signer)
   const what = appName(app)
-  const summary: Record<Verdict, string> = {
-    genuine: `${what} signed this token for ${who}, who authorised that app. ${claims.exp ? 'It is in date.' : 'It does not expire.'}`,
-    'not-genuine':
-      delegation.outcome === 'none' && checks.every((c) => c.id !== 'signature' || c.status === 'pass')
-        ? `The token is signed, but ${shortAddress(claims.address)} never authorised this app key, so it does not prove who is behind it.`
-        : 'This token was changed or forged: its signature does not hold.',
+  const signed = checks.some((c) => c.id === 'signature' && c.status === 'pass')
+  const sentences: Record<Reason, string> = {
+    signature: 'This token was changed or forged: its signature does not hold.',
+    shape: 'The token is signed by the app key it names, but it is not a valid Renown sign-in token, so apps that use Renown refuse it.',
+    'never-authorised': signed
+      ? `The token is signed, but ${shortAddress(claims.address)} never authorised this app key, so it does not prove who is behind it.`
+      : `The token names ${shortAddress(claims.address)}, but ${shortAddress(claims.address)} never authorised this app key, so it does not prove who is behind it.`,
+    'not-yet': `This token is not valid before ${claims.nbf !== undefined ? formatInstant(new Date(claims.nbf * 1000).toISOString()) : 'its start time'}, so apps must refuse it until then.`,
     revoked: `${who} revoked the credential that authorised this app key, so the token no longer speaks for them.`,
-    expired: expired
-      ? 'This token has expired. Apps must refuse it.'
-      : `The credential that authorised this app key for ${who} has expired.`,
-    unchecked: 'The token is signed and in date, but Renown could not be reached to confirm who authorised its key. Try again in a moment.',
-    identity: '',
+    'token-expired': 'This token has expired. Apps must refuse it.',
+    'credential-expired': `The credential that authorised this app key for ${who} has expired.`,
+    unknown: 'The token is signed and in date, but Renown could not be reached to confirm who authorised its key. Try again in a moment.',
+    genuine: `${what} signed this token for ${who}, who authorised that app. ${claims.exp ? 'It is in date.' : 'It does not expire.'}`,
   }
   const times = [
     ...(claims.iat ?? claims.nbf ? [{ label: 'Issued', iso: new Date((claims.iat ?? claims.nbf ?? 0) * 1000).toISOString() }] : []),
     ...(claims.exp ? [{ label: 'Expires', iso: new Date(claims.exp * 1000).toISOString() }] : []),
   ]
-  return { kind: 'token', verdict, summary: sentence(summary[verdict]), checks, signer, app, times }
+  return { kind: 'token', verdict, summary: sentence(sentences[reason]), checks, signer, app, times }
 }

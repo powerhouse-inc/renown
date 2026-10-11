@@ -1,14 +1,40 @@
 // /verify for a signed document operation: does the v2 hash bind this action
 // to the given document and branch, is the P-256 signature the app key's, and
-// did the user authorise that key when it signed? Mirrors the reactor's
-// verifyActionSignature (integrity) plus the Renown trust lookup (identity).
+// did the user authorise that key? Mirrors the reactor's verifyActionSignature
+// on its mutation path (integrity, legacy hashes included) plus the Renown
+// trust lookup (identity).
 // @powerhousedao/shared is loaded only when an operation is checked.
-import { appName, sentence, shortAddress, signerName } from './format'
+import { appName, formatDay, formatInstant, sentence, shortAddress, signerName } from './format'
 import { hexToBytes, verifyP256 } from './p256'
 import { appParty, checkDelegation, signerParty, type Delegation } from './parties'
 import { SKIPPED_DETAIL, type Check, type Report, type Verdict, type VerifyDeps } from './types'
 
 type Tuple = [string, string, string, string, string]
+
+/** Legacy hash lengths, as the reactor tells its schemes apart (schemeOf). */
+const RENOWN_HASH_LENGTH = 44
+const SHARED_HASH_LENGTH = 28
+
+type LegacyScheme = 'legacy-renown' | 'legacy-shared' | 'legacy-unknown'
+
+function legacySchemeOf(hash: string): LegacyScheme {
+  if (hash.length === RENOWN_HASH_LENGTH) return 'legacy-renown'
+  if (hash.length === SHARED_HASH_LENGTH) return 'legacy-shared'
+  return 'legacy-unknown'
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return btoa(binary)
+}
+
+/** The reactor's legacy-renown hash: SHA-256 of scope, type and JSON input, base64. */
+async function renownLegacyHash(action: { scope: string; type: string; input: unknown }): Promise<string> {
+  const payload = [action.scope, action.type, JSON.stringify(action.input)].join('')
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
+  return bytesToBase64(new Uint8Array(digest))
+}
 
 interface SignedAction {
   id: string
@@ -84,6 +110,53 @@ function malformed(problem: string): Report {
   }
 }
 
+type Shared = typeof import('@powerhousedao/shared/document-model')
+
+/**
+ * The legacy hash recomputed as the reactor does on its mutation path, and
+ * compared with the one the signature covers. legacy-shared covers the content
+ * and the document; legacy-renown the content only; neither covers the branch.
+ */
+async function legacyBinding(shared: Shared, action: SignedAction, scheme: LegacyScheme | null, documentId: string): Promise<Check> {
+  const id = 'binding'
+  const label = 'Matches what was signed'
+  const hash = action.tuple[2]
+  if (scheme === 'legacy-renown') {
+    const expected = await renownLegacyHash(action)
+    return expected === hash
+      ? { id, label, status: 'pass', detail: 'A legacy signature over exactly this content. It does not cover which document or branch it belongs to.' }
+      : { id, label, status: 'fail', detail: 'It does not match the legacy hash its signature covers: its content was changed after signing.' }
+  }
+  if (scheme === 'legacy-shared') {
+    if (!documentId) {
+      return { id, label, status: 'unknown', detail: 'A legacy signature that covers the document: enter the document id to check it.' }
+    }
+    let expected: string | null = null
+    try {
+      expected = shared.buildOperationSignatureParams({
+        documentId,
+        signer: { user: action.signer.user, app: action.signer.app, signatures: [] },
+        action: { id: action.id, type: action.type, scope: action.scope, timestampUtcMs: action.timestampUtcMs, input: action.input },
+        previousStateHash: '',
+      } as Parameters<Shared['buildOperationSignatureParams']>[0])[2]
+    } catch {
+      expected = null
+    }
+    if (expected === null) {
+      return { id, label, status: 'unknown', detail: 'Its legacy hash could not be recomputed from this content.' }
+    }
+    return expected === hash
+      ? { id, label, status: 'pass', detail: `A legacy signature for document ${documentId} with exactly this content. It does not cover the branch.` }
+      : {
+          id,
+          label,
+          status: 'fail',
+          detail: `It does not match the legacy hash its signature covers for document ${documentId}: its content was changed, or it was signed for another document.`,
+        }
+  }
+  return { id, label, status: 'unknown', detail: `Its hash is of no known legacy kind (${hash.length} characters), so it cannot be recomputed.` }
+}
+
 export async function verifyOperation(
   raw: Record<string, unknown>,
   target: { documentId: string; branch: string },
@@ -95,6 +168,7 @@ export async function verifyOperation(
   const [timestamp, key, hash, prevStateHash, signatureHex] = action.tuple
   const checks: Check[] = []
   const v2 = shared.isV2ActionHash(hash)
+  const legacyScheme = v2 ? null : legacySchemeOf(hash)
   const documentId = target.documentId.trim()
   const branch = target.branch.trim() || 'main'
 
@@ -131,12 +205,7 @@ export async function verifyOperation(
       )
     }
   } else {
-    checks.push({
-      id: 'binding',
-      label: 'Bound to this document',
-      status: 'neutral',
-      detail: 'A legacy signature: it covers the content, but not which document or branch it belongs to.',
-    })
+    checks.push(await legacyBinding(shared, action, legacyScheme, documentId))
   }
 
   const bytes = hexToBytes(signatureHex)
@@ -156,27 +225,44 @@ export async function verifyOperation(
       ? await checkDelegation(deps.lookups, key, user, signedAt, 'signed')
       : { outcome: 'none', credential: null, check: { id: 'delegation', label: 'Authorised by the user', status: 'fail', detail: 'It carries no signing time to check the authorisation against.' } }
   checks.push(delegation.check)
+  if (!integrityFailed && signedAt) {
+    checks.push({
+      id: 'timing',
+      label: 'Signing time',
+      status: 'neutral',
+      detail: `It says it was signed on ${formatInstant(signedAt.toISOString())}. That time is the signer's own claim: expiry is judged at it, a revocation counts whenever it happened.`,
+    })
+  }
 
   const [signer, app] = await Promise.all([
     signerParty(deps.lookups, user, action.signer.user.chainId || null),
-    appParty(deps.lookups, key, action.signer.app.name || delegation.credential?.credentialSubjectApp || null),
+    // signer.app.name is not covered by any signature: only the authorising credential names the app.
+    appParty(deps.lookups, key, delegation.credential?.credentialSubjectApp || null),
   ])
   const verdict = verdictOf(checks, delegation.outcome)
   const who = signerName(signer)
   const what = appName(app)
-  const scope = v2 ? '' : ' (a legacy signature, which does not cover the document it belongs to)'
+  const scope =
+    legacyScheme === 'legacy-shared'
+      ? ' (a legacy signature, which does not cover the branch)'
+      : legacyScheme === 'legacy-renown'
+        ? ' (a legacy signature, which does not cover the document or branch)'
+        : ''
+  const revokedAt = delegation.credential?.revokedAt
+  const revokedOn = revokedAt && !Number.isNaN(Date.parse(revokedAt)) ? ` on ${formatDay(revokedAt)}` : ''
   const summary: Record<Verdict, string> = {
     genuine: `${who} made this ${action.type} through ${what}${scope}. It has not been changed since.`,
     'not-genuine': integrityFailed
       ? 'This operation was changed after it was signed, or its signature belongs to something else.'
-      : `The operation is signed, but ${shortAddress(user)} had not authorised this app key when it was signed, so it does not show that they made it.`,
-    revoked: `${who} had revoked the credential for this app key before it was signed.`,
-    expired: `The credential that authorised this app key for ${who} had expired before it was signed.`,
-    unchecked: integrityFailed
-      ? ''
-      : documentId || !v2
-        ? 'The signature holds, but Renown could not be reached to confirm who authorised its key. Try again in a moment.'
-        : 'The signature holds. Enter the document id to check that it belongs to that document.',
+      : `The operation is signed, but ${shortAddress(user)} had not authorised this app key at the signing time it states, so it does not show that they made it.`,
+    revoked: `The credential behind this app key was revoked${revokedOn}. The signing time is the signer's own claim, so it cannot show the operation came before that.`,
+    expired: `The credential that authorised this app key for ${who} had expired by the signing time the operation states.`,
+    unchecked:
+      checks.find((c) => c.id === 'binding')?.status === 'unknown'
+        ? legacyScheme === 'legacy-unknown'
+          ? 'The signature holds, but it covers a legacy hash of a kind that cannot be recomputed, so it does not show what was signed.'
+          : 'The signature holds. Enter the document id to check that it belongs to that document.'
+        : 'The signature holds, but Renown could not be reached to confirm who authorised its key. Try again in a moment.',
     identity: '',
   }
   return {
