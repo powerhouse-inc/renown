@@ -16,19 +16,39 @@ export interface ImageBox {
 export const AVATAR_BOX: ImageBox = { width: 256, height: 256 }
 export const LOGO_BOX: ImageBox = { width: 256, height: 256 }
 
+/** How strongly an app cover is blurred behind the card (sharp's Gaussian sigma, in card pixels). */
+export const COVER_BLUR_SIGMA = 24
+
 /**
- * `bytes` (PNG, JPEG, GIF, WebP, AVIF or SVG) as a PNG data URL, cropped to
- * fill `box` like the card's `objectFit: cover` and never enlarged. Only the
- * first frame of an animation is used; EXIF orientation is applied. Throws on
- * bytes sharp cannot decode, on images over MAX_INPUT_PIXELS and on a
- * conversion that runs past SHARP_TIMEOUT_SECONDS.
+ * The formats a card draws, as sharp names them (AVIF is "heif"). SVG is
+ * refused by its bytes, whatever the content type said: Renown media never
+ * stores SVG, and it is the one input that can keep librsvg busy for seconds.
  */
-export async function toPngDataUrl(bytes: Uint8Array, box: ImageBox): Promise<string> {
-  const png = await sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+const RASTER_FORMATS = new Set(['png', 'jpeg', 'gif', 'webp', 'heif'])
+
+export interface ConvertOptions {
+  /** Gaussian blur sigma applied after the resize (app covers). */
+  blur?: number
+}
+
+/**
+ * `bytes` (PNG, JPEG, GIF, WebP or AVIF) as a PNG data URL, cropped to fill
+ * `box` like the card's `objectFit: cover` and never enlarged, optionally
+ * blurred. Only the first frame of an animation is used; EXIF orientation is
+ * applied. Throws on any other format (SVG included), on bytes sharp cannot
+ * decode, on images over MAX_INPUT_PIXELS and on a conversion that runs past
+ * SHARP_TIMEOUT_SECONDS.
+ */
+export async function toPngDataUrl(bytes: Uint8Array, box: ImageBox, { blur }: ConvertOptions = {}): Promise<string> {
+  const image = sharp(bytes, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+  // metadata() reads the header only: nothing is decoded or rendered yet.
+  const { format } = await image.metadata()
+  if (!format || !RASTER_FORMATS.has(format)) throw new Error(`Image format not allowed: ${format ?? 'unknown'}`)
+  let pipeline = image
     .timeout({ seconds: SHARP_TIMEOUT_SECONDS })
     .rotate()
     .resize({ width: box.width, height: box.height, fit: 'cover', withoutEnlargement: true })
-    .png()
-    .toBuffer()
+  if (blur) pipeline = pipeline.blur(blur)
+  const png = await pipeline.png().toBuffer()
   return `data:image/png;base64,${png.toString('base64')}`
 }

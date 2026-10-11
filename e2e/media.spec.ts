@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
-import { isAllowedMediaTarget, sniffImageType } from '../lib/media-fetch'
+import { isAllowedMediaTarget, normaliseMediaHost, sniffImageType, storageHosts } from '../lib/media-fetch'
 import { STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 
 // Versioned /media URLs (`?v=<sha256 prefix>`) whose version matches the
@@ -189,6 +189,29 @@ test('image signatures are sniffed: PNG, JPEG, WebP, GIF only', () => {
   expect(sniffImageType(ascii('<svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeNull()
   expect(sniffImageType(ascii('<html>'))).toBeNull()
   expect(sniffImageType(bytes())).toBeNull()
+})
+
+test('OG_MEDIA_HOSTS entries are normalised like URL.host: a default :443 is dropped, other ports kept', () => {
+  expect(normaliseMediaHost('files.example:443')).toBe('files.example')
+  expect(normaliseMediaHost(' Files.Example ')).toBe('files.example')
+  expect(normaliseMediaHost('https://files.example/')).toBe('files.example')
+  expect(normaliseMediaHost('files.example:8443')).toBe('files.example:8443')
+  expect(normaliseMediaHost('')).toBeNull()
+  expect(normaliseMediaHost('files.example/path')).toBeNull()
+  expect(normaliseMediaHost('user@files.example')).toBeNull()
+
+  const saved = process.env.OG_MEDIA_HOSTS
+  process.env.OG_MEDIA_HOSTS = 'files.example:443, other.example:8443, ,bad/entry'
+  try {
+    expect(storageHosts()).toEqual(['files.example', 'other.example:8443'])
+    expect(isAllowedMediaTarget(new URL('https://files.example/bucket/key'))).toBe(true)
+    expect(isAllowedMediaTarget(new URL('https://files.example:443/bucket/key'))).toBe(true)
+    expect(isAllowedMediaTarget(new URL('https://other.example:8443/bucket/key'))).toBe(true)
+    expect(isAllowedMediaTarget(new URL('https://other.example/bucket/key'))).toBe(false)
+  } finally {
+    if (saved === undefined) delete process.env.OG_MEDIA_HOSTS
+    else process.env.OG_MEDIA_HOSTS = saved
+  }
 })
 
 test('only https storage hosts on the allowlist, on their default port, are followed', () => {

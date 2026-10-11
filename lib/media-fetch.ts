@@ -10,24 +10,40 @@ import { switchboardOrigin } from '../services/media'
 export const MAX_MEDIA_HOPS = 2
 
 /**
+ * An OG_MEDIA_HOSTS entry spelled as URL.host spells it: lowercase, the
+ * default :443 dropped (URL.host omits it, so "host:443" would never match),
+ * any other port kept; a leading https:// and trailing slashes are tolerated.
+ * Null for an empty entry or one that is not a bare host.
+ */
+export function normaliseMediaHost(entry: string): string | null {
+  const bare = entry.trim().toLowerCase().replace(/^https:\/\//, '').replace(/\/+$/, '')
+  if (!bare || /[/?#@\s]/.test(bare)) return null
+  try {
+    return new URL(`https://${bare}`).host
+  } catch {
+    return null
+  }
+}
+
+/**
  * Hosts a media fetch may be redirected to, besides the switchboard: the
  * attachment storage behind the /media route's signed redirect.
- * Comma-separated hosts in OG_MEDIA_HOSTS (`host` for the default port 443, or
- * `host:port`); the default is the production bucket host
- * (nbg1.your-objectstorage.com, seen by curling a real /media URL). Storage
- * hosts must be https.
+ * Comma-separated hosts in OG_MEDIA_HOSTS (`host` or `host:443` for the default
+ * port, or `host:port`; see normaliseMediaHost); the default is the production
+ * bucket host (nbg1.your-objectstorage.com, seen by curling a real /media URL).
+ * Storage hosts must be https.
  */
 export function storageHosts(): string[] {
   return (process.env.OG_MEDIA_HOSTS || 'nbg1.your-objectstorage.com')
     .split(',')
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean)
+    .map(normaliseMediaHost)
+    .filter((host): host is string => host !== null)
 }
 
 /** The switchboard, any of `origins`, or an allowed https storage host. */
 export function isAllowedMediaTarget(target: URL, origins: string[] = []): boolean {
   if ([switchboardOrigin(), ...origins].some((origin) => target.origin === new URL(origin).origin)) return true
-  // URL.host carries the port only when it is not the scheme default, so a bare entry means port 443 only.
+  // URL.host carries the port only when it is not the scheme default, like the normalised entries.
   return target.protocol === 'https:' && storageHosts().includes(target.host.toLowerCase())
 }
 

@@ -22,7 +22,7 @@
 //   PUT  /__stub/s3/<sha256>   stores the bytes (checks the hash)
 //   GET  /__stub/s3/<sha256>   serves them
 //   GET  /api/@powerhousedao/renown-package/media/<doc>/<field>   302 to
-//        /__stub/og/<webp|avif|svg|badwebp|bomb>   OG image fixtures
+//        /__stub/og/<webp|avif|svg|svgpng|badwebp|bomb>   OG image fixtures
 //        /__stub/blob/<kind>/<sha256>?tag=<tag> for "stub-blob-<kind>-<tag>"   /media route
 //        guards (e2e/media.spec.ts); GET /__stub/blob-hits?tag=<tag> counts storage GETs per tag
 //   GET  .../media/stub-fs-<png|fake>-<tag>/<field>   200 with the bytes (filesystem storage)
@@ -61,7 +61,7 @@ function pixelBombPng(size) {
   ])
 }
 
-// Images the OG route converts with sharp (e2e/og.spec.ts): valid WebP/AVIF/SVG,
+// Images the OG route converts with sharp (e2e/og.spec.ts): valid WebP/AVIF, an SVG (refused),
 // a WebP with corrupt bytes, and a 64-megapixel PNG (over the 40 MP limit).
 const OG_IMAGES = {
   webp: { type: 'image/webp', bytes: () => Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvB8ABAAfQ/4aUtv+BiOh/AAA=', 'base64') },
@@ -75,6 +75,11 @@ const OG_IMAGES = {
   },
   svg: {
     type: 'image/svg+xml',
+    bytes: () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#0080ff"/></svg>'),
+  },
+  // SVG bytes served as image/png: the card must refuse them by their bytes, not trust the label.
+  svgpng: {
+    type: 'image/png',
     bytes: () => Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#0080ff"/></svg>'),
   },
   badwebp: { type: 'image/webp', bytes: () => Buffer.concat([Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1'), Buffer.alloc(64, 0x5a)]) },
@@ -208,6 +213,7 @@ async function packageRoute(req, res) {
       'stub-webp-doc': `http://localhost:${port}/__stub/og/webp`,
       'stub-avif-doc': `http://localhost:${port}/__stub/og/avif`,
       'stub-svg-doc': `http://localhost:${port}/__stub/og/svg`,
+      'stub-svgpng-doc': `http://localhost:${port}/__stub/og/svgpng`,
       'stub-badwebp-doc': `http://localhost:${port}/__stub/og/badwebp`,
       'stub-bomb-doc': `http://localhost:${port}/__stub/og/bomb`,
       'stub-photopng-doc': `http://localhost:${port}/__stub/og/photopng`,
@@ -235,7 +241,7 @@ async function packageRoute(req, res) {
     if (media[1] === 'stub-broken-doc') return send(res, 500, { error: 'boom' })
     return send(res, 404, { error: 'Not found' })
   }
-  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|badwebp|bomb|photopng|photowebp|photocover|whitecover|yellowcover|loop1|loop2|loop3)$/.exec(url.pathname)
+  const og = /^\/__stub\/og\/(text|huge|webp|avif|svg|svgpng|badwebp|bomb|photopng|photowebp|photocover|whitecover|yellowcover|loop1|loop2|loop3)$/.exec(url.pathname)
   if (og && req.method === 'GET') {
     if (og[1] === 'text') {
       res.writeHead(200, { 'Content-Type': 'text/plain' })

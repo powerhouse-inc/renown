@@ -22,6 +22,7 @@ const AVIF = '0x5e00000000000000000000000000000000000c09'
 const SVG = '0x5e00000000000000000000000000000000000c0a'
 const BAD_WEBP = '0x5e00000000000000000000000000000000000c0b'
 const BOMB = '0x5e00000000000000000000000000000000000c0c'
+const SVG_AS_PNG = '0x5e00000000000000000000000000000000000c12'
 const LONG_NAME = '0x5e00000000000000000000000000000000000c0d'
 const LONG_WORD = '0x5e00000000000000000000000000000000000c0e'
 const LONG_APP_DID = 'did:key:z6MkSeoLongAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
@@ -62,7 +63,7 @@ test.beforeAll(async () => {
   for (const [address, doc] of [[TEXT, 'stub-text-doc'], [HUGE, 'stub-huge-doc'], [EVIL, 'stub-evil-doc'], [LOOP, 'stub-loop-doc']]) {
     await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'b'.repeat(64)}`)] } } })
   }
-  for (const [address, doc] of [[WEBP, 'stub-webp-doc'], [AVIF, 'stub-avif-doc'], [SVG, 'stub-svg-doc'], [BAD_WEBP, 'stub-badwebp-doc'], [BOMB, 'stub-bomb-doc']]) {
+  for (const [address, doc] of [[WEBP, 'stub-webp-doc'], [AVIF, 'stub-avif-doc'], [SVG, 'stub-svg-doc'], [SVG_AS_PNG, 'stub-svgpng-doc'], [BAD_WEBP, 'stub-badwebp-doc'], [BOMB, 'stub-bomb-doc']]) {
     await fixtureStub({ match: 'OgProfile', variables: address, response: { data: { renownUsers: [profile(doc, `attachment://v1:${'c'.repeat(64)}`)] } } })
   }
   await fixtureStub({
@@ -96,17 +97,17 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe('profile')
   })
 
-  test('draw the stored image: PNG as is, WebP, AVIF and SVG converted to PNG', async ({ request }) => {
+  test('draw the stored image: PNG as is, WebP and AVIF converted to PNG', async ({ request }) => {
     expect(await cardOf(request, `?variant=app&did=${APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
     expect(await cardOf(request, `?variant=profile&address=${WEBP}`)).toEqual({ variant: 'profile', image: 'drawn' })
     expect(await cardOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
     expect(await cardOf(request, `?variant=profile&address=${AVIF}`)).toEqual({ variant: 'profile', image: 'drawn' })
-    expect(await cardOf(request, `?variant=profile&address=${SVG}`)).toEqual({ variant: 'profile', image: 'drawn' })
   })
 
-  test('draw the monogram when the image cannot be decoded or is a decompression bomb', async ({ request }) => {
+  test('draw the monogram when the image cannot be decoded, is a decompression bomb or is an SVG labelled as PNG', async ({ request }) => {
     expect(await cardOf(request, `?variant=profile&address=${BAD_WEBP}`)).toEqual({ variant: 'profile', image: 'monogram' })
     expect(await cardOf(request, `?variant=profile&address=${BOMB}`)).toEqual({ variant: 'profile', image: 'monogram' })
+    expect(await cardOf(request, `?variant=profile&address=${SVG_AS_PNG}`)).toEqual({ variant: 'profile', image: 'monogram' })
   })
 
   test('without a stored image the card draws its monogram; the default card has no image', async ({ request }) => {
@@ -114,8 +115,8 @@ test.describe('link-preview images', () => {
     expect(await cardOf(request, '')).toEqual({ variant: 'default', image: 'none' })
   })
 
-  test('fall back to the default card on a non-image, an oversized image, a foreign redirect or a redirect loop', async ({ request }) => {
-    for (const address of [TEXT, HUGE, EVIL, LOOP]) {
+  test('fall back to the default card on a non-image, an SVG, an oversized image, a foreign redirect or a redirect loop', async ({ request }) => {
+    for (const address of [TEXT, SVG, HUGE, EVIL, LOOP]) {
       expect(await variantOf(request, `?variant=profile&address=${address}`), address).toBe('default')
     }
   })
@@ -322,6 +323,23 @@ test.describe('link-preview cover legibility and failures', () => {
     })
   }
 
+  // The banded cover's colour bands meet at x = 900 on the card. Above and below the text
+  // (rows 100-199 and 480-519) a blurred boundary is a gradual ramp, so the cover's own text
+  // or edges never show through the scrim.
+  test('the cover is blurred: no sharp edge survives under the scrim', async ({ request }) => {
+    const response = await request.get(`/api/og?variant=app&did=${PHOTO}`)
+    expect(response.headers()['x-og-background']).toBe('cover')
+    const { data, info } = await sharp(await response.body()).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    let step = 0
+    for (const y of [100, 120, 140, 160, 180, 480, 500, 518]) {
+      for (let x = 880; x < 920; x++) {
+        const i = (y * info.width + x) * 3
+        for (let c = 0; c < 3; c++) step = Math.max(step, Math.abs(data[i + c] - data[i + 3 + c]))
+      }
+    }
+    expect(step).toBeLessThanOrEqual(3)
+  })
+
   test('a cover that cannot be fetched draws the identity art but is cached as degraded', async ({ request }) => {
     const response = await request.get(`/api/og?variant=app&did=${FAIL}`)
     expect(response.status()).toBe(200)
@@ -331,8 +349,9 @@ test.describe('link-preview cover legibility and failures', () => {
   })
 })
 
-test.describe('link-preview image conversion is CPU-bounded', () => {
-  // An SVG under the byte and pixel caps that takes librsvg several seconds to render.
+test.describe('link-preview images are never rendered from SVG', () => {
+  // An SVG under the byte and pixel caps that takes librsvg several seconds to render:
+  // the reason SVG is refused (Renown media never stores it).
   const heavySvg = () => {
     let shapes = ''
     for (let i = 0; i < 12000; i++) {
@@ -341,14 +360,17 @@ test.describe('link-preview image conversion is CPU-bounded', () => {
     return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="6000" height="6000"><filter id="f"><feGaussianBlur stdDeviation="30"/></filter>${shapes}</svg>`)
   }
 
-  test('a conversion past the timeout fails, and the image fetch answers null (the card draws its monogram)', async () => {
-    test.setTimeout(60_000)
+  test('an SVG is refused by its bytes before it is drawn, whatever its content type', async () => {
     const svg = heavySvg()
     expect(svg.byteLength).toBeLessThan(4 * 1024 * 1024)
-    await expect(toPngDataUrl(svg, AVATAR_BOX)).rejects.toThrow(/timeout/)
+    const started = Date.now()
+    await expect(toPngDataUrl(svg, AVATAR_BOX)).rejects.toThrow(/not allowed: svg/)
+    expect(Date.now() - started).toBeLessThan(1000)
     const realFetch = globalThis.fetch
-    globalThis.fetch = async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
     try {
+      globalThis.fetch = async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } })
+      await expect(fetchImageDataUrl('http://og.test/media/doc/avatar', 'http://og.test', AVATAR_BOX)).rejects.toThrow(/Unusable image \(200 image\/svg\+xml\)/)
+      globalThis.fetch = async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/png' } })
       expect(await fetchImageDataUrl('http://og.test/media/doc/avatar', 'http://og.test', AVATAR_BOX)).toBeNull()
     } finally {
       globalThis.fetch = realFetch

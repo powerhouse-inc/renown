@@ -6,14 +6,15 @@ import { mediaUrl, switchboardOrigin } from '../../services/media'
 import { fetchAllowedMedia, readCapped } from '../media-fetch'
 import { SWITCHBOARD_ENDPOINT } from '../../services/switchboard-endpoint'
 import { CARD_BOX, identityArtDataUrl } from './og-art'
-import { AVATAR_BOX, LOGO_BOX, toPngDataUrl, type ImageBox } from './og-image'
+import { AVATAR_BOX, COVER_BLUR_SIGMA, LOGO_BOX, toPngDataUrl, type ConvertOptions, type ImageBox } from './og-image'
 import { profileCardText } from './og-profile-text'
 
 export const OG_FETCH_TIMEOUT_MS = 2500
 const ADDRESS_RE = /^0x[0-9a-f]{40}$/
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
-// Every image is converted to PNG before drawing (lib/og/og-image.ts).
-const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/svg+xml'])
+// Every image is converted to PNG before drawing (lib/og/og-image.ts). No SVG: Renown media
+// never stores it, and toPngDataUrl refuses SVG bytes under any label.
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'])
 
 /** What a card is drawn on: the app's cover, the seed's identity art, or the plain frame. */
 export interface OgBackground {
@@ -60,13 +61,14 @@ async function graphql<T>(endpoint: string, query: string, variables: Record<str
 }
 
 /**
- * Fetches a media image (PNG/JPEG/GIF/WebP/AVIF/SVG, at most 4 MB) as a PNG
- * data URL that fits `box`; null when the bytes cannot be decoded or the image
- * is too large to decode (the card draws its monogram); throws on anything else.
+ * Fetches a media image (PNG/JPEG/GIF/WebP/AVIF, at most 4 MB) as a PNG data
+ * URL that fits `box` (blurred when `options.blur` is set); null when the bytes
+ * cannot be decoded, are not a raster image or are too large to decode (the
+ * card draws its monogram); throws on anything else.
  * Redirects are followed by hand: at most two hops, each only to the site's
  * public `origin`, the switchboard or a storage host (lib/media-fetch.ts).
  */
-export async function fetchImageDataUrl(url: string, origin: string, box: ImageBox): Promise<string | null> {
+export async function fetchImageDataUrl(url: string, origin: string, box: ImageBox, options: ConvertOptions = {}): Promise<string | null> {
   const signal = AbortSignal.timeout(OG_FETCH_TIMEOUT_MS)
   const { response } = await fetchAllowedMedia(url, { signal, origins: [origin] })
   if (response.status === 404 || response.status === 410) throw new ImageNotFoundError(`Image not found (${response.status})`)
@@ -74,9 +76,9 @@ export async function fetchImageDataUrl(url: string, origin: string, box: ImageB
   if (!response.ok || !IMAGE_TYPES.has(type)) throw new Error(`Unusable image (${response.status} ${type})`)
   const bytes = await readCapped(response, MAX_IMAGE_BYTES)
   try {
-    return await toPngDataUrl(bytes, box)
+    return await toPngDataUrl(bytes, box, options)
   } catch (error) {
-    // Corrupt bytes or a decompression bomb: a valid answer, not an outage.
+    // Corrupt bytes, a decompression bomb or SVG bytes: a valid answer, not an outage.
     console.warn('og: image could not be converted, drawing the monogram:', error instanceof Error ? error.message : error)
     return null
   }
@@ -151,7 +153,7 @@ export async function loadAppCard(did: string, origin: string): Promise<OgCard |
   const [logo, cover, art] = await Promise.all([
     logoUrl ? fetchImageDataUrl(logoUrl, origin, LOGO_BOX) : Promise.resolve(null),
     coverUrl
-      ? fetchImageDataUrl(coverUrl, origin, CARD_BOX).catch((error) => {
+      ? fetchImageDataUrl(coverUrl, origin, CARD_BOX, { blur: COVER_BLUR_SIGMA }).catch((error) => {
           if (!(error instanceof ImageNotFoundError)) {
             console.error('og: cover fetch failed, drawing the identity art:', error)
             degraded = true
