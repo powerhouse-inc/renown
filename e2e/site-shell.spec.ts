@@ -86,6 +86,38 @@ test.describe('mobile drawer', () => {
     await expect(toggle).toBeFocused()
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
+
+  test('covers the whole viewport even though the header is blurred', async ({ page }) => {
+    await page.goto(PAGE)
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Menu' })
+    await expect(drawer).toBeVisible()
+    await page.waitForTimeout(500) // slide-in animation
+    const vh = 844
+    const overlay = await drawer.locator('xpath=..').boundingBox()
+    const panel = await drawer.boundingBox()
+    expect(overlay!.height).toBeGreaterThan(vh - 2)
+    expect(overlay!.width).toBeGreaterThan(388)
+    expect(panel!.height).toBeGreaterThan(vh - 2)
+    for (const el of [drawer.getByRole('link', { name: 'Ecosystem' }), drawer.getByRole('button', { name: 'Sign in' })]) {
+      const box = (await el.boundingBox())!
+      expect(box.y).toBeGreaterThanOrEqual(panel!.y)
+      expect(box.y + box.height).toBeLessThanOrEqual(panel!.y + panel!.height)
+    }
+    // The drawer is not inside the header, and the page can't scroll behind it.
+    expect(await drawer.evaluate((el) => !!el.closest('header'))).toBe(false)
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden')
+  })
+
+  test('closes and releases the scroll lock when the viewport grows past md', async ({ page }) => {
+    await page.goto(PAGE)
+    await page.getByRole('button', { name: 'Open menu' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Menu' })
+    await expect(drawer).toBeVisible()
+    await page.setViewportSize({ width: 900, height: 844 })
+    await expect(drawer).toHaveCount(0)
+    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden')
+  })
 })
 
 test.describe('auth screens keep the minimal chrome', () => {

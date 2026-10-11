@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { cx } from '../../utils/cx'
 import { accountLinks } from './account-links'
 import { isActivePath, SITE_NAV } from './nav'
@@ -8,6 +9,8 @@ import { buttonClasses } from './primitives'
 import type { SiteAuth } from './use-site-auth'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+const subscribeNever = () => () => {}
 
 /**
  * The < 768 px navigation: a toggle button and a modal drawer. Focus moves into
@@ -18,7 +21,20 @@ export function MobileNav({ auth }: { auth: SiteAuth }) {
   const [open, setOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  // false on the server and during hydration, true after.
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false)
   const { pathname, events } = useRouter()
+
+  // The drawer is portalled to <body> (the header's backdrop-filter would otherwise
+  // make it the containing block of the fixed overlay), so only after mount.
+  // The toggle is md:hidden but the portalled drawer is not: close it past md.
+  useEffect(() => {
+    if (!open) return
+    const query = window.matchMedia('(min-width: 768px)')
+    const onChange = (event: MediaQueryListEvent) => event.matches && setOpen(false)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -75,8 +91,8 @@ export function MobileNav({ auth }: { auth: SiteAuth }) {
           <path d="M4 7h16M4 12h16M4 17h10" />
         </svg>
       </button>
-      {open && (
-        <div className="fixed inset-0 z-50">
+      {open && mounted && createPortal(
+        <div className="fixed inset-0 z-50 md:hidden">
           <div aria-hidden="true" className="bg-background/70 absolute inset-0 backdrop-blur-sm" onClick={close} />
           <div
             id="site-drawer"
@@ -153,7 +169,8 @@ export function MobileNav({ auth }: { auth: SiteAuth }) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
