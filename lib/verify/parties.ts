@@ -2,7 +2,7 @@
 // the delegation check tokens and operations share. Pure apart from the
 // injected lookups.
 import { formatDay } from './format'
-import type { AppParty, Check, SignerParty, StoredCredential, VerifyLookups } from './types'
+import type { AppParty, Check, Report, SignerParty, StoredCredential, VerifyLookups } from './types'
 
 /** Clock skew tolerated between a signer's clock and a credential's issuance time. */
 export const SKEW_MS = 5 * 60 * 1000
@@ -121,4 +121,18 @@ export async function checkDelegation(
       detail: `No Renown credential from ${short(address)} authorises this app key${atText}, so the signature does not show that ${short(address)} made it.`,
     },
   }
+}
+
+/**
+ * The signer card's heading. "Signed by" only when the signature holds and,
+ * for a token or operation, a credential from that signer authorises the key
+ * (the delegation check passed): anyone can make a key that names someone.
+ */
+export function signerHeading(report: Report): 'Identity' | 'Signed by' | 'Claims to be signed by' {
+  if (report.kind === 'did-pkh') return 'Identity'
+  const status = (id: string) => report.checks.find((c) => c.id === id)?.status
+  const integrityFailed = report.checks.some((c) => ['shape', 'key', 'binding', 'signature'].includes(c.id) && c.status === 'fail')
+  if (integrityFailed || status('signature') !== 'pass') return 'Claims to be signed by'
+  if ((report.kind === 'token' || report.kind === 'operation') && status('delegation') !== 'pass') return 'Claims to be signed by'
+  return 'Signed by'
 }

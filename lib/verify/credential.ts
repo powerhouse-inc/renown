@@ -308,7 +308,9 @@ export async function verifyCredential(
       checks.find((c) => c.id === 'revocation')?.status === 'pass'
         ? `${who} signed this credential for ${what}. It is in date and has not been revoked.`
         : `${who} signed this credential for ${what} and it is in date. Renown has no record of it.`,
-    'not-genuine': `This credential was not signed by the wallet it names, so it proves nothing about ${shortAddress(issuer)}.`,
+    'not-genuine': binding
+      ? `This credential does not name its signer consistently, so it proves nothing about ${shortAddress(issuer)}.`
+      : `This credential was not signed by the wallet it names, so it proves nothing about ${shortAddress(issuer)}.`,
     revoked: signatureUnknown
       ? `${signedBy}. The issuer has revoked it, so it no longer authorises anything.`
       : `${signedBy}, then revoked it. It no longer authorises anything.`,
@@ -340,6 +342,23 @@ export async function verifyCredentialId(credentialId: string, deps: VerifyDeps)
       verdict: 'unchecked',
       summary: 'Renown could not be reached to look up this credential. Try again in a moment.',
       checks: [{ id: 'registry', label: 'Known to Renown', status: 'unknown', detail: 'The lookup failed.' }],
+      signer: null,
+      app: null,
+      times: [],
+    }
+  }
+  // Anyone can store their own credential under an existing id, and the
+  // registry returns the copies in no set order: by id alone, which one is
+  // meant cannot be told.
+  const issuers = new Set(found.value.map((r) => r.issuerEthereumAddress.toLowerCase()))
+  if (issuers.size > 1) {
+    return {
+      kind: 'credential-id',
+      verdict: 'unchecked',
+      summary: 'More than one wallet has stored a credential with this id. Paste the full credential to check the one you have.',
+      checks: [
+        { id: 'registry', label: 'Known to Renown', status: 'unknown', detail: `Credentials from ${issuers.size} different wallets are stored under this id.` },
+      ],
       signer: null,
       app: null,
       times: [],

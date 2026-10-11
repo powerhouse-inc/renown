@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { identityAccent } from '../../lib/identity-art'
+import { signerHeading } from '../../lib/verify/parties'
 import type { Report, Verdict } from '../../lib/verify/types'
 import { cx } from '../../utils/cx'
 import { CheckList } from './check-list'
@@ -97,9 +98,6 @@ export function VerifyReport({ report, shareUrl }: { report: Report; shareUrl: s
   const tone = VERDICT_TONE[report.verdict]
   const accent = report.signer ? identityAccent(report.signer.address) : null
   const hasSide = !!(report.signer || report.app || report.times.length)
-  // A signature that does not hold names a signer it cannot vouch for.
-  const forged = report.checks.some((c) => ['shape', 'key', 'binding', 'signature'].includes(c.id) && c.status === 'fail')
-  const signerHeading = report.kind === 'did-pkh' ? 'Identity' : forged ? 'Claims to be signed by' : 'Signed by'
   return (
     <section aria-labelledby="verify-verdict" data-kind={report.kind} className="mt-10 md:mt-14">
       <div className={cx('rounded-panel flex flex-col gap-5 border p-6 sm:flex-row sm:items-center md:gap-7 md:p-8', BAND[tone])}>
@@ -124,7 +122,7 @@ export function VerifyReport({ report, shareUrl }: { report: Report; shareUrl: s
         </div>
         {hasSide && (
           <aside className="min-w-0 space-y-4" aria-label="Details">
-            {report.signer && <SignerCard signer={report.signer} heading={signerHeading} />}
+            {report.signer && <SignerCard signer={report.signer} heading={signerHeading(report)} />}
             {report.app && <AppCard app={report.app} />}
             <Times times={report.times} />
           </aside>

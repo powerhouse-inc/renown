@@ -210,11 +210,15 @@ test.describe('/verify', () => {
     await paste(page, token)
     await expect(verdict(page)).toHaveText('Not genuine', { timeout: 30_000 })
     await expect(page.locator('#verify-verdict + p')).toContainText('never authorised this app key')
+    // A key nobody authorised can name anyone: the card must not vouch for them.
+    await expect(page.getByRole('region', { name: 'Claims to be signed by' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Signed by', exact: true })).toHaveCount(0)
 
     registry.credentials = [stored(credential)]
     await paste(page, `Bearer ${token}`)
     await expect(verdict(page)).toHaveText('Genuine', { timeout: 30_000 })
     await expect(check(page, 'delegation')).toHaveAttribute('data-status', 'pass')
+    await expect(page.getByRole('region', { name: 'Signed by', exact: true })).toBeVisible()
   })
 
   test('a signed operation needs its document id and holds only for that document', async ({ page }) => {
@@ -373,7 +377,7 @@ test.describe('/verify', () => {
     expect(filter({ type: 'identify', payload: { profileId: 'x' } })).toBe(true)
   })
 
-  test('the live region announces the verdict, not the whole report; a refused copy says so', async ({ page }) => {
+  test('the report stays out of the live regions; a refused copy says so', async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) } })
     })

@@ -3,6 +3,7 @@ import { verifyAuthBearerToken, verifyCredentialSignature } from '@renown/sdk'
 import { verifyCredential, verifyCredentialId } from '../lib/verify/credential'
 import { verifyAppDid, verifyWalletDid } from '../lib/verify/did'
 import { verifyOperation } from '../lib/verify/operation'
+import { signerHeading } from '../lib/verify/parties'
 import { checkContractSignature, rpcUrl, type ChainReader } from '../lib/verify/smart-wallet'
 import { verifyToken } from '../lib/verify/token'
 import { liveDeps } from '../lib/verify/run'
@@ -436,9 +437,14 @@ async function signJwt(key: AppKey, header: Record<string, unknown>, payload: Re
 }
 
 /** A legacy-tuple action whose hash is `hash`, signed by `key` the way the reactor checks it. */
-async function legacyTupleAction(key: AppKey, address: string, action: Record<string, unknown>, hash: string): Promise<Record<string, unknown>> {
+async function legacyTupleAction(
+  key: AppKey,
+  address: string,
+  action: Record<string, unknown>,
+  hash: string,
+  timestamp = String(Math.floor(Date.now() / 1000)),
+): Promise<Record<string, unknown>> {
   const shared = await import('@powerhousedao/shared/document-model')
-  const timestamp = String(Math.floor(Date.now() / 1000))
   const signature = await key.sign(shared.buildOperationSignatureMessage([timestamp, key.did, hash, '']))
   const tuple = [timestamp, key.did, hash, '', `0x${Buffer.from(signature).toString('hex')}`]
   return {
@@ -691,5 +697,117 @@ test.describe('/verify page fix round 1: verdicts', () => {
     expect(status(report)).toMatchObject({ signature: 'pass', validity: 'fail' })
     expect(report.verdict).toBe('not-valid')
     expect(report.summary).toMatch(/its dates cannot be read/)
+  })
+})
+
+test.describe('/verify final fix wave', () => {
+  test('I1: the signer card says "Signed by" only for a signature that holds from a key the signer authorised', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const credential = await makeCredential({ wallet, subject: key.did, app: 'Vault' })
+    const token = await makeBearerToken(key, wallet.address, { expiresIn: 600 })
+    const authorised = { credentials: [stored(credential)], profiles: {} }
+    const nobody = { credentials: [], profiles: {} }
+
+    expect(signerHeading(await verifyToken(token, deps(authorised)))).toBe('Signed by')
+    const unauthorised = await verifyToken(token, deps(nobody))
+    expect(unauthorised.verdict).toBe('not-genuine')
+    expect(signerHeading(unauthorised)).toBe('Claims to be signed by')
+    expect(signerHeading(await verifyToken(token, deps({ ...authorised, down: true })))).toBe('Claims to be signed by')
+    const revoked = { credentials: [stored(credential, { revoked: true, revokedAt: new Date().toISOString() })], profiles: {} }
+    expect(signerHeading(await verifyToken(token, deps(revoked)))).toBe('Claims to be signed by')
+
+    const action = await makeV2Action({ key, address: wallet.address, documentId: 'doc-1' })
+    const target = { documentId: 'doc-1', branch: 'main' }
+    expect(signerHeading(await verifyOperation(action, target, deps(authorised)))).toBe('Signed by')
+    expect(signerHeading(await verifyOperation(action, target, deps(nobody)))).toBe('Claims to be signed by')
+
+    // A signature that could not be checked vouches for nobody.
+    const tampered = { ...credential, credentialSubject: { id: key.did, app: 'Anything' } }
+    const unchecked = await verifyCredential(tampered, deps(nobody, { contractSignature: async () => 'unavailable' }))
+    expect(status(unchecked).signature).toBe('unknown')
+    expect(signerHeading(unchecked)).toBe('Claims to be signed by')
+    expect(signerHeading(await verifyCredential(credential, deps(authorised)))).toBe('Signed by')
+    expect(signerHeading(await verifyWalletDid(`did:pkh:eip155:1:${wallet.address.toLowerCase()}`, wallet.address.toLowerCase(), 1, deps(nobody)))).toBe('Identity')
+  })
+
+  test('I2: a credential id stored by more than one wallet cannot be checked by id', async () => {
+    const key = await makeAppKey()
+    const theirs = await makeCredential({ wallet: makeWallet(), subject: key.did })
+    const planted = await makeCredential({ wallet: makeWallet(), subject: key.did, id: theirs.id as string })
+    const registry = {
+      credentials: [stored(planted), stored(theirs, { revoked: true, revokedAt: new Date().toISOString() })],
+      profiles: {},
+    }
+    const report = await verifyCredentialId(theirs.id as string, deps(registry))
+    expect(report.verdict).toBe('unchecked')
+    expect(report.summary).toBe('More than one wallet has stored a credential with this id. Paste the full credential to check the one you have.')
+    expect(report.signer).toBeNull()
+
+    // Two copies from one wallet are still one issuer: checked as before.
+    const one = await verifyCredentialId(theirs.id as string, deps({ credentials: [stored(theirs), stored(theirs)], profiles: {} }))
+    expect(one.verdict).toBe('genuine')
+  })
+
+  test('I4: a document-level action names the document its hash covers, not the one entered', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const registry = { credentials: [stored(await makeCredential({ wallet, subject: key.did, issuedAt: new Date(Date.now() - 60_000) }))], profiles: {} }
+    const action = await makeV2Action({
+      key,
+      address: wallet.address,
+      documentId: 'doc-made',
+      type: 'CREATE_DOCUMENT',
+      input: { documentId: 'doc-made', model: 'powerhouse/document-model', version: 0 },
+    })
+
+    const same = await verifyOperation(action, { documentId: 'doc-made', branch: 'main' }, deps(registry))
+    expect(status(same).binding).toBe('pass')
+    expect(same.checks.find((c) => c.id === 'binding')?.detail).toBe('It was signed for document doc-made on branch main, with exactly this content.')
+
+    const other = await verifyOperation(action, { documentId: 'doc-entered', branch: 'main' }, deps(registry))
+    expect(status(other).binding).toBe('pass')
+    const detail = other.checks.find((c) => c.id === 'binding')?.detail ?? ''
+    expect(detail).toContain('signed for document doc-made on branch main')
+    expect(detail).toContain('not the document you entered (doc-entered)')
+    expect(detail).not.toContain('signed for document doc-entered')
+  })
+
+  test('minor: a legacy signature does not claim more than its hash covers', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const registry = { credentials: [stored(await makeCredential({ wallet, subject: key.did, app: 'Connect' }))], profiles: {} }
+    const base = { id: 'a-1', type: 'SET_NAME', scope: 'global', timestampUtcMs: new Date().toISOString(), input: { name: 'Report' } }
+    const legacy = await verifyOperation(await legacyTupleAction(key, wallet.address, base, await renownLegacyHash(base)), { documentId: '', branch: 'main' }, deps(registry))
+    expect(legacy.verdict).toBe('genuine')
+    expect(legacy.summary).toContain('Its content has not been changed since.')
+    expect(legacy.summary).not.toContain('It has not been changed since')
+    expect(legacy.times.map((t) => t.label)).toEqual(['Signed', 'Action time (not signed)'])
+
+    const v2 = await verifyOperation(await makeV2Action({ key, address: wallet.address, documentId: 'doc-1' }), { documentId: 'doc-1', branch: 'main' }, deps(registry))
+    expect(v2.times.map((t) => t.label)).toEqual(['Signed', 'Action time'])
+  })
+
+  test('minor: an operation without a signing time does not mention the signing time it states', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const registry = { credentials: [stored(await makeCredential({ wallet, subject: key.did }))], profiles: {} }
+    const base = { id: 'a-2', type: 'SET_NAME', scope: 'global', timestampUtcMs: new Date().toISOString(), input: { name: 'Report' } }
+    const report = await verifyOperation(await legacyTupleAction(key, wallet.address, base, await renownLegacyHash(base), 'soon'), { documentId: '', branch: 'main' }, deps(registry))
+    expect(report.verdict).toBe('not-genuine')
+    expect(status(report)).toMatchObject({ binding: 'pass', signature: 'pass', delegation: 'fail' })
+    expect(report.summary).not.toContain('the signing time it states')
+    expect(report.summary).toContain('carries no signing time')
+  })
+
+  test('minor: a credential that names its signer inconsistently does not say its signature was checked', async () => {
+    const key = await makeAppKey()
+    const credential = await makeCredential({ wallet: makeWallet(), subject: key.did })
+    const report = await verifyCredential({ ...credential, issuer: { id: 'did:web:example.com', ethereumAddress: (credential.issuer as { ethereumAddress: string }).ethereumAddress } }, deps({ credentials: [], profiles: {} }))
+    expect(report.verdict).toBe('not-genuine')
+    expect(report.summary).toMatch(/^This credential does not name its signer consistently, so it proves nothing about 0x/)
+
+    const changed = await verifyCredential({ ...credential, credentialSubject: { id: key.did, app: 'Other' } }, deps({ credentials: [], profiles: {} }))
+    expect(changed.summary).toMatch(/^This credential was not signed by the wallet it names/)
   })
 })

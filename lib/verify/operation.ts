@@ -183,8 +183,10 @@ export async function verifyOperation(
       checks.push({ id: 'binding', label: 'Bound to this document', status: 'unknown', detail: 'Enter the document id to check which document it was signed for.' })
     } else {
       let expected: string | null = null
+      // A document-level action (CREATE_DOCUMENT, *_RELATIONSHIP, ...) is
+      // signed for the document its input names, not the one it is sent to.
+      const signedFor = shared.actionSigningTarget({ type: action.type, input: action.input }, documentId, branch)
       try {
-        const signedFor = shared.actionSigningTarget({ type: action.type, input: action.input }, documentId, branch)
         expected = await shared.hashActionV2(
           { id: action.id, type: action.type, scope: action.scope, timestampUtcMs: action.timestampUtcMs, input: action.input } as Parameters<typeof shared.hashActionV2>[0],
           signedFor,
@@ -193,14 +195,24 @@ export async function verifyOperation(
       } catch {
         expected = null
       }
+      const elsewhere =
+        signedFor.documentId === documentId
+          ? ''
+          : ` A ${action.type} action is signed for the document its input names, so this is not the document you entered (${documentId}).`
+      const label = elsewhere ? 'Bound to the document it names' : 'Bound to this document'
       checks.push(
         expected === hash
-          ? { id: 'binding', label: 'Bound to this document', status: 'pass', detail: `It was signed for document ${documentId} on branch ${branch}, with exactly this content.` }
+          ? {
+              id: 'binding',
+              label,
+              status: 'pass',
+              detail: `It was signed for document ${signedFor.documentId} on branch ${branch}, with exactly this content.${elsewhere}`,
+            }
           : {
               id: 'binding',
-              label: 'Bound to this document',
+              label,
               status: 'fail',
-              detail: `It does not match what was signed for document ${documentId} on branch ${branch}: its content was changed, or it was signed for another document or branch.`,
+              detail: `It does not match what was signed for document ${signedFor.documentId} on branch ${branch}: its content was changed, or it was signed for another document or branch.`,
             },
       )
     }
@@ -251,10 +263,13 @@ export async function verifyOperation(
   const revokedAt = delegation.credential?.revokedAt
   const revokedOn = revokedAt && !Number.isNaN(Date.parse(revokedAt)) ? ` on ${formatDay(revokedAt)}` : ''
   const summary: Record<Verdict, string> = {
-    genuine: `${who} made this ${action.type} through ${what}${scope}. It has not been changed since.`,
+    // A legacy hash covers the content only, not the action id, time or user.
+    genuine: `${who} made this ${action.type} through ${what}${scope}. ${legacyScheme ? 'Its content has' : 'It has'} not been changed since.`,
     'not-genuine': integrityFailed
       ? 'This operation was changed after it was signed, or its signature belongs to something else.'
-      : `The operation is signed, but ${shortAddress(user)} had not authorised this app key at the signing time it states, so it does not show that they made it.`,
+      : signedAt
+        ? `The operation is signed, but ${shortAddress(user)} had not authorised this app key at the signing time it states, so it does not show that they made it.`
+        : `The operation is signed, but it carries no signing time, so it cannot show that ${shortAddress(user)} had authorised this app key when it was signed.`,
     revoked: `The credential behind this app key was revoked${revokedOn}. The signing time is the signer's own claim, so it cannot show the operation came before that.`,
     expired: `The credential that authorised this app key for ${who} had expired by the signing time the operation states.`,
     // verdictOf never gives these for an operation; the sentences stay true if it ever does.
@@ -277,7 +292,9 @@ export async function verifyOperation(
     app,
     times: [
       ...(signedAt ? [{ label: 'Signed', iso: signedAt.toISOString() }] : []),
-      ...(Date.parse(action.timestampUtcMs) ? [{ label: 'Action time', iso: new Date(Date.parse(action.timestampUtcMs)).toISOString() }] : []),
+      ...(Date.parse(action.timestampUtcMs)
+        ? [{ label: legacyScheme ? 'Action time (not signed)' : 'Action time', iso: new Date(Date.parse(action.timestampUtcMs)).toISOString() }]
+        : []),
     ],
   }
 }
