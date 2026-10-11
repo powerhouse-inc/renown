@@ -40,18 +40,23 @@ export interface ProfileFields {
   bio?: string | null;
   links?: readonly ProfileLink[] | null;
   avatar?: string | null;
+  /** People-search opt-in. */
+  listed?: boolean | null;
 }
 
 /**
  * The JSON a profile signature hashes. Legacy writes (username/userImage
  * only) keep the exact two-key payload older clients sign. As soon as any
- * identity field is present, all seven keys are hashed in this fixed order,
- * and each link is reduced to `{id, label, url}` in that key order, so the
- * client and the server serialize the same bytes.
+ * identity field (or `listed`) is present, all seven keys are hashed in this
+ * fixed order, and each link is reduced to `{id, label, url}` in that key
+ * order, so the client and the server serialize the same bytes. `listed` is
+ * appended as an eighth key only when it is a boolean, so every payload
+ * signed before it existed hashes exactly as before.
  */
 export function profilePayload(profile: ProfileFields): string {
   const legacy = { username: profile.username ?? null, userImage: profile.userImage ?? null };
-  const identity = [profile.displayName, profile.handle, profile.bio, profile.links, profile.avatar];
+  const listed = profile.listed ?? null;
+  const identity = [profile.displayName, profile.handle, profile.bio, profile.links, profile.avatar, listed];
   if (identity.every((value) => value === undefined || value === null)) {
     return JSON.stringify(legacy);
   }
@@ -62,6 +67,7 @@ export function profilePayload(profile: ProfileFields): string {
     bio: profile.bio ?? null,
     links: profile.links ? profile.links.map(({ id, label, url }) => ({ id, label, url })) : null,
     avatar: profile.avatar ?? null,
+    ...(listed === null ? {} : { listed }),
   });
 }
 

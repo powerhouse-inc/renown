@@ -21,6 +21,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.status(400).json({ error: 'address is required' })
     return
   }
+  if (body.listed !== undefined && body.listed !== null && typeof body.listed !== 'boolean') {
+    res.status(400).json({ error: 'listed must be true or false', field: 'listed' })
+    return
+  }
   if (!signature || !timestamp) {
     res.status(401).json({ error: 'A signature and timestamp are required to update a profile' })
     return
@@ -36,6 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       bio: body.bio,
       links: body.links,
       avatar: body.avatar,
+      listed: body.listed,
       signature,
       timestamp,
     })

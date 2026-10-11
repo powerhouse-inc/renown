@@ -14,6 +14,9 @@ import {
 import { legacyUpsertProfile } from './renown-credential-legacy'
 import { profileMessage, type ProfileFields } from './renown-signed-messages'
 
+// Two documents, so that a save without `listed` still works against a
+// switchboard that predates people search (an unknown argument fails the
+// whole request).
 const UPSERT_PROFILE = gql`
   mutation UpsertProfile(
     $address: String!
@@ -42,7 +45,37 @@ const UPSERT_PROFILE = gql`
   }
 `
 
-const IDENTITY_FIELDS = ['displayName', 'handle', 'bio', 'links', 'avatar'] as const
+const UPSERT_PROFILE_LISTED = gql`
+  mutation UpsertProfileListed(
+    $address: String!
+    $username: String
+    $userImage: String
+    $displayName: String
+    $handle: String
+    $bio: String
+    $links: [RenownProfileLinkInput!]
+    $avatar: String
+    $listed: Boolean
+    $signature: String
+    $timestamp: String
+  ) {
+    renown_upsertProfile(
+      address: $address
+      username: $username
+      userImage: $userImage
+      displayName: $displayName
+      handle: $handle
+      bio: $bio
+      links: $links
+      avatar: $avatar
+      listed: $listed
+      signature: $signature
+      timestamp: $timestamp
+    )
+  }
+`
+
+const IDENTITY_FIELDS = ['displayName', 'handle', 'bio', 'links', 'avatar', 'listed'] as const
 
 /**
  * Create or update `address`'s profile; returns its document id. Identity
@@ -57,9 +90,10 @@ export async function upsertProfile(
   const username = params.username ?? null
   const userImage = params.userImage ?? null
 
+  const withListed = typeof params.listed === 'boolean'
   let documentId: string | null
   try {
-    const data = await client().request<{ renown_upsertProfile: string | null }>(UPSERT_PROFILE, {
+    const data = await client().request<{ renown_upsertProfile: string | null }>(withListed ? UPSERT_PROFILE_LISTED : UPSERT_PROFILE, {
       address,
       username,
       userImage,
@@ -68,6 +102,7 @@ export async function upsertProfile(
       bio: params.bio,
       links: params.links,
       avatar: params.avatar,
+      ...(withListed && { listed: params.listed }),
       signature,
       timestamp,
     })

@@ -37,6 +37,16 @@ test.describe('profile form', () => {
     })
   })
 
+  test('reads the people-search opt-in as off unless the profile says true, and signs it only when changed', () => {
+    expect(base.listed).toBe(false)
+    expect(formFromProfile({ documentId: 'd', listed: null }).listed).toBe(false)
+    expect(formFromProfile({ documentId: 'd', listed: true }).listed).toBe(true)
+    expect(changedFields(base, { ...base, listed: true })).toEqual({ listed: true })
+    const listed = { ...base, listed: true }
+    expect(changedFields(listed, { ...listed, listed: false })).toEqual({ listed: false })
+    expect(changedFields(listed, listed)).toEqual({})
+  })
+
   test('reports the problems the switchboard would refuse', () => {
     expect(formProblems(base)).toEqual({})
     expect(formProblems({ ...base, displayName: 'x'.repeat(65) }).displayName).toMatch(/64/)

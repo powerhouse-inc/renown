@@ -28,6 +28,8 @@ export interface RenownProfile {
   links?: RenownProfileLink[]
   /** attachment://v1:<sha256> of the uploaded avatar; render it via mediaUrl(). */
   avatar?: string | null
+  /** Opted in to people search (only read by the profile editor). */
+  listed?: boolean | null
   createdAt?: string | null
   updatedAt?: string | null
 }
@@ -40,9 +42,7 @@ interface RenownUsersInput {
   handles?: string[]
 }
 
-const GET_PROFILE_QUERY = `
-  query RenownUsers($input: RenownUsersInput!) {
-    renownUsers(input: $input) {
+const PROFILE_FIELDS = `
       documentId
       username
       ethAddress
@@ -53,7 +53,21 @@ const GET_PROFILE_QUERY = `
       links { id label url }
       avatar
       createdAt
-      updatedAt
+      updatedAt`
+
+const GET_PROFILE_QUERY = `
+  query RenownUsers($input: RenownUsersInput!) {
+    renownUsers(input: $input) {${PROFILE_FIELDS}
+    }
+  }
+`
+
+// Only the profile editor asks for listed: public pages keep working against a
+// switchboard that predates people search.
+const GET_PROFILE_WITH_LISTED_QUERY = `
+  query RenownUsersWithListed($input: RenownUsersInput!) {
+    renownUsers(input: $input) {${PROFILE_FIELDS}
+      listed
     }
   }
 `
@@ -74,8 +88,14 @@ export interface HandleAvailability {
   reason: 'INVALID' | 'RESERVED' | 'TAKEN' | null
 }
 
-/** Like getProfile, but a failed read throws (null means the profile does not exist). */
-export async function fetchProfile(input: GetProfileInput): Promise<RenownProfile | null> {
+/**
+ * Like getProfile, but a failed read throws (null means the profile does not
+ * exist). `withListed` also reads the people-search opt-in.
+ */
+export async function fetchProfile(
+  input: GetProfileInput,
+  options: { withListed?: boolean } = {},
+): Promise<RenownProfile | null> {
   const renownUsersInput: RenownUsersInput = {
     driveId: input.driveId,
     ...(input.id && { phids: [input.id] }),
@@ -84,7 +104,8 @@ export async function fetchProfile(input: GetProfileInput): Promise<RenownProfil
     ...(input.handle && { handles: [input.handle] }),
   }
 
-  const data = await client.request<{ renownUsers: RenownProfile[] }>(GET_PROFILE_QUERY, {
+  const query = options.withListed ? GET_PROFILE_WITH_LISTED_QUERY : GET_PROFILE_QUERY
+  const data = await client.request<{ renownUsers: RenownProfile[] }>(query, {
     input: renownUsersInput,
   })
 

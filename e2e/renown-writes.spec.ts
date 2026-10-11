@@ -389,6 +389,23 @@ test.describe('POST /api/profile/update', () => {
     expect(response.status()).toBe(200)
     const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === body.address)
     expect(call?.variables).toEqual({ address: body.address, username: null, userImage: null, ...fields, signature: body.signature, timestamp: body.timestamp })
+    // A save without listed does not name the argument, so it works on a switchboard that predates people search.
+    expect(call?.query).not.toContain('listed')
+  })
+
+  test('forwards listed only when sent, exactly as signed, and refuses anything but a boolean', async ({ request }) => {
+    const body = await signedProfile({ listed: true })
+    await scriptStub({ match: 'renown_upsertProfile', variables: body.address, response: { data: { renown_upsertProfile: 'doc-listed' } } })
+
+    const response = await request.post('/api/profile/update', { data: body })
+    expect(response.status()).toBe(200)
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === body.address)
+    expect(call?.query).toContain('listed: $listed')
+    expect(call?.variables).toEqual({ address: body.address, username: null, userImage: null, listed: true, signature: body.signature, timestamp: body.timestamp })
+
+    const refused = await request.post('/api/profile/update', { data: { ...body, listed: 'yes' } })
+    expect(refused.status()).toBe(400)
+    expect(await refused.json()).toMatchObject({ field: 'listed' })
   })
 
   test('relays HANDLE_TAKEN as 409 naming the field', async ({ request }) => {
@@ -610,7 +627,7 @@ test.describe('profile editor', () => {
     test.setTimeout(120_000)
   })
 
-  async function openEditor(page: import('@playwright/test').Page, taken: string[] = []) {
+  async function openEditor(page: import('@playwright/test').Page, taken: string[] = [], saved: Record<string, unknown> = {}) {
     await page.addInitScript(() => {
       ;(window as { __renownE2eBearer?: string }).__renownE2eBearer = 'e2e-bearer'
     })
@@ -634,7 +651,7 @@ test.describe('profile editor', () => {
           json: {
             data: {
               renownUsers: [
-                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null },
+                { documentId: 'doc-edit', ethAddress: flow.wallet.address.toLowerCase(), username: null, userImage: null, displayName: null, handle: null, bio: null, links: [], avatar: null, createdAt: null, updatedAt: null, ...(query.includes('listed') ? { listed: false } : {}), ...saved },
               ],
             },
           },
@@ -697,6 +714,41 @@ test.describe('profile editor', () => {
     )
     expect(editor.wallet.personalSignRequests).toEqual([expected])
     expect(await verifyMessage({ address: editor.wallet.address, message: expected, signature: v.signature as `0x${string}` })).toBe(true)
+  })
+
+  test('opts in to people search with the same single signature', async ({ page }) => {
+    const editor = await openEditor(page)
+    const toggle = page.getByRole('switch', { name: 'List me in people search' })
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-checked', 'true')
+    await scriptStub({
+      match: 'renown_upsertProfile',
+      variables: editor.wallet.address,
+      response: { data: { renown_upsertProfile: 'doc-edit' } },
+    })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('status')).toContainText('Profile saved.')
+
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === editor.wallet.address)
+    const v = call!.variables as { listed: boolean; timestamp: string }
+    expect(v.listed).toBe(true)
+    expect(editor.wallet.personalSignRequests).toEqual([await profileMessage(editor.wallet.address, { listed: true }, v.timestamp)])
+    // Saved: the switch stays on and there is nothing left to save.
+    await expect(toggle).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('button', { name: 'Save profile' })).toBeDisabled()
+  })
+
+  test('shows a saved opt-in, and turning it off signs listed: false', async ({ page }) => {
+    const editor = await openEditor(page, [], { listed: true })
+    const toggle = page.getByRole('switch', { name: 'List me in people search' })
+    await expect(toggle).toHaveAttribute('aria-checked', 'true')
+    await toggle.click()
+    await scriptStub({ match: 'renown_upsertProfile', variables: editor.wallet.address, response: { data: { renown_upsertProfile: 'doc-edit' } } })
+    await page.getByRole('button', { name: 'Save profile' }).click()
+    await expect(page.getByRole('status')).toContainText('Profile saved.')
+    const call = (await stubRequests('renown_upsertProfile')).find((c) => c.variables.address === editor.wallet.address)
+    expect(call?.variables).toMatchObject({ listed: false })
   })
 
   test('the crop dialog is a real modal: focus moves in, Escape closes, focus returns', async ({ page }) => {

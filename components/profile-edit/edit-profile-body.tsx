@@ -11,6 +11,7 @@ import { Field, inputClass } from './field'
 import { glass } from './glass'
 import { HandleField } from './handle-field'
 import { LinksEditor } from './links-editor'
+import { ListedSwitch } from './listed-switch'
 import { ProfileSummary } from '../profile/profile-summary'
 import RenownCard from '../ui/renown-card'
 import { useProfileEditorAuth } from '../../hooks/use-profile-editor-auth'
@@ -69,7 +70,7 @@ function Editor({ address, profileId, signMessage, getBearer }: {
     let cancelled = false
     // A failed read must never look like an empty profile: saving would send an
     // empty links list over the real one.
-    fetchProfile({ driveId: `renown-${address.toLowerCase()}`, ethAddress: address.toLowerCase() })
+    fetchProfile({ driveId: `renown-${address.toLowerCase()}`, ethAddress: address.toLowerCase() }, { withListed: true })
       .then((profile) => {
         if (cancelled) return
         const start = formFromProfile(profile)
@@ -292,6 +293,8 @@ function Editor({ address, profileId, signMessage, getBearer }: {
         </Field>
 
         <LinksEditor links={form.links} onChange={(links) => set('links', links)} error={problems.links} />
+
+        <ListedSwitch checked={form.listed} onChange={(listed) => set('listed', listed)} />
 
         <div className="border-border flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {viewHref && (

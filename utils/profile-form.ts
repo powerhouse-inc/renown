@@ -15,6 +15,8 @@ export interface ProfileForm {
   avatar: string | null
   /** External image URL (ENS avatar); shown when there is no upload. */
   userImage: string | null
+  /** Opted in to people search (/people). */
+  listed: boolean
 }
 
 export type FormField = 'displayName' | 'handle' | 'bio' | 'links' | 'avatar'
@@ -28,6 +30,7 @@ export function formFromProfile(profile: RenownProfile | null): ProfileForm {
     links: (profile?.links ?? []).map(({ id, label, url }) => ({ id, label, url })),
     avatar: profile?.avatar ?? null,
     userImage: profile?.userImage ?? null,
+    listed: profile?.listed === true,
   }
 }
 
@@ -96,6 +99,7 @@ export function changedFields(initial: ProfileForm, current: ProfileForm): Profi
   if (!sameLinks(initial.links, links)) out.links = links
   if (initial.avatar !== current.avatar) out.avatar = current.avatar ?? ''
   if (initial.userImage !== current.userImage && current.userImage) out.userImage = current.userImage
+  if (initial.listed !== current.listed) out.listed = current.listed
   return out
 }
 
