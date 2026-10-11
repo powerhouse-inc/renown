@@ -132,6 +132,49 @@ test.describe('/people', () => {
     await removeFixture('people-back')
   })
 
+  test('a slow answer to an older query does not overwrite newer results', async ({ page }) => {
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql`, async (route: Route) => {
+      const body = route.request().postDataJSON() as { query: string; variables: { q: string } }
+      if (!body.query.includes('renownUserSearch')) return route.continue()
+      const slow = body.variables.q === 'qa'
+      if (slow) await new Promise((r) => setTimeout(r, 1500))
+      const items = slow ? [person('qaold')] : [person('qabnew')]
+      return route.fulfill({ json: { data: { renownUserSearch: { items, next: null } } } })
+    })
+    await openPeople(page)
+    const box = page.getByRole('searchbox', { name: 'Search people by name or handle' })
+    await box.fill('qa')
+    await page.waitForTimeout(500) // past the debounce: the slow "qa" request is in flight
+    await box.fill('qab')
+    await expect(page.getByText('Person qabnew')).toBeVisible()
+    await page.waitForTimeout(1600) // the stale answer has arrived by now
+    await expect(page.getByText('Person qabnew')).toBeVisible()
+    await expect(page.getByText('Person qaold')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/people\?q=qab$/)
+  })
+
+  test('Load more moves keyboard focus to the first new person, also on the last page', async ({ page }) => {
+    await serveSearch(page, (q, after) => (after ? { items: page2 } : { items: page1, next: 'cursor' }))
+    await openPeople(page)
+    await page.getByRole('searchbox', { name: 'Search people by name or handle' }).fill('qa')
+    const more = page.getByRole('button', { name: 'Load more people' })
+    await more.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('list', { name: 'People' }).getByRole('listitem')).toHaveCount(26)
+    await expect(more).toHaveCount(0)
+    await expect(page.locator('[data-person-id="doc-people-qa24"]')).toBeFocused()
+  })
+
+  test('counts characters, not UTF-16 units, for the hint and the cap', async ({ page }) => {
+    await serveSearch(page, () => ({}))
+    await openPeople(page)
+    const box = page.getByRole('searchbox', { name: 'Search people by name or handle' })
+    await box.fill('😀')
+    await expect(page.getByText('Type at least 2 characters.')).toBeVisible()
+    await box.fill('😀'.repeat(45))
+    await expect(box).toHaveValue('😀'.repeat(40))
+  })
+
   for (const theme of ['light', 'dark'] as Theme[]) {
     test(`no serious axe violations, no layout shift (${theme})`, async ({ page }, testInfo) => {
       await useTheme(page, theme)

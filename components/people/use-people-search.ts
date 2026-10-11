@@ -15,6 +15,8 @@ interface Loaded {
   next: string | null
   failed: boolean
   more: 'idle' | 'loading' | 'error'
+  /** documentId of the first person added by the last Load more (focus target). */
+  focusId: string | null
 }
 
 export interface PeopleSearch {
@@ -29,14 +31,16 @@ export interface PeopleSearch {
   items: Person[]
   hasMore: boolean
   more: Loaded['more']
+  /** documentId to focus after Load more added people. */
+  focusId: string | null
   loadMore: () => void
   retry: () => void
 }
 
 function fromPage(query: string, page: PeoplePage | null): Loaded {
   return page
-    ? { query, items: page.items, next: page.next, failed: false, more: 'idle' }
-    : { query, items: [], next: null, failed: isSearchable(query), more: 'idle' }
+    ? { query, items: page.items, next: page.next, failed: false, more: 'idle', focusId: null }
+    : { query, items: [], next: null, failed: isSearchable(query), more: 'idle', focusId: null }
 }
 
 /**
@@ -112,7 +116,10 @@ export function usePeopleSearch(initial: { query: string; page: PeoplePage | nul
     withTimeout(searchPeople(query, next), CLIENT_DATA_TIMEOUT_MS)
       .then((page) => {
         if (id !== request.current) return
-        setLoaded((l) => ({ ...l, items: appendPeople(l.items, page.items), next: page.next, more: 'idle' }))
+        setLoaded((l) => {
+          const items = appendPeople(l.items, page.items)
+          return { ...l, items, next: page.next, more: 'idle', focusId: items[l.items.length]?.documentId ?? l.items.at(-1)?.documentId ?? null }
+        })
       })
       .catch((error: unknown) => {
         console.warn('People search: next page unavailable:', error)
@@ -141,6 +148,7 @@ export function usePeopleSearch(initial: { query: string; page: PeoplePage | nul
     items: loaded.items,
     hasMore: !!loaded.next,
     more: loaded.more,
+    focusId: loaded.focusId,
     loadMore,
     retry,
   }

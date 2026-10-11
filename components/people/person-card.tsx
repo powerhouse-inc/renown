@@ -15,6 +15,7 @@ export function PersonCard({ person }: { person: Person }) {
   return (
     <Link
       href={profilePath(person)}
+      data-person-id={person.documentId}
       className="group border-hairline bg-surface-1 shadow-card rounded-card hover:border-primary/40 relative flex h-full flex-col overflow-hidden border p-5 transition-[border-color,box-shadow] duration-300"
     >
       <span

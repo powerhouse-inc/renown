@@ -1,4 +1,5 @@
 import type { GetServerSideProps, NextPage } from 'next'
+import { useEffect } from 'react'
 import { NobodyMatches, PeopleIntro, PeopleOutage } from '../components/people/people-notices'
 import { PersonCard } from '../components/people/person-card'
 import { usePeopleSearch } from '../components/people/use-people-search'
@@ -35,6 +36,12 @@ function SearchIcon() {
 
 const PeoplePage: NextPage<PeoplePageProps> = ({ query: initialQuery, page }) => {
   const search = usePeopleSearch({ query: initialQuery, page })
+  const { focusId } = search
+  // After Load more, keyboard focus continues from the first new person.
+  useEffect(() => {
+    if (!focusId) return
+    document.querySelector<HTMLElement>(`[data-person-id="${CSS.escape(focusId)}"]`)?.focus()
+  }, [focusId])
   const busy = search.status === 'loading'
   const status =
     search.status === 'loading'
@@ -74,8 +81,7 @@ const PeoplePage: NextPage<PeoplePageProps> = ({ query: initialQuery, page }) =>
                 type="search"
                 name="q"
                 value={search.text}
-                onChange={(event) => search.setText(event.target.value)}
-                maxLength={PEOPLE_QUERY_MAX}
+                onChange={(event) => search.setText(Array.from(event.target.value).slice(0, PEOPLE_QUERY_MAX).join(''))}
                 autoComplete="off"
                 spellCheck={false}
                 placeholder="Name or handle"
@@ -83,7 +89,7 @@ const PeoplePage: NextPage<PeoplePageProps> = ({ query: initialQuery, page }) =>
               />
             </div>
             <p className="text-ink-muted mt-2 min-h-5 text-sm">
-              {search.text.trim().length === 1 ? 'Type at least 2 characters.' : ''}
+              {Array.from(search.text.trim()).length === 1 ? 'Type at least 2 characters.' : ''}
             </p>
           </form>
         </Container>
@@ -119,7 +125,7 @@ const PeoplePage: NextPage<PeoplePageProps> = ({ query: initialQuery, page }) =>
         </div>
         {search.status === 'results' && search.hasMore && (
           <div className="mt-12 flex flex-col items-center gap-3">
-            <button type="button" onClick={search.loadMore} disabled={search.more === 'loading'} className={buttonClasses('secondary', 'lg')}>
+            <button type="button" aria-disabled={search.more === 'loading'} onClick={search.loadMore} className={buttonClasses('secondary', 'lg')}>
               {search.more === 'loading' ? 'Loading…' : 'Load more people'}
             </button>
             {search.more === 'error' && (
