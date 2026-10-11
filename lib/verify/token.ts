@@ -87,8 +87,8 @@ function decide(checks: Check[], expired: boolean, notYet: boolean, delegation: 
   if (failed('signature')) return { verdict: 'not-genuine', reason: 'signature' }
   if (failed('shape')) return { verdict: 'not-genuine', reason: 'shape' }
   if (delegation === 'none' && failed('delegation')) return { verdict: 'not-genuine', reason: 'never-authorised' }
-  if (notYet && !expired) return { verdict: 'not-genuine', reason: 'not-yet' }
   if (delegation === 'revoked') return { verdict: 'revoked', reason: 'revoked' }
+  if (notYet && !expired) return { verdict: 'not-yet-valid', reason: 'not-yet' }
   if (expired) return { verdict: 'expired', reason: 'token-expired' }
   if (delegation === 'expired') return { verdict: 'expired', reason: 'credential-expired' }
   if (checks.some((c) => c.status === 'unknown')) return { verdict: 'unchecked', reason: 'unknown' }
@@ -130,7 +130,10 @@ export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report
       checks.push({ id: 'shape', label: 'A Renown sign-in', status: 'fail', detail: 'The signature is valid, but the Renown token check refused its contents.' })
     }
   }
-  if (expired && claims.exp !== undefined) {
+  if (checks[0].status === 'fail') {
+    // Ruling 1: nothing else a forged token claims is checked.
+    checks.push({ id: 'validity', label: 'In date', status: 'neutral', detail: SKIPPED_DETAIL })
+  } else if (expired && claims.exp !== undefined) {
     checks.push({ id: 'validity', label: 'In date', status: 'fail', detail: `It expired on ${formatInstant(new Date(claims.exp * 1000).toISOString())}.` })
   } else if (notYet && claims.nbf !== undefined) {
     checks.push({ id: 'validity', label: 'In date', status: 'fail', detail: `It is not valid before ${formatInstant(new Date(claims.nbf * 1000).toISOString())}.` })

@@ -257,8 +257,9 @@ export async function verifyOperation(
       : `The operation is signed, but ${shortAddress(user)} had not authorised this app key at the signing time it states, so it does not show that they made it.`,
     revoked: `The credential behind this app key was revoked${revokedOn}. The signing time is the signer's own claim, so it cannot show the operation came before that.`,
     expired: `The credential that authorised this app key for ${who} had expired by the signing time the operation states.`,
-    // Only credentials give this verdict; operations never do.
-    'not-yet-valid': '',
+    // verdictOf never gives these for an operation; the sentences stay true if it ever does.
+    'not-yet-valid': `The credential that authorised this app key for ${who} was not valid yet at the signing time the operation states.`,
+    'not-valid': `The dates of the credential that authorised this app key for ${who} cannot be read.`,
     unchecked:
       checks.find((c) => c.id === 'binding')?.status === 'unknown'
         ? legacyScheme === 'legacy-unknown'

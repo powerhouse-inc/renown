@@ -170,7 +170,7 @@ function verdictOf(checks: Check[], notInDate: 'unreadable' | 'future' | 'expire
   const byId = (id: string) => checks.find((c) => c.id === id)
   if (checks.some((c) => (c.id === 'signature' || c.id === 'shape') && c.status === 'fail')) return 'not-genuine'
   if (byId('revocation')?.status === 'fail') return 'revoked'
-  if (byId('validity')?.status === 'fail') return notInDate === 'future' ? 'not-yet-valid' : 'expired'
+  if (byId('validity')?.status === 'fail') return notInDate === 'future' ? 'not-yet-valid' : notInDate === 'unreadable' ? 'not-valid' : 'expired'
   if (checks.some((c) => c.status === 'unknown')) return 'unchecked'
   return 'genuine'
 }
@@ -314,6 +314,7 @@ export async function verifyCredential(
       : `${signedBy}, then revoked it. It no longer authorises anything.`,
     expired: signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
     'not-yet-valid': signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
+    'not-valid': signatureUnknown ? `${signedBy}, and ${dateProblem}.` : `${signedBy}, but ${dateProblem}.`,
     unchecked: !signatureUnknown
       ? 'Part of this credential could not be checked just now. Nothing below says it is forged; try again in a moment.'
       : stored

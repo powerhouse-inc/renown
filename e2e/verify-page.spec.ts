@@ -1,5 +1,8 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { dirname, join } from 'node:path'
+import { SCRUB_SHARE_FRAGMENTS } from '../components/analytics/scrub-share-fragments'
 import { EXAMPLE_DATA } from '../lib/verify/examples'
+import { shareFragment, type SharedInput } from '../lib/verify/share'
 import type { StoredCredentialFull } from '../lib/verify/types'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme, type Theme } from './support/site'
 import { STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
@@ -98,6 +101,21 @@ async function openVerify(page: Page): Promise<void> {
   await expect(page.getByRole('banner').getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 30_000 })
 }
 
+function share(input: SharedInput): string {
+  const fragment = shareFragment(input)
+  if (!fragment) throw new Error('not shareable')
+  return fragment
+}
+
+/** Next's router (pages), as the browser exposes it. */
+type WindowWithNext = Window & { next: { router: { push(url: string): Promise<boolean> } } }
+
+/** The real OpenPanel tracker (@openpanel/web 1.4.1), served in place of the CDN's op1.js. */
+const OPENPANEL_TRACKER = join(
+  dirname(require.resolve('@openpanel/web', { paths: [dirname(require.resolve('@openpanel/nextjs'))] })),
+  'src/tracker.global.js',
+)
+
 const EXAMPLE_REGISTRY: Registry = { credentials: [stored(EXAMPLE_DATA.credential)] }
 
 test.describe('/verify', () => {
@@ -140,6 +158,7 @@ test.describe('/verify', () => {
       expiresAt: new Date(Date.now() - 86_400_000),
     })
     const early = await makeCredential({ wallet, subject: key.did, issuedAt: new Date(Date.now() + 2 * 86_400_000) })
+    const undated = await makeCredential({ wallet, subject: key.did, rawIssuanceDate: 'not a date' })
     const revokedAt = new Date(Date.now() - 3_600_000).toISOString()
     const registry: Registry = { credentials: [stored(live), stored(lapsed)] }
     await serveLookups(page, registry)
@@ -163,6 +182,11 @@ test.describe('/verify', () => {
     await expect(verdict(page)).toHaveText('Not valid yet', { timeout: 30_000 })
     await expect(check(page, 'validity')).toHaveAttribute('data-status', 'fail')
     await expect(page.locator('#verify-verdict + p')).toContainText('not valid yet')
+
+    // Dates that cannot be read: not valid, and no claim about when.
+    await paste(page, JSON.stringify(undated))
+    await expect(verdict(page)).toHaveText('Not valid', { timeout: 30_000 })
+    await expect(page.locator('#verify-verdict + p')).toContainText('its dates cannot be read')
 
     registry.credentials = [stored(live, { revoked: true, revokedAt })]
     await paste(page, JSON.stringify(live))
@@ -227,8 +251,11 @@ test.describe('/verify', () => {
     const action = await makeV2Action({ key, address: wallet.address, documentId: 'doc-7', branch: 'draft' })
     const sent = await serveLookups(page, { credentials: [stored(credential)] })
     const siteRequests: string[] = []
+    const allRequests: string[] = []
     page.on('request', (request) => {
-      if (baseURL && request.url().startsWith(baseURL)) siteRequests.push(`${request.url()} ${request.postData() ?? ''}`)
+      const seen = `${request.url()} ${request.headers().referer ?? ''} ${request.postData() ?? ''}`
+      allRequests.push(seen)
+      if (baseURL && request.url().startsWith(baseURL)) siteRequests.push(seen)
     })
     await openVerify(page)
     await input(page).fill(JSON.stringify(action))
@@ -253,7 +280,10 @@ test.describe('/verify', () => {
     const signature = (action.context as { signer: { signatures: string[][] } }).signer.signatures[0][4]
     expect(JSON.stringify(sent)).not.toContain(signature)
     expect(siteRequests.join('\n')).not.toContain(signature)
-    expect(siteRequests.join('\n')).not.toContain('#v=')
+    // Neither the opened link's fragment nor its payload went out with any request (URL, referrer or body).
+    const payload = link.split('#v=')[1]
+    expect(payload.length).toBeGreaterThan(20)
+    expect(allRequests.join('\n')).not.toContain(payload)
   })
 
   test('a paste too long for a link is checked but offers no share link', async ({ page }) => {
@@ -267,6 +297,96 @@ test.describe('/verify', () => {
     await expect(verdict(page)).toHaveText('Genuine', { timeout: 30_000 })
     await expect(page.getByRole('button', { name: 'Copy share link' })).toHaveCount(0)
     await expect(page.getByText('This paste is too long to share as a link.')).toBeVisible()
+  })
+
+  test('a second share link opened in the same tab is checked and leaves the address bar', async ({ page }) => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const credential = await makeCredential({ wallet, subject: key.did })
+    await serveLookups(page, { credentials: [stored(credential)] })
+    const did = `did:pkh:eip155:1:${wallet.address.toLowerCase()}`
+    await page.goto(`/verify${share({ text: did, documentId: '', branch: 'main' })}`)
+    await expect(page.locator('section[data-kind="did-pkh"] #verify-verdict')).toHaveText('A Renown identity', { timeout: 30_000 })
+    await expect.poll(() => new URL(page.url()).hash).toBe('')
+
+    // Pasted into the address bar of the same tab: a same-document fragment navigation.
+    const text = JSON.stringify(credential)
+    await page.evaluate((hash) => {
+      window.location.hash = hash
+    }, share({ text, documentId: '', branch: 'main' }))
+    await expect(page.locator('section[data-kind="credential"] #verify-verdict')).toHaveText('Genuine', { timeout: 30_000 })
+    await expect(input(page)).toHaveValue(text)
+    await expect.poll(() => new URL(page.url()).hash).toBe('')
+
+    // A client-side link to another share link.
+    await page.evaluate((url) => (window as unknown as WindowWithNext).next.router.push(url), `/verify${share({ text: did, documentId: '', branch: 'main' })}`)
+    await expect(page.locator('section[data-kind="did-pkh"] #verify-verdict')).toHaveText('A Renown identity', { timeout: 30_000 })
+    await expect(input(page)).toHaveValue(did)
+    await expect.poll(() => new URL(page.url()).hash).toBe('')
+  })
+
+  test('analytics never records a share fragment', async ({ page }) => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const credential = await makeCredential({ wallet, subject: key.did })
+    await serveLookups(page, { credentials: [stored(credential)] })
+    // Turns OpenPanel on for this page (components/analytics, e2e builds only) and serves the real tracker.
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eOpenPanel?: string }).__renownE2eOpenPanel = 'e2e-openpanel'
+    })
+    await page.route(/openpanel\.dev\/op1\.js/, (route) => route.fulfill({ path: OPENPANEL_TRACKER, contentType: 'application/javascript' }))
+    const events: { type: string; payload: { name?: string; properties?: Record<string, unknown> } }[] = []
+    await page.route(/api\.openpanel\.dev/, (route) => {
+      const body = route.request().postData()
+      if (body) events.push(JSON.parse(body) as (typeof events)[number])
+      return route.fulfill({ json: {} })
+    })
+    const screenViews = () => events.filter((e) => e.payload.name === 'screen_view').map((e) => String(e.payload.properties?.__path))
+
+    const did = `did:pkh:eip155:1:${wallet.address.toLowerCase()}`
+    await page.goto(`/verify${share({ text: did, documentId: '', branch: 'main' })}`)
+    await expect(verdict(page)).toHaveText('A Renown identity', { timeout: 30_000 })
+    await expect.poll(screenViews, { timeout: 15_000 }).toContainEqual(expect.stringMatching(/\/verify$/))
+
+    await page.evaluate((hash) => {
+      window.location.hash = hash
+    }, share({ text: JSON.stringify(credential), documentId: '', branch: 'main' }))
+    await expect(page.locator('section[data-kind="credential"] #verify-verdict')).toHaveText('Genuine', { timeout: 30_000 })
+    await page.evaluate((url) => (window as unknown as WindowWithNext).next.router.push(url), `/verify${share({ text: did, documentId: '', branch: 'main' })}`)
+    await expect(page.locator('section[data-kind="did-pkh"] #verify-verdict')).toHaveText('A Renown identity', { timeout: 30_000 })
+    // OpenPanel debounces screen views by 50 ms; give any late one time to arrive.
+    await page.waitForTimeout(500)
+
+    expect(screenViews().length).toBeGreaterThan(0)
+    for (const path of screenViews()) expect(path).not.toContain('#')
+    expect(JSON.stringify(events)).not.toContain('#v=')
+  })
+
+  test("OpenPanel's filter cuts a share fragment out of every property and keeps other URLs", () => {
+    const filter = new Function(`return (${SCRUB_SHARE_FRAGMENTS})`)() as (event: unknown) => boolean
+    const event = {
+      type: 'track',
+      payload: { name: 'screen_view', properties: { __path: 'https://renown.id/verify#v=eyJ0IjoiZGlkOnBraCJ9', __title: 'Verify', other: 'https://renown.id/developers#sdk', n: 1 } },
+    }
+    expect(filter(event)).toBe(true)
+    expect(event.payload.properties).toEqual({ __path: 'https://renown.id/verify', __title: 'Verify', other: 'https://renown.id/developers#sdk', n: 1 })
+    expect(filter({ type: 'identify', payload: { profileId: 'x' } })).toBe(true)
+  })
+
+  test('the live region announces the verdict, not the whole report; a refused copy says so', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) } })
+    })
+    await serveLookups(page, EXAMPLE_REGISTRY)
+    await openVerify(page)
+    await page.getByRole('button', { name: 'DID', exact: true }).click()
+    await expect(verdict(page)).toHaveText('A Renown identity', { timeout: 30_000 })
+    await expect(page.locator('[aria-live] [data-check]')).toHaveCount(0)
+    await expect(page.locator('[aria-live] #verify-verdict')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Copy share link' }).click()
+    await expect(page.getByText('Could not copy the link. Select it below and copy it yourself.')).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Share link' })).toHaveValue(/\/verify#v=[A-Za-z0-9_-]+$/)
   })
 
   for (const theme of ['light', 'dark'] as Theme[]) {

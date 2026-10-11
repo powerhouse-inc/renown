@@ -86,6 +86,8 @@ export interface CredentialOptions {
   expiresAt?: Date
   chainId?: number
   id?: string
+  /** Signs this exact issuanceDate string instead of issuedAt (e.g. one that is not a date). */
+  rawIssuanceDate?: string
 }
 
 /** A Renown delegation credential exactly as renown.id builds and signs it (services/wallet/credentials.ts). */
@@ -101,7 +103,7 @@ export async function makeCredential(options: CredentialOptions): Promise<Record
     issuer: { id: issuerId, ethereumAddress: wallet.address },
     credentialSubject: { id: subject, app },
     credentialSchema: { id: 'https://renown.id/schemas/renown-credential/v1', type: 'JsonSchemaValidator2018' },
-    issuanceDate: issuedAt.toISOString(),
+    issuanceDate: options.rawIssuanceDate ?? issuedAt.toISOString(),
     expirationDate: expiresAt.toISOString(),
   }
   const domain = { version: '1', chainId }

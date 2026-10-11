@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { detectInput, KIND_NAMES, PROBLEM_TEXT } from '../../lib/verify/detect'
 import { VERIFY_EXAMPLES } from '../../lib/verify/examples'
 import { liveDeps, runVerify } from '../../lib/verify/run'
-import { readShareFragment, shareFragment } from '../../lib/verify/share'
+import { readShareFragment, shareFragment, type SharedInput } from '../../lib/verify/share'
 import type { Report } from '../../lib/verify/types'
 import { cx } from '../../utils/cx'
 import { buttonClasses } from '../site/primitives'
@@ -17,6 +17,20 @@ type Result =
 
 const fieldClass =
   'border-hairline-strong bg-surface-1 text-ink placeholder:text-ink-muted focus:border-primary/60 h-11 w-full rounded-[10px] border px-3 font-mono text-[13px] outline-none transition-colors'
+
+/**
+ * Reads a share link's fragment and removes it from the address bar at once
+ * (also from the state Next keeps for back and forward); null for any other URL.
+ */
+function takeShareFragment(): SharedInput | null {
+  const shared = readShareFragment(window.location.hash)
+  if (!shared) return null
+  const path = window.location.pathname + window.location.search
+  const state: unknown = window.history.state
+  const kept = state && typeof state === 'object' && 'as' in state ? { ...state, as: path } : state
+  window.history.replaceState(kept, '', path)
+  return shared
+}
 
 /** /verify's paste box, its live detection and the result of a check. */
 export function VerifyTool() {
@@ -76,6 +90,25 @@ export function VerifyTool() {
     void router.replace({ pathname: router.pathname }, undefined, { shallow: true, scroll: false })
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the fragment only exists in the browser, read once after hydration
     load(shared)
+  }, [router, load])
+
+  // A share link opened while /verify is already showing: pasted into the
+  // address bar of this tab (hashchange) or followed as a client-side link
+  // (Next's hashChangeComplete). Take it out of the URL at once, before
+  // OpenPanel's debounced screen view reads the address, then check it.
+  useEffect(() => {
+    const onHashChange = () => {
+      const shared = takeShareFragment()
+      if (!shared) return
+      void router.replace({ pathname: router.pathname }, undefined, { shallow: true, scroll: false })
+      load(shared)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    router.events.on('hashChangeComplete', onHashChange)
+    return () => {
+      window.removeEventListener('hashchange', onHashChange)
+      router.events.off('hashChangeComplete', onHashChange)
+    }
   }, [router, load])
 
   function edit(update: () => void) {
@@ -196,8 +229,9 @@ export function VerifyTool() {
         ))}
       </div>
 
-      <div aria-live="polite" aria-busy={busy}>
-        {result.status === 'checking' && <p className="text-ink-muted mt-10 text-sm">Checking signatures…</p>}
+      {/* Only the progress line is live: a result moves focus to its verdict, which reads it once. */}
+      <div aria-live="polite">{result.status === 'checking' && <p className="text-ink-muted mt-10 text-sm">Checking signatures…</p>}</div>
+      <div aria-busy={busy}>
         {result.status === 'failed' && (
           <p role="alert" className="text-danger-ink mt-10">
             The check stopped unexpectedly. Reload the page and try again.

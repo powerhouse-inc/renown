@@ -12,6 +12,7 @@ const TITLE: Record<Exclude<Verdict, 'identity'>, string> = {
   revoked: 'Revoked',
   expired: 'Expired',
   'not-yet-valid': 'Not valid yet',
+  'not-valid': 'Not valid',
   unchecked: 'Could not check',
 }
 
@@ -29,10 +30,11 @@ export function verdictTitle(report: Report): string {
 }
 
 function ShareButton({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false)
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const copied = copy === 'copied'
   useEffect(() => {
     if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 2000)
+    const timer = setTimeout(() => setCopy('idle'), 2000)
     return () => clearTimeout(timer)
   }, [copied])
   return (
@@ -40,10 +42,13 @@ function ShareButton({ url }: { url: string }) {
       <button
         type="button"
         onClick={() => {
-          navigator.clipboard.writeText(url).then(
-            () => setCopied(true),
-            () => setCopied(false),
-          )
+          // writeText is missing outside secure contexts, and browsers may refuse it.
+          Promise.resolve()
+            .then(() => navigator.clipboard.writeText(url))
+            .then(
+              () => setCopy('copied'),
+              () => setCopy('failed'),
+            )
         }}
         className="border-hairline-strong bg-surface-1 text-ink hover:border-primary/50 inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition-colors"
       >
@@ -62,6 +67,23 @@ function ShareButton({ url }: { url: string }) {
       <span role="status" className="sr-only">
         {copied ? 'Share link copied' : ''}
       </span>
+      {copy === 'failed' && (
+        <div className="mt-3">
+          <p role="alert" className="text-ink-muted text-xs leading-5">
+            Could not copy the link. Select it below and copy it yourself.
+          </p>
+          <label htmlFor="verify-share-link" className="sr-only">
+            Share link
+          </label>
+          <input
+            id="verify-share-link"
+            readOnly
+            value={url}
+            onFocus={(event) => event.currentTarget.select()}
+            className="border-hairline-strong bg-surface-1 text-ink mt-1.5 h-9 w-full rounded-[8px] border px-2 font-mono text-xs"
+          />
+        </div>
+      )}
     </>
   )
 }
@@ -88,7 +110,7 @@ export function VerifyReport({ report, shareUrl }: { report: Report; shareUrl: s
           </h2>
           <p className="text-ink mt-2 max-w-[60ch] text-[17px] leading-7 text-pretty">{report.summary}</p>
         </div>
-        <div className="shrink-0 sm:max-w-[200px]">
+        <div className="shrink-0 sm:w-[220px]">
           {shareUrl ? <ShareButton url={shareUrl} /> : <p className="text-ink-muted text-sm leading-6">This paste is too long to share as a link.</p>}
         </div>
       </div>

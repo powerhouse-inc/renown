@@ -5,6 +5,20 @@ import Router from 'next/router'
 import { useSyncExternalStore } from 'react'
 import { ANALYTICS_APP, readProfileHint } from '../../services/analytics'
 import { AnalyticsIdentity } from './analytics-identity'
+import { SCRUB_SHARE_FRAGMENTS } from './scrub-share-fragments'
+
+// Playwright runs the dev server with NEXT_PUBLIC_E2E_AUTH=1: a test can then
+// turn OpenPanel on by setting window.__renownE2eOpenPanel to a client id
+// (e2e/verify-page.spec.ts checks no share fragment is recorded). Inert in
+// every other build.
+const E2E_AUTH = process.env.NEXT_PUBLIC_E2E_AUTH === '1'
+
+/** The OpenPanel client id; read in the browser only. */
+function openPanelClientId(): string | undefined {
+  const configured = process.env.NEXT_PUBLIC_OPENPANEL_CLIENT_ID
+  if (configured) return configured
+  return E2E_AUTH ? (window as { __renownE2eOpenPanel?: string }).__renownE2eOpenPanel : undefined
+}
 
 /** A /verify share link: its fragment carries what someone pasted and must never be recorded. */
 function hasPrivateFragment(): boolean {
@@ -42,12 +56,13 @@ function clientSnapshot(): string | null {
  * after hydration anyway, so mounting it then loses nothing.
  */
 export function Analytics() {
-  const clientId = process.env.NEXT_PUBLIC_OPENPANEL_CLIENT_ID
   // null on the server and during hydration; the browser's cookies afterwards.
   // Also null while a /verify share fragment is in the URL: mounting waits until it is gone.
   const cookies = useSyncExternalStore(subscribe, clientSnapshot, () => null)
 
-  if (!clientId || cookies === null) return null
+  if (cookies === null) return null
+  const clientId = openPanelClientId()
+  if (!clientId) return null
   const profileId = readProfileHint(cookies)
 
   return (
@@ -58,6 +73,7 @@ export function Analytics() {
         {...(profileId ? { profileId } : {})}
         trackScreenViews
         trackOutgoingLinks
+        filter={SCRUB_SHARE_FRAGMENTS}
         globalProperties={{ app: ANALYTICS_APP }}
       />
       <AnalyticsIdentity />

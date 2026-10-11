@@ -8,6 +8,7 @@ export const VERDICT_TONE: Record<Verdict, Tone> = {
   revoked: 'caution',
   expired: 'caution',
   'not-yet-valid': 'caution',
+  'not-valid': 'caution',
   unchecked: 'neutral',
   identity: 'info',
 }
@@ -46,6 +47,13 @@ function Glyph({ verdict }: { verdict: Verdict }) {
         <>
           <path d="M40 36h18M40 62h18" />
           <path d="M42.5 36c0 7 13 9.5 13 13s-13 6-13 13M55.5 36c0 7-13 9.5-13 13s13 6 13 13" />
+        </>
+      )
+    case 'not-valid':
+      return (
+        <>
+          <circle cx="49" cy="49" r="14" />
+          <path d="M42 49h14" />
         </>
       )
     case 'unchecked':

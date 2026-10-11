@@ -15,6 +15,7 @@ import type {
   VerifyDeps,
   VerifyLookups,
 } from '../lib/verify/types'
+import { SKIPPED_DETAIL } from '../lib/verify/types'
 import {
   makeAppKey,
   makeBearerToken,
@@ -551,7 +552,8 @@ test.describe('/verify fix round 1: bearer tokens', () => {
     expect(refused.summary).toMatch(/not a valid Renown sign-in token/)
 
     const notYet = await verifyToken(await signJwt(key, header, { ...payload, nbf: Math.floor(Date.now() / 1000) + 3600 }), deps(registry))
-    expect(notYet.verdict).toBe('not-genuine')
+    // Signed by its key, only not valid yet (Task 4 fix round 1: not "Not genuine").
+    expect(notYet.verdict).toBe('not-yet-valid')
     expect(status(notYet)).toMatchObject({ signature: 'pass', validity: 'fail' })
     expect(notYet.summary).not.toMatch(/forged|never authorised/)
     expect(notYet.summary).toMatch(/^This token is not valid before /)
@@ -649,5 +651,45 @@ test.describe('/verify fix round 2: revocation wins', () => {
     const action = await makeV2Action({ key, address: wallet.address, documentId: 'doc-1' })
     const report = await verifyOperation(action, { documentId: 'doc-1', branch: 'main' }, deps(registry))
     expect(report.verdict).toBe('revoked')
+  })
+})
+
+test.describe('/verify page fix round 1: verdicts', () => {
+  test('a correctly signed token that is not valid yet is "not-yet-valid"; a forged one stays not genuine', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const registry = { credentials: [stored(await makeCredential({ wallet, subject: key.did }))], profiles: {} }
+    const { header, payload } = jwtParts(await makeBearerToken(key, wallet.address, { expiresIn: 7200 }))
+    const early = await signJwt(key, header, { ...payload, nbf: Math.floor(Date.now() / 1000) + 3600 })
+    const report = await verifyToken(early, deps(registry))
+    expect(report.verdict).toBe('not-yet-valid')
+    expect(status(report)).toMatchObject({ signature: 'pass', validity: 'fail' })
+    expect(report.summary).toMatch(/^This token is not valid before /)
+
+    const [h, p, s] = early.split('.')
+    const changed = JSON.parse(Buffer.from(p, 'base64url').toString()) as Record<string, unknown>
+    const forged = `${h}.${Buffer.from(JSON.stringify({ ...changed, sub: 'did:key:zDnaeForgedForgedForgedForgedForgedForged1' })).toString('base64url')}.${s}`
+    const bad = await verifyToken(forged, deps(registry))
+    expect(bad.verdict).toBe('not-genuine')
+  })
+
+  test('a forged token does not say it is in date: later checks are not checked', async () => {
+    const key = await makeAppKey()
+    const wallet = makeWallet()
+    const registry = { credentials: [stored(await makeCredential({ wallet, subject: key.did }))], profiles: {} }
+    const token = await makeBearerToken(key, wallet.address, { expiresIn: 600 })
+    const report = await verifyToken(token.slice(0, -4) + 'AAAA', deps(registry))
+    expect(report.verdict).toBe('not-genuine')
+    expect(status(report)).toMatchObject({ signature: 'fail', validity: 'neutral', delegation: 'neutral' })
+    expect(report.checks.find((c) => c.id === 'validity')?.detail).toBe(SKIPPED_DETAIL)
+  })
+
+  test('a genuine credential whose dates cannot be read is "not-valid", not expired', async () => {
+    const key = await makeAppKey()
+    const credential = await makeCredential({ wallet: makeWallet(), subject: key.did, rawIssuanceDate: 'not a date' })
+    const report = await verifyCredential(credential, deps({ credentials: [], profiles: {} }))
+    expect(status(report)).toMatchObject({ signature: 'pass', validity: 'fail' })
+    expect(report.verdict).toBe('not-valid')
+    expect(report.summary).toMatch(/its dates cannot be read/)
   })
 })
