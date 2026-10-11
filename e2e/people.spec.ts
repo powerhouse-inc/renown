@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
 import { appendPeople, isSearchable, parsePeopleQuery, type Person } from '../services/people'
+import { peopleCacheControl } from '../utils/cache-control'
 import { fixtureStub, removeFixture, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme, type Theme } from './support/site'
 
@@ -52,6 +53,15 @@ test.describe('people search helpers', () => {
     expect(isSearchable('a')).toBe(false)
     expect(isSearchable('😀😀')).toBe(true)
     expect(appendPeople([person('a')], [person('a'), person('b')]).map((p) => p.handle)).toEqual(['a', 'b'])
+  })
+
+  // The dev server overrides Cache-Control on pages, so the rule is pinned here (and seen on `next start`).
+  test('peopleCacheControl: search results are never stored; the bare page is cached like the other listings', () => {
+    // Turning the listing off must take effect at once: no shared cache may keep a result page.
+    expect(peopleCacheControl('ada', true)).toBe('no-store')
+    expect(peopleCacheControl('ada', false)).toBe('no-store')
+    // Nobody is listed on the bare page.
+    expect(peopleCacheControl('', true)).toBe('public, s-maxage=60, stale-while-revalidate=300')
   })
 })
 

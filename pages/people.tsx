@@ -7,7 +7,7 @@ import { PageMeta } from '../components/site/page-meta'
 import { buttonClasses, Container, Heading, Lead } from '../components/site/primitives'
 import { SiteLayout } from '../components/site/site-layout'
 import { isSearchable, parsePeopleQuery, PEOPLE_QUERY_MAX, searchPeople, type PeoplePage } from '../services/people'
-import { listingCacheControl } from '../utils/cache-control'
+import { peopleCacheControl } from '../utils/cache-control'
 import { cx } from '../utils/cx'
 import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
 
@@ -143,14 +143,14 @@ const PeoplePage: NextPage<PeoplePageProps> = ({ query: initialQuery, page }) =>
 export const getServerSideProps: GetServerSideProps<PeoplePageProps> = async ({ query, res }) => {
   const q = parsePeopleQuery(query['q'])
   if (!isSearchable(q)) {
-    res.setHeader('Cache-Control', listingCacheControl(true))
+    res.setHeader('Cache-Control', peopleCacheControl('', true))
     return { props: { query: '', page: null } }
   }
   const page = await withTimeout(searchPeople(q), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
     console.error('People search unavailable:', error)
     return null
   })
-  res.setHeader('Cache-Control', listingCacheControl(page !== null))
+  res.setHeader('Cache-Control', peopleCacheControl(q, page !== null))
   return { props: { query: q, page } }
 }
 
