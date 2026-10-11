@@ -1,3 +1,7 @@
+## <small>1.22.3 (2026-10-11)</small>
+
+* fix(media): allow public images to be embedded cross-site ([f38d5f2](https://github.com/powerhouse-inc/renown/commit/f38d5f2))
+
 ## <small>1.22.2 (2026-10-11)</small>
 
 * fix(home): calm, continuous final call-to-action panel ([9676cbe](https://github.com/powerhouse-inc/renown/commit/9676cbe))
