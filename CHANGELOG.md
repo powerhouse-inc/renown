@@ -1,3 +1,23 @@
+## 1.23.0 (2026-10-11)
+
+* fix(identity): accent colour from the server; popover placement resets and follows resizes ([d87c463](https://github.com/powerhouse-inc/renown/commit/d87c463))
+* fix(layout): surface guard accepts a panel that scrolls by itself ([e5a5148](https://github.com/powerhouse-inc/renown/commit/e5a5148))
+* fix(media): refuse OG_MEDIA_HOSTS entries containing a backslash ([16238d3](https://github.com/powerhouse-inc/renown/commit/16238d3))
+* fix(og): blur app covers, never render SVG, normalise OG_MEDIA_HOSTS ([ccf74ca](https://github.com/powerhouse-inc/renown/commit/ccf74ca))
+* fix(og): refuse AVIF like the media route does ([2d45d3e](https://github.com/powerhouse-inc/renown/commit/2d45d3e))
+* fix(site): only ask about a wallet switch once the wallet was seen on the session ([aa1b5c6](https://github.com/powerhouse-inc/renown/commit/aa1b5c6))
+* fix(wallet): log the render error's name and a short message, never the stack ([cae3a82](https://github.com/powerhouse-inc/renown/commit/cae3a82))
+* fix(wallet): show Sign-in could not load when the wallet code throws while rendering ([f47eee3](https://github.com/powerhouse-inc/renown/commit/f47eee3))
+* test(e2e): keep the web flow's switchboard answers through another copy's reset ([56568b0](https://github.com/powerhouse-inc/renown/commit/56568b0))
+* test(e2e): seed the wallet pairing in the account switch prompt layout state ([917bf1a](https://github.com/powerhouse-inc/renown/commit/917bf1a))
+* test(e2e): settle skips infinite animations; home must yield a paint probe ([81a05fe](https://github.com/powerhouse-inc/renown/commit/81a05fe))
+* test(layout): geometric layout guards, proven on hand-made pages ([58d25d3](https://github.com/powerhouse-inc/renown/commit/58d25d3))
+* test(layout): layout invariants for every public page, both widths and themes, and open surfaces ([7cd8fa0](https://github.com/powerhouse-inc/renown/commit/7cd8fa0))
+* test(og): cover the SHARP_TIMEOUT_SECONDS safety net with a slow raster pipeline ([0723e0d](https://github.com/powerhouse-inc/renown/commit/0723e0d))
+* ci: run the layout guards and wallet/account e2e specs on every pull request ([b86f077](https://github.com/powerhouse-inc/renown/commit/b86f077))
+* docs(og): metadata() parses an SVG in full but never renders it ([afec38f](https://github.com/powerhouse-inc/renown/commit/afec38f))
+* feat(site): ask before switching when the wallet changes accounts ([3774f19](https://github.com/powerhouse-inc/renown/commit/3774f19))
+
 ## <small>1.22.3 (2026-10-11)</small>
 
 * fix(media): allow public images to be embedded cross-site ([f38d5f2](https://github.com/powerhouse-inc/renown/commit/f38d5f2))
