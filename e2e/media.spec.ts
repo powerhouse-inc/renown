@@ -199,6 +199,9 @@ test('OG_MEDIA_HOSTS entries are normalised like URL.host: a default :443 is dro
   expect(normaliseMediaHost('')).toBeNull()
   expect(normaliseMediaHost('files.example/path')).toBeNull()
   expect(normaliseMediaHost('user@files.example')).toBeNull()
+  // URL treats a backslash as a path separator for https, so these would otherwise become a bare host.
+  expect(normaliseMediaHost('files.example\\path')).toBeNull()
+  expect(normaliseMediaHost('evil.example\\files.example')).toBeNull()
 
   const saved = process.env.OG_MEDIA_HOSTS
   process.env.OG_MEDIA_HOSTS = 'files.example:443, other.example:8443, ,bad/entry'

@@ -17,7 +17,7 @@ export const MAX_MEDIA_HOPS = 2
  */
 export function normaliseMediaHost(entry: string): string | null {
   const bare = entry.trim().toLowerCase().replace(/^https:\/\//, '').replace(/\/+$/, '')
-  if (!bare || /[/?#@\s]/.test(bare)) return null
+  if (!bare || /[/\\?#@\s]/.test(bare)) return null
   try {
     return new URL(`https://${bare}`).host
   } catch {
