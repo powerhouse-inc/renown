@@ -20,11 +20,12 @@ export const LOGO_BOX: ImageBox = { width: 256, height: 256 }
 export const COVER_BLUR_SIGMA = 24
 
 /**
- * The formats a card draws, as sharp names them (AVIF is "heif"). SVG is
- * refused by its bytes, whatever the content type said: Renown media never
- * stores SVG, and it is the one input that can keep librsvg busy for seconds.
+ * The formats a card draws, as sharp names them: the same four the site's
+ * /media route serves. Anything else is refused by its bytes, whatever the
+ * content type said. SVG can keep librsvg busy for seconds, and AVIF ("heif")
+ * decodes outside the sharp timeout, so neither reaches a decoder.
  */
-const RASTER_FORMATS = new Set(['png', 'jpeg', 'gif', 'webp', 'heif'])
+const RASTER_FORMATS = new Set(['png', 'jpeg', 'gif', 'webp'])
 
 export interface ConvertOptions {
   /** Gaussian blur sigma applied after the resize (app covers). */
@@ -32,7 +33,7 @@ export interface ConvertOptions {
 }
 
 /**
- * `bytes` (PNG, JPEG, GIF, WebP or AVIF) as a PNG data URL, cropped to fill
+ * `bytes` (PNG, JPEG, GIF or WebP) as a PNG data URL, cropped to fill
  * `box` like the card's `objectFit: cover` and never enlarged, optionally
  * blurred. Only the first frame of an animation is used; EXIF orientation is
  * applied. Throws on any other format (SVG included), on bytes sharp cannot

@@ -97,14 +97,14 @@ test.describe('link-preview images', () => {
     expect(await variantOf(request, `?variant=profile&address=${EXTERNAL}`)).toBe('profile')
   })
 
-  test('draw the stored image: PNG as is, WebP and AVIF converted to PNG', async ({ request }) => {
+  test('draw the stored image: PNG as is, WebP converted to PNG', async ({ request }) => {
     expect(await cardOf(request, `?variant=app&did=${APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
     expect(await cardOf(request, `?variant=profile&address=${WEBP}`)).toEqual({ variant: 'profile', image: 'drawn' })
     expect(await cardOf(request, `?variant=app&did=${WEBP_APP_DID}`)).toEqual({ variant: 'app', image: 'drawn' })
-    expect(await cardOf(request, `?variant=profile&address=${AVIF}`)).toEqual({ variant: 'profile', image: 'drawn' })
   })
 
-  test('draw the monogram when the image cannot be decoded, is a decompression bomb or is an SVG labelled as PNG', async ({ request }) => {
+  test('draw the monogram when the image cannot be decoded, is a decompression bomb, an AVIF or an SVG labelled as PNG', async ({ request }) => {
+    expect(await cardOf(request, `?variant=profile&address=${AVIF}`)).toEqual({ variant: 'profile', image: 'monogram' })
     expect(await cardOf(request, `?variant=profile&address=${BAD_WEBP}`)).toEqual({ variant: 'profile', image: 'monogram' })
     expect(await cardOf(request, `?variant=profile&address=${BOMB}`)).toEqual({ variant: 'profile', image: 'monogram' })
     expect(await cardOf(request, `?variant=profile&address=${SVG_AS_PNG}`)).toEqual({ variant: 'profile', image: 'monogram' })
