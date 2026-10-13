@@ -82,7 +82,7 @@ test.describe('org mutation registry', () => {
   test('knows only registered mutations and names the first bad argument', () => {
     expect(isOrgMutationName('inviteOrgMember')).toBe(true)
     expect(isOrgMutationName('toString')).toBe(false)
-    expect(isOrgMutationName('resolveOrgReport')).toBe(false)
+    expect(isOrgMutationName('startOrgRecovery')).toBe(false)
     expect(argsProblem('inviteOrgMember', { orgId: 'o', invitee: 'bob', role: 'MEMBER' })).toBeNull()
     expect(argsProblem('inviteOrgMember', { orgId: 'o', invitee: 'bob' })).toBe('role')
     expect(argsProblem('inviteOrgMember', { orgId: 'o', invitee: 'bob', role: null })).toBe('role')

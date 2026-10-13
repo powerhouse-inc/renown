@@ -10,6 +10,15 @@ import {
   PROPOSAL_FIELDS,
   TEAM_FIELDS,
 } from './orgs'
+import {
+  DELIVERY_FIELDS,
+  DOMAIN_FIELDS,
+  OIDC_CLIENT_FIELDS,
+  REPORT_FIELDS,
+  TRANSFER_FIELDS,
+  WEBHOOK_FIELDS,
+  WORKLOAD_FIELDS,
+} from './org-security'
 
 export interface OrgMutationSpec {
   /** Argument name → GraphQL type, in SDL order (`auth: OrgAuthInput` is added to every one). */
@@ -53,6 +62,33 @@ export const ORG_MUTATIONS = {
     args: { orgId: 'String!', kind: 'OrgProposalKind!', payload: 'OrgProposalPayloadInput!' },
     select: PROPOSAL_FIELDS,
   },
+  approveOrgProposal: { args: { orgId: 'String!', proposalId: 'String!' }, select: PROPOSAL_FIELDS },
+  cancelOrgProposal: { args: { orgId: 'String!', proposalId: 'String!' }, select: PROPOSAL_FIELDS },
+  executeOrgProposal: { args: { orgId: 'String!', proposalId: 'String!' }, select: PROPOSAL_FIELDS },
+  addOrgDomain: { args: { orgId: 'String!', domain: 'String!' }, select: DOMAIN_FIELDS },
+  checkOrgDomain: { args: { orgId: 'String!', domainId: 'String!' }, select: DOMAIN_FIELDS },
+  removeOrgDomain: { args: { orgId: 'String!', domainId: 'String!' }, select: '' },
+  proposeAppTransfer: { args: { appDid: 'String!', toOrgId: 'String!' }, select: TRANSFER_FIELDS },
+  acceptAppTransfer: { args: { transferId: 'String!' }, select: TRANSFER_FIELDS },
+  declineAppTransfer: { args: { transferId: 'String!' }, select: TRANSFER_FIELDS },
+  suspendOrgCredentials: { args: { orgId: 'String!', credentialIds: '[String!]', memberAddress: 'String' }, select: '' },
+  unsuspendOrgCredential: { args: { orgId: 'String!', credentialId: 'String!' }, select: '' },
+  setOrgWorkloadDisabled: { args: { orgId: 'String!', did: 'String!', disabled: 'Boolean!' }, select: WORKLOAD_FIELDS },
+  createOrgWebhook: { args: { orgId: 'String!', url: 'String!', events: '[String!]!' }, select: `webhook { ${WEBHOOK_FIELDS} } secret` },
+  updateOrgWebhook: {
+    args: { orgId: 'String!', webhookId: 'String!', url: 'String', events: '[String!]', enabled: 'Boolean' },
+    select: WEBHOOK_FIELDS,
+  },
+  deleteOrgWebhook: { args: { orgId: 'String!', webhookId: 'String!' }, select: '' },
+  testOrgWebhook: { args: { orgId: 'String!', webhookId: 'String!' }, select: DELIVERY_FIELDS },
+  registerOrgOidcClient: { args: { orgId: 'String!', name: 'String!', redirectUris: '[String!]!' }, select: 'clientId clientSecret' },
+  updateOrgOidcClient: {
+    args: { orgId: 'String!', clientId: 'String!', name: 'String', addRedirectUris: '[String!]', removeRedirectUris: '[String!]', status: 'OrgOidcClientStatus' },
+    select: OIDC_CLIENT_FIELDS,
+  },
+  rotateOrgOidcClientSecret: { args: { orgId: 'String!', clientId: 'String!' }, select: 'clientId clientSecret' },
+  reportOrganization: { args: { orgId: 'String!', reason: 'OrgReportReason!', details: 'String' }, select: '' },
+  resolveOrgReport: { args: { reportId: 'String!', resolution: 'OrgReportResolution!', note: 'String' }, select: REPORT_FIELDS },
 } as const satisfies Record<string, OrgMutationSpec>
 
 export type OrgMutationName = keyof typeof ORG_MUTATIONS

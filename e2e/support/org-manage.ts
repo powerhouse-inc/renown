@@ -44,6 +44,8 @@ export async function openManagePage(
     answers?: Record<string, Answer>
     /** false: do not wait for the organisation's heading (a non-member sees a notice instead). */
     ready?: boolean
+    /** Query string (without the ?) appended to the page URL. */
+    search?: string
   },
 ): Promise<ManageSetup> {
   const wallet = await signInTestWallet(page, { bearer: 'e2e-org-bearer' })
@@ -69,7 +71,7 @@ export async function openManagePage(
     OrgInviteLinks: () => ({ orgInviteLinks: [orgInviteLink({ orgId })] }),
     ...options.answers,
   })
-  await page.goto(`/org/acme-manage/manage/${options.section}`)
+  await page.goto(`/org/acme-manage/manage/${options.section}${options.search ? `?${options.search}` : ''}`)
   if (options.ready !== false) await expect(page.getByRole('heading', { level: 1, name: org.name })).toBeVisible({ timeout: 30_000 })
   return { wallet, orgId, me, org }
 }

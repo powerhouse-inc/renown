@@ -25,7 +25,7 @@ test.describe('/api/org/[mutation]', () => {
     request,
   }) => {
     expect((await request.get('/api/org/inviteOrgMember')).status()).toBe(405)
-    const unknown = await request.post('/api/org/resolveOrgReport', {
+    const unknown = await request.post('/api/org/startOrgRecovery', {
       data: { args: {}, auth: AUTH },
     })
     expect(unknown.status()).toBe(404)

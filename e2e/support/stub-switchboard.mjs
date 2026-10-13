@@ -168,6 +168,20 @@ const DEFAULT_DATA = {
   myUnreadNotificationCount: 0,
   organizationStats: null,
   organizationDidDocument: null,
+  orgProposals: [],
+  orgDomains: [],
+  orgCredentials: [],
+  orgCredentialStatus: null,
+  orgWorkloads: [],
+  appTransfers: [],
+  releaseAttestations: { items: [], next: null },
+  releaseAttestation: null,
+  orgWebhooks: [],
+  orgWebhookDeliveries: [],
+  orgOidcClients: [],
+  orgAuditLog: { items: [], next: null },
+  orgAuditExport: '[]',
+  orgReports: [],
 }
 
 function send(res, status, body) {
