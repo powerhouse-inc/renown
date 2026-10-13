@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { buttonClasses } from '../site/primitives'
 import { withLazyWalletShell, type WalletFallbackProps } from '../wallet/lazy-wallet-shell'
 import { WalletLoadError } from '../wallet/wallet-load-error'
@@ -18,10 +18,15 @@ const ReportDialog = withLazyWalletShell(() => import('./report-org-dialog').the
 /** "Report" on an organisation page. */
 export function ReportOrgButton({ org }: { org: { id: string; name: string } }) {
   const [open, setOpen] = useState(false)
-  const close = useCallback(() => setOpen(false), [])
+  const button = useRef<HTMLButtonElement>(null)
+  const close = useCallback(() => {
+    setOpen(false)
+    // The dialog unmounts rather than closing itself: hand focus back to the button.
+    button.current?.focus()
+  }, [])
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClasses('ghost', 'md')}>
+      <button ref={button} type="button" onClick={() => setOpen(true)} className={buttonClasses('ghost', 'md')}>
         Report
       </button>
       {open && <ReportDialog orgId={org.id} orgName={org.name} onClose={close} />}

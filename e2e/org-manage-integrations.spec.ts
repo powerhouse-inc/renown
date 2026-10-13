@@ -94,6 +94,11 @@ test.describe('manage: webhooks', () => {
     expect(page.url()).not.toContain(secret)
 
     const hook = page.getByRole('list', { name: 'Webhooks' }).getByRole('listitem').first()
+    // Each row's buttons name their endpoint, so a screen reader can tell the rows apart.
+    const hookUrl = (await hook.locator('p').first().innerText()).trim()
+    for (const name of ['Send a test event to', 'Show deliveries for', 'Disable', 'Delete']) {
+      await expect(hook.getByRole('button', { name: `${name} ${name === 'Disable' || name === 'Delete' ? 'webhook ' : ''}${hookUrl}`, exact: true })).toBeVisible()
+    }
     await hook.getByRole('button', { name: 'Send a test event' }).click()
     await expect(page.getByText('Test event delivered (HTTP 204).')).toBeVisible()
     await hook.getByRole('button', { name: 'Show deliveries' }).click()

@@ -133,7 +133,8 @@ export function OrgPage({ data }: { data: OrgPageData }) {
                 <OrgAvatar org={org} className="h-20 w-20" />
               </span>
               <div className="flex items-center gap-2 pb-1">
-                <ReportOrgButton org={org} />
+                {/* Nothing to moderate on an archived organisation. */}
+                {!org.archived && <ReportOrgButton org={org} />}
                 <ShareMenu url={canonicalUrl} title={`${org.name} on Renown`} qr={qr} subject="this organisation" />
               </div>
             </div>

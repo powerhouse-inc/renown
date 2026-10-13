@@ -1,6 +1,6 @@
 // The report dialog. It signs with the wallet session, so ReportOrgButton
 // loads it inside the wallet shell, and only once the button is pressed.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
 import type { OrgReportReason } from '../../services/org-security'
 import { useMeSession } from '../me/use-me-session'
@@ -20,15 +20,24 @@ export function ReportOrgDialog({ orgId, orgName, onClose }: { orgId: string; or
   const session = useMeSession()
   const [reason, setReason] = useState<OrgReportReason>('IMPERSONATION')
   const [details, setDetails] = useState('')
-  const [state, setState] = useState<{ status: 'idle' | 'sending' | 'sent' } | { status: 'error'; message: string }>({ status: 'idle' })
+  const [state, setState] = useState<{ status: 'idle' | 'sending' | 'sent' | 'uncertain' } | { status: 'error'; message: string }>({ status: 'idle' })
+  const dialog = useRef<HTMLDialogElement>(null)
 
+  // A native modal <dialog>, like ConfirmDialog: the page behind is inert (focus stays
+  // inside), showModal() focuses the first control, and Esc closes it. The button that
+  // opened it takes focus back (ReportOrgButton).
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+    const el = dialog.current
+    if (el && !el.open) el.showModal()
+  }, [])
+
+  // The content changes under the focus (the session settles, a report is sent): when the
+  // focused control went away, focus the dialog's first control instead of the page body.
+  useEffect(() => {
+    const el = dialog.current
+    if (!el?.open || el.contains(document.activeElement)) return
+    el.querySelector<HTMLElement>('input, textarea, button:not([disabled])')?.focus()
+  }, [session.state, state.status])
 
   async function send() {
     if (session.state !== 'signed-in') return
@@ -36,13 +45,25 @@ export function ReportOrgDialog({ orgId, orgName, onClose }: { orgId: string; or
     const text = details.trim()
     const result = await orgWriter(sessionSigner(session)).write('reportOrganization', { orgId, reason, ...(text && { details: text.slice(0, MAX_DETAILS) }) })
     if (result.ok) setState({ status: 'sent' })
+    // A lost answer may have been recorded: sending again would spend another of the 5 a day and duplicate it.
+    else if (result.unconfirmed) setState({ status: 'uncertain' })
     // D22: 5 reports per address per day.
     else setState({ status: 'error', message: result.code === 'RATE_LIMITED' ? 'You can send 5 reports a day.' : result.message })
   }
 
+  const finished = state.status === 'sent' || state.status === 'uncertain'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-      <div role="dialog" aria-modal="true" aria-labelledby="report-title" className="border-hairline bg-background shadow-modal rounded-panel max-h-full w-full max-w-md overflow-y-auto border p-6">
+    <dialog
+      ref={dialog}
+      aria-labelledby="report-title"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      className="bg-background text-ink rounded-panel border-hairline shadow-modal m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto border p-0 backdrop:bg-black/50"
+    >
+      <div className="p-6">
         <h2 id="report-title" className="text-ink text-h3 break-words">
           Report {orgName}
         </h2>
@@ -60,6 +81,10 @@ export function ReportOrgDialog({ orgId, orgName, onClose }: { orgId: string; or
         ) : state.status === 'sent' ? (
           <p role="status" className="text-ink mt-4 leading-7">
             Thank you. Renown&apos;s moderators will look at it.
+          </p>
+        ) : state.status === 'uncertain' ? (
+          <p role="status" className="text-ink mt-4 leading-7">
+            We couldn&apos;t confirm whether your report was sent. Renown did not answer, so it may have reached the moderators; don&apos;t send it again right away.
           </p>
         ) : (
           <div className="mt-4 space-y-4">
@@ -84,16 +109,16 @@ export function ReportOrgDialog({ orgId, orgName, onClose }: { orgId: string; or
           </div>
         )}
         <div className="mt-6 flex flex-wrap justify-end gap-2">
-          {session.state === 'signed-in' && state.status !== 'sent' && (
+          {session.state === 'signed-in' && !finished && (
             <button type="button" disabled={state.status === 'sending'} onClick={() => void send()} className={buttonClasses('primary', 'md')}>
               {state.status === 'sending' ? 'Sending…' : 'Send report'}
             </button>
           )}
           <button type="button" onClick={onClose} className={buttonClasses('ghost', 'md')}>
-            {state.status === 'sent' ? 'Close' : 'Cancel'}
+            {finished ? 'Close' : 'Cancel'}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   )
 }

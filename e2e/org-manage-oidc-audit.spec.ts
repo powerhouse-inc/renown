@@ -67,6 +67,20 @@ test.describe('manage: sign-in clients', () => {
       clientId: 'client-1',
       removeRedirectUris: ['https://intranet.acme.example/callback'],
     })
+
+    // Disabling blocks sign-in for every member: it asks first, and Cancel sends nothing.
+    await client.getByRole('button', { name: 'Disable Acme intranet' }).click()
+    const confirm = page.getByRole('dialog', { name: 'Disable Acme intranet?' })
+    await expect(confirm).toContainText('stops signing anyone in')
+    await confirm.getByRole('button', { name: 'Cancel' }).click()
+    await expect(confirm).toHaveCount(0)
+    await client.getByRole('button', { name: 'Disable Acme intranet' }).click()
+    await page.getByRole('dialog', { name: 'Disable Acme intranet?' }).getByRole('button', { name: 'Disable Acme intranet' }).click()
+    expect(await signedWrite(setup.wallet, 'updateOrgOidcClient', setup.orgId, (v) => v.status === 'DISABLED')).toEqual({
+      orgId: setup.orgId,
+      clientId: 'client-1',
+      status: 'DISABLED',
+    })
   })
 })
 

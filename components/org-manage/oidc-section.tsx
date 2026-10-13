@@ -10,6 +10,7 @@ import {
 import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageContext, ManageSectionProps } from './manage-context'
+import { useConfirm } from './confirm-dialog'
 import { ConfirmButton, Panel, RemoteView } from './manage-ui'
 import { SecretOnce } from './secret-once'
 
@@ -29,6 +30,7 @@ function ClientRow({
   const [uri, setUri] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const { ask, dialog } = useConfirm()
 
   async function update(args: Record<string, unknown>, success: string) {
     setBusy(true)
@@ -138,11 +140,17 @@ function ClientRow({
           <button
             type="button"
             disabled={busy}
+            aria-label={`${client.status === 'ACTIVE' ? 'Disable' : 'Enable'} ${client.name}`}
             onClick={() =>
-              void update(
-                { status: client.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE' },
-                client.status === 'ACTIVE' ? 'Client disabled.' : 'Client enabled.',
-              )
+              client.status === 'ACTIVE'
+                ? // Disabling stops sign-in for every member using the app: ask first.
+                  ask({
+                    title: `Disable ${client.name}?`,
+                    body: `${client.name} stops signing anyone in with Renown until it is enabled again.`,
+                    confirm: `Disable ${client.name}`,
+                    onConfirm: () => void update({ status: 'DISABLED' }, 'Client disabled.'),
+                  })
+                : void update({ status: 'ACTIVE' }, 'Client enabled.')
             }
             className={buttonClasses('ghost', 'md')}
           >
@@ -150,6 +158,7 @@ function ClientRow({
           </button>
         </div>
       )}
+      {dialog}
     </li>
   )
 }

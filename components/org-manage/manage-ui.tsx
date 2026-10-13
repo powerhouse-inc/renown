@@ -86,8 +86,11 @@ export function ConfirmButton({
   confirm,
   onConfirm,
   busy = false,
+  ariaLabel,
 }: {
   label: string
+  /** The first button's accessible name when the visible label alone is ambiguous (one per row); starts with `label`. */
+  ariaLabel?: string
   confirm: string
   onConfirm: () => void
   busy?: boolean
@@ -98,6 +101,7 @@ export function ConfirmButton({
       <button
         type="button"
         disabled={busy}
+        aria-label={ariaLabel}
         onClick={() => setAsking(true)}
         className={buttonClasses('ghost', 'md', cx('text-danger-ink', LONG_LABEL))}
       >

@@ -97,7 +97,10 @@ test.describe('manage: settings', () => {
     })
     await answer(setup.orgId, 'ProposeOrgChange', orgProposal({ orgId: setup.orgId }))
     await page.getByLabel('New handle').fill('acme-two')
+    // Nothing can be proposed while the availability check runs (it waits 400 ms before asking).
+    await expect(page.getByRole('button', { name: 'Propose handle change' })).toBeDisabled()
     await expect(page.getByText('renown.id/@acme-two is available.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Propose handle change' })).toBeEnabled()
     await page.getByRole('button', { name: 'Propose handle change' }).click()
     expect(await signedWrite(setup.wallet, 'proposeOrgChange', setup.orgId, (v) => v.kind === 'CHANGE_HANDLE')).toEqual({
       orgId: setup.orgId,
