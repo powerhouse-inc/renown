@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fixtureStub, graphqlError, stubRequests } from './support/stub-switchboard-client'
 import { APP_DID_A, organization, orgMember, orgSummary } from './support/org-fixtures'
+import { orgPageCacheControl } from '../lib/orgs/org-page-data'
 
 // Server-rendered organisation pages: reads answered by stub fixtures with
 // variables no other spec uses (handles acme-page*, the ids below).
@@ -14,7 +15,10 @@ const ORG = organization({
   name: 'Acme Page Works',
   bio: 'We build pages that hold.',
   website: 'https://acme-page.example',
-  links: [{ id: 'l1', label: 'GitHub', url: 'https://github.com/acme-page' }],
+  links: [
+    { id: 'l1', label: 'GitHub', url: 'https://github.com/acme-page' },
+    { id: 'l2', label: 'Sneaky', url: 'javascript:alert(1)' },
+  ],
   verifiedDomains: ['acme-page.example'],
   apps: [{ appDid: APP_DID_A, addedAt: '2026-10-02T10:00:00.000Z', frozen: false }],
   memberCount: 4,
@@ -76,6 +80,11 @@ test.beforeAll(async () => {
     response: org(organization({ id: 'a0c0ffee-0000-4000-8000-00000000a003', handle: 'acme-page-gone', name: 'Gone Works', takenDown: true })),
   })
   await fixtureStub({ match: 'query OrgByRef', variables: '"acme-page-down"', response: graphqlError('down', 'SERVICE_UNAVAILABLE') })
+  await fixtureStub({
+    match: 'query OrgByRef',
+    variables: '"acme-page-old"',
+    response: org(organization({ id: ARCHIVED_ID, handle: 'acme-page-old', name: 'Old Page Works', archived: true })),
+  })
   await fixtureStub({ match: 'query OrgByRef', variables: '"acme-page-busy"', response: graphqlError('Too many requests', 'RATE_LIMITED') })
   // The switchboard serves no DID document for an archived or taken-down organisation (D18).
   await fixtureStub({ match: 'query OrgDidDocument', variables: ARCHIVED_ID, response: { data: { organizationDidDocument: null } } })
@@ -121,6 +130,11 @@ test.describe('organisation page', () => {
     await expect(page.getByText('Verified: acme-page.example')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Acme Page Ledger' })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Members' }).getByText('Alice Pagewright')).toBeVisible()
+    // memberCount (4) counts hidden members; only the public list is counted.
+    await expect(page.getByText('1 member', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Links' }).getByRole('link', { name: /GitHub/ })).toHaveAttribute('href', 'https://github.com/acme-page')
+    await expect(page.getByText('Sneaky')).toHaveCount(0)
+    await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0)
     await expect(page.getByText('Up to 321')).toBeVisible()
     await expect(page.getByRole('link', { name: 'See in the app directory' })).toHaveAttribute('href', '/apps?org=acme-page')
     await expect(page.getByRole('link', { name: 'DID document' })).toHaveAttribute('href', `/org/${ORG_ID}/did.json`)
@@ -139,6 +153,19 @@ test.describe('organisation page', () => {
     await expect(note).toContainText('Not affiliated with the verified Acme Page Works')
     await expect(note.getByRole('link', { name: 'Acme Page Works' })).toHaveAttribute('href', '/@acme-page')
     await expect(page.getByRole('list', { name: 'Members' })).toHaveCount(0)
+  })
+
+  test('an archived organisation is labelled and not indexed', async ({ page }) => {
+    const res = await page.goto('/@acme-page-old')
+    expect(res?.status()).toBe(200)
+    await expect(page.getByRole('heading', { level: 1, name: 'Old Page Works' })).toBeVisible()
+    await expect(page.getByText('Archived', { exact: true })).toBeVisible()
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+  })
+
+  test('a degraded organisation page is never cached', () => {
+    expect(orgPageCacheControl(true)).toBe('no-store')
+    expect(orgPageCacheControl(false)).toBe('public, s-maxage=30, stale-while-revalidate=120')
   })
 
   test('a taken-down organisation shows only the notice', async ({ page }) => {
@@ -178,6 +205,7 @@ test.describe('organisation page', () => {
     expect(res.status()).toBe(200)
     expect(res.headers()['content-type']).toContain('application/json')
     expect(res.headers()['access-control-allow-origin']).toBe('*')
+    expect(res.headers()['cache-control']).toBe('public, s-maxage=60, stale-while-revalidate=60')
     expect(await res.json()).toEqual(DID_DOC)
     expect((await request.get('/org/a0c0ffee-0000-4000-8000-00000000a0ff/did.json')).status()).toBe(404)
     expect((await request.get('/org/bad%20id/did.json')).status()).toBe(404)

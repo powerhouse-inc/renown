@@ -42,9 +42,10 @@ function OrgTotals({ stats }: { stats: OrganizationStats }) {
   )
 }
 
-function OrgMembers({ members, total }: { members: OrgMember[]; total: number }) {
+// The count is the public list's length, never org.memberCount: that counts hidden members too.
+function OrgMembers({ members }: { members: OrgMember[] }) {
   return (
-    <PageSection id="org-members" title="Members" aside={<span className="text-ink-muted text-sm">{plural(total, 'member', 'members')}</span>}>
+    <PageSection id="org-members" title="Members" aside={<span className="text-ink-muted text-sm">{plural(members.length, 'member', 'members')}</span>}>
       <ul aria-label="Members" className="space-y-1">
         {members.slice(0, 12).map((member) => (
           <li key={member.id}>
@@ -186,7 +187,7 @@ export function OrgPage({ data }: { data: OrgPageData }) {
             )}
           </div>
           <aside className="min-w-0 space-y-10">
-            {members.length > 0 && <OrgMembers members={members} total={org.memberCount} />}
+            {members.length > 0 && <OrgMembers members={members} />}
             <OrgIdentity org={org} />
           </aside>
         </div>

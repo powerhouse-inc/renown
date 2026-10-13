@@ -25,19 +25,28 @@ export interface OrgPageData {
   canonicalUrl: string
   art: IdentityArtSvgs
   qr: QrCode
+  /** True when a secondary read (stats, apps, members) failed or timed out: the page is shown without that section and never cached. */
+  degraded: boolean
 }
 
 export const ORG_PAGE_APPS = 24
 
-function optional<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  return withTimeout(promise, SSR_DATA_TIMEOUT_MS).catch(() => fallback)
+/** Cache-Control for an organisation page: a degraded page is never stored, so a passing outage is not served to the next visitor. */
+export function orgPageCacheControl(degraded: boolean): string {
+  return degraded ? 'no-store' : 'public, s-maxage=30, stale-while-revalidate=120'
 }
 
 /** `request` is the incoming SSR request: its visitor IP and the trusted-read token go with each renown-orgs read (D23). */
 export async function loadOrgPageData(org: Organization, request?: OrgServerRequest | null): Promise<OrgPageData> {
   const url = canonicalUrl(orgPath(org.handle))
   const base = { org, canonicalUrl: url, art: identityArtSvgs(org.id, { ...HERO_ART, idPrefix: 'org' }), qr: qrCode(url) }
-  if (org.takenDown) return { ...base, stats: null, apps: [], members: [] }
+  if (org.takenDown) return { ...base, stats: null, apps: [], members: [], degraded: false }
+  let degraded = false
+  const optional = <T,>(promise: Promise<T>, fallback: T): Promise<T> =>
+    withTimeout(promise, SSR_DATA_TIMEOUT_MS).catch(() => {
+      degraded = true
+      return fallback
+    })
   const [stats, apps, members] = await Promise.all([
     optional(fetchOrganizationStats(org.id, request), null),
     org.apps.length > 0
@@ -45,5 +54,5 @@ export async function loadOrgPageData(org: Organization, request?: OrgServerRequ
       : Promise.resolve([]),
     org.membersPublic ? optional(organizationMembers(org.id, false, null, request), []) : Promise.resolve([]),
   ])
-  return { ...base, stats, apps, members }
+  return { ...base, stats, apps, members, degraded }
 }

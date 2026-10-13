@@ -9,7 +9,7 @@ import { NotFoundPage } from '../../components/ui/not-found-page'
 import { OrgPage } from '../../components/org/org-page'
 import { MemberOf } from '../../components/profile/member-of'
 import { orgPath } from '../../lib/orgs/format'
-import { loadOrgPageData, type OrgPageData } from '../../lib/orgs/org-page-data'
+import { loadOrgPageData, orgPageCacheControl, type OrgPageData } from '../../lib/orgs/org-page-data'
 import { fetchOrganization, organizationsByMember, type OrgAffiliation, type Organization } from '../../services/orgs'
 import { profileJsonLd } from '../../lib/json-ld'
 import { HERO_ART, identityArtSvgs, type IdentityArtSvgs } from '../../lib/identity-art'
@@ -179,8 +179,9 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
     }
     if (org) {
       if (org.handle !== id) return { redirect: { destination: orgPath(org.handle), permanent: false } }
-      context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
-      return { props: { ...empty, org: await loadOrgPageData(org, context.req) } }
+      const data = await loadOrgPageData(org, context.req)
+      context.res.setHeader('Cache-Control', orgPageCacheControl(data.degraded))
+      return { props: { ...empty, org: data } }
     }
   }
   if (!profile) {
