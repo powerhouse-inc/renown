@@ -31,6 +31,8 @@ interface World {
   byId?: Record<string, StoredAttestation | null>
   status?: OrgCredentialVerdict | null
   orgDown?: boolean
+  /** Only the publishing-organisation read fails. */
+  publisherDown?: boolean
   credentials?: StoredCredential[]
   /** Organisation ids asked for (releaseAttestation / releaseAttestations calls). */
   calls?: string[]
@@ -45,7 +47,7 @@ function deps(world: World): VerifyDeps {
   }
   const orgs: OrgLookups = {
     credentialStatus: async () => (world.orgDown ? { ok: false } : { ok: true, value: world.status ?? null }),
-    appPublisherOrg: async () => ({ ok: true, value: ORG }),
+    appPublisherOrg: async () => (world.publisherDown ? { ok: false } : { ok: true, value: ORG }),
     releaseAttestation: async (id) => {
       world.calls?.push(`id:${id}`)
       if (world.orgDown) return { ok: false }
@@ -169,6 +171,30 @@ test.describe('release attestations', () => {
     const pageOnly: string[] = []
     await verifyAttestation(json, deps({ attestations: [stored(json)], calls: pageOnly }))
     expect(pageOnly).toEqual(['page'])
+  })
+
+  test('a stored record counts only when every signed field matches (same signature, other version)', async () => {
+    const { json } = await signedAttestation()
+    const other = stored(json, { version: '1.5.0' })
+    const report = await verifyAttestation({ id: 'att-1', ...json }, deps({ attestations: [other] }))
+    expect(report.verdict).toBe('genuine')
+    expect(status(report).record).toBe('neutral')
+    expect(report.summary).toMatch(/Renown has no record of it\.$/)
+    expect(report.times.map((t) => t.label)).toEqual(['Signed off'])
+  })
+
+  test('an issuedAt without a zone is not a complete attestation', async () => {
+    const { json } = await signedAttestation({}, { issuedAt: '2026-10-12T10:00:00' })
+    const report = await verifyAttestation(json, deps({}))
+    expect(report).toMatchObject({ verdict: 'not-genuine', summary: 'This is not a complete release attestation: issuedAt is missing or malformed.' })
+  })
+
+  test('when only the publisher read fails, the summary says so', async () => {
+    const { json } = await signedAttestation()
+    const report = await verifyAttestation(json, deps({ attestations: [stored(json)], publisherDown: true }))
+    expect(report.verdict).toBe('unchecked')
+    expect(status(report)).toMatchObject({ record: 'pass', publisher: 'unknown' })
+    expect(report.summary).toMatch(/could not be reached to check which organisation publishes the app\. Try again in a moment\.$/)
   })
 
   test('issuedAt is checked as signed against Renown’s window (D17)', async () => {

@@ -18,6 +18,9 @@ export const RELEASE_TYPES = {
   ],
 } as const
 
+// The window renown-orgs accepts issuedAt in, mirrored from the backend's
+// ATTESTATION_FUTURE_SKEW_MS / ATTESTATION_MAX_AGE_MS in renown-package
+// subgraphs/renown-orgs/areas/attestations.ts (the source of truth: keep in step).
 /** renown-orgs accepts issuedAt at most this far ahead of the time it records the attestation… */
 export const ATTESTATION_FUTURE_SKEW_MS = 5 * 60_000
 /** …and at most this old. */
@@ -38,8 +41,8 @@ const APP_DID_RE = /^did:key:z[1-9A-HJ-NP-Za-km-z]{32,128}$/
 const DIGEST_RE = /^sha256:[0-9a-f]{64}$/
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
 const HEX_RE = /^0x[0-9a-fA-F]+$/
-/** An ISO-8601 time that names its zone, as renown-orgs requires. */
-const ZONED_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+/** An ISO-8601 time that names its zone, as renown-orgs requires (its STRICT_ISO_RE shape). */
+const ZONED_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/
 const FIELDS = ['appDid', 'version', 'artifactDigest', 'orgId', 'issuedAt', 'signer', 'signature'] as const
 
 /** JSON that carries every signed field of an attestation (extra fields such as `id` are fine). */
@@ -54,7 +57,7 @@ export function parseAttestation(raw: Record<string, unknown>): { attestation: R
     ['version', Boolean(text('version')?.trim())],
     ['artifactDigest', DIGEST_RE.test(text('artifactDigest') ?? '')],
     ['orgId', text('orgId') !== null],
-    ['issuedAt', !Number.isNaN(Date.parse(text('issuedAt') ?? ''))],
+    ['issuedAt', ZONED_RE.test(text('issuedAt') ?? '') && !Number.isNaN(Date.parse(text('issuedAt') ?? ''))],
     ['signer', ADDRESS_RE.test(text('signer') ?? '')],
     ['signature', HEX_RE.test(text('signature') ?? '')],
   ]
@@ -93,8 +96,21 @@ async function checkSignature(a: ReleaseAttestationInput, deps: VerifyDeps): Pro
   return onChain === 'valid' ? 'contract' : onChain === 'unavailable' ? 'unavailable' : 'invalid'
 }
 
+/**
+ * The stored record is this attestation: every signed field verbatim (issuedAt
+ * is stored byte for byte), plus signature and signer. A smart wallet's
+ * signature bytes can repeat across messages, so the signature alone is not enough.
+ */
 function sameAttestation(stored: StoredAttestation, a: ReleaseAttestationInput): boolean {
-  return stored.signature.toLowerCase() === a.signature.toLowerCase() && stored.signer.toLowerCase() === a.signer.toLowerCase()
+  return (
+    stored.appDid === a.appDid &&
+    stored.version === a.version &&
+    stored.artifactDigest === a.artifactDigest &&
+    stored.orgId === a.orgId &&
+    stored.issuedAt === a.issuedAt &&
+    stored.signature.toLowerCase() === a.signature.toLowerCase() &&
+    stored.signer.toLowerCase() === a.signer.toLowerCase()
+  )
 }
 
 interface RecordLookup {
@@ -129,9 +145,6 @@ function issuedAtCheck(a: ReleaseAttestationInput, record: StoredAttestation | n
   const issued = Date.parse(a.issuedAt)
   const at = record ? Date.parse(record.createdAt) : now.getTime()
   const when = `It was signed off on ${formatInstant(a.issuedAt)}`
-  if (!ZONED_RE.test(a.issuedAt)) {
-    return { id, label, status: 'neutral', detail: `${when}, but the time names no zone, so Renown would not record it.` }
-  }
   const inWindow = issued <= at + ATTESTATION_FUTURE_SKEW_MS && issued >= at - ATTESTATION_MAX_AGE_MS
   if (record) {
     return inWindow
@@ -224,7 +237,9 @@ export async function verifyAttestation(raw: Record<string, unknown>, deps: Veri
         ? `This attestation was not signed by the wallet it names, so it proves nothing about release ${a.version}.`
         : outcome === 'unavailable'
           ? `It is not from a plain wallet, and chain 1 could not be asked whether a smart wallet at ${shortAddress(signer)} made it.`
-          : `${who} signed off release ${a.version} of ${what}, but Renown could not be reached to check its record. Try again in a moment.`
+          : checks.find((c) => c.id === 'record')?.status === 'unknown'
+            ? `${who} signed off release ${a.version} of ${what}, but Renown could not be reached to check its record. Try again in a moment.`
+            : `${who} signed off release ${a.version} of ${what}, but Renown could not be reached to check which organisation publishes the app. Try again in a moment.`
   return {
     kind: 'release-attestation',
     verdict,
