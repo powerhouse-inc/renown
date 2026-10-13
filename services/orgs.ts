@@ -533,11 +533,15 @@ export async function myOrgInvites(bearer: string | null): Promise<OrgInvite[]> 
   return data.myOrgInvites
 }
 
-/** The public preview of an invite link; null when the token is unknown. */
-export async function orgInviteLinkPreview(token: string): Promise<OrgInviteLinkPreview | null> {
+/** The public preview of an invite link; null when the token is unknown. `request`: the incoming SSR request (D23). */
+export async function orgInviteLinkPreview(
+  token: string,
+  request?: OrgServerRequest | null,
+): Promise<OrgInviteLinkPreview | null> {
   const data = await orgsRequest<{ orgInviteLink: OrgInviteLinkPreview | null }>(
     `query OrgInviteLinkPreview($token: String!) { orgInviteLink(token: $token) { org { ${ORG_SUMMARY_FIELDS} } role expiresAt expired revoked full usable } }`,
     { token },
+    { request },
   )
   return data.orgInviteLink
 }

@@ -64,6 +64,6 @@ const InvitePage: NextPage<InvitePageProps> = ({ preview, token, unavailable }) 
   )
 }
 
-export const getServerSideProps: GetServerSideProps<InvitePageProps> = ({ params, res }) => loadInvitePage(params?.token, res)
+export const getServerSideProps: GetServerSideProps<InvitePageProps> = ({ params, req, res }) => loadInvitePage(params?.token, res, req)
 
 export default InvitePage

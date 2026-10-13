@@ -73,6 +73,12 @@ test.describe('create form rules', () => {
     expect(res.statusCode).toBe(404)
   })
 
+  test('the invite preview read carries the visitor IP like every SSR org read (D23)', async ({ request }) => {
+    expect((await request.get(`/invite/${TOKEN}`, { headers: { 'x-real-ip': '203.0.113.46' } })).status()).toBe(200)
+    const sent = (await stubRequests('query OrgInviteLinkPreview')).filter((r) => r.variables.token === TOKEN)
+    expect(sent.some((r) => r.headers['x-renown-client-ip'] === '203.0.113.46')).toBe(true)
+  })
+
   test("OpenPanel's filter replaces an invite token in every property; arrival flags are one-shot", () => {
     const filter = new Function(`return (${SCRUB_SHARE_FRAGMENTS})`)() as (event: unknown) => boolean
     const event = {
