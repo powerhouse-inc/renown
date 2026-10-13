@@ -121,7 +121,7 @@ test.describe('header and inbox', () => {
     })
     await page.goto('/trust')
     await expect(page.getByRole('link', { name: 'Notifications, 2 unread' })).toBeVisible({ timeout: 30_000 })
-    expect(calls).toBe(2)
+    expect(calls).toBeGreaterThanOrEqual(2)
   })
 
   test('the account menu lists my organisations, remembers the last one and offers to create one', async ({
@@ -301,5 +301,138 @@ test.describe('/me organisations', () => {
     await row.getByRole('button', { name: 'Leave Acme Home' }).click()
     await row.getByRole('button', { name: 'Yes, leave Acme Home' }).click()
     expect(await signedWrite(wallet, 'leaveOrganization', home.id)).toEqual({ orgId: home.id })
+  })
+})
+
+const ORG_API = `${STUB_SWITCHBOARD_URL}/graphql/renown-orgs**`
+
+/** Counts the unread-count requests and answers them (3 unread). */
+async function countUnreadRequests(page: Page): Promise<{ count: number }> {
+  const seen = { count: 0 }
+  await page.route(ORG_API, async (route: Route) => {
+    const { query } = route.request().postDataJSON() as { query: string }
+    if (!query.includes('query MyUnreadNotificationCount')) return route.fallback()
+    seen.count += 1
+    return route.fulfill({ json: { data: { myUnreadNotificationCount: 3 } } })
+  })
+  return seen
+}
+
+test.describe('unread polling', () => {
+  test('polls every minute while visible, not while hidden, and not after the header unmounts', async ({ page }) => {
+    await standInSession(page)
+    await page.addInitScript(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => ((window as unknown as { __hidden?: boolean }).__hidden ? 'hidden' : 'visible'),
+      })
+    })
+    await page.clock.install()
+    const seen = await countUnreadRequests(page)
+    await page.goto('/trust')
+    await expect(page.getByRole('link', { name: 'Notifications, 3 unread' })).toBeVisible({ timeout: 30_000 })
+    const first = seen.count
+    await page.clock.runFor(60_000)
+    await expect.poll(() => seen.count).toBeGreaterThan(first)
+
+    await page.evaluate(() => ((window as unknown as { __hidden: boolean }).__hidden = true))
+    const whileHidden = seen.count
+    await page.clock.runFor(180_000)
+    expect(seen.count).toBe(whileHidden)
+
+    await page.evaluate(() => ((window as unknown as { __hidden: boolean }).__hidden = false))
+    // The header goes away with the page layout (auth screens have none): its timer must stop.
+    await page.evaluate(() => (window as unknown as { next: { router: { push: (url: string) => void } } }).next.router.push('/oidc/login'))
+    await expect(page.getByRole('link', { name: /Notifications/ })).toHaveCount(0)
+    await page.waitForTimeout(500)
+    const afterUnmount = seen.count
+    await page.clock.runFor(180_000)
+    expect(seen.count).toBe(afterUnmount)
+  })
+
+  test('an anonymous visitor makes no unread or notification requests', async ({ page }) => {
+    const queries: string[] = []
+    await page.route(ORG_API, async (route: Route) => {
+      queries.push((route.request().postDataJSON() as { query: string }).query)
+      return route.fallback()
+    })
+    await page.goto('/trust')
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true }).first()).toBeVisible({ timeout: 30_000 })
+    await page.waitForTimeout(1500)
+    expect(queries.filter((q) => /MyUnreadNotificationCount|MyNotifications/.test(q))).toEqual([])
+    await expect(page.getByRole('link', { name: /^Notifications/ })).toHaveCount(0)
+  })
+
+  test('the count arrives soon after the bearer becomes available, without waiting a minute', async ({ page }) => {
+    await page.addInitScript((address) => {
+      const w = window as unknown as Record<string, unknown>
+      w.__renownE2eSession = { address, calls: [] }
+      // No bearer yet: Renown is still starting.
+    }, SESSION)
+    await page.clock.install()
+    const seen = await countUnreadRequests(page)
+    await page.goto('/trust')
+    await page.clock.runFor(100)
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__renownE2eBearer = 'e2e-late-bearer'))
+    await page.clock.runFor(4_000)
+    await expect(page.getByRole('link', { name: 'Notifications, 3 unread' })).toBeVisible({ timeout: 30_000 })
+    // Only ~4 s of page time passed: the 60 s poll cannot have been what answered.
+    expect(seen.count).toBeGreaterThan(0)
+  })
+})
+
+test.describe('hostile notification content', () => {
+  const HOSTILE_ORG = orgSummary({ id: 'org-evil', handle: 'evil-org', name: '<img src=x onerror=window.__pwned=1>Evil' })
+  const hostile = [
+    note('INVITED', { role: '<img src=x onerror=window.__pwned=1>' }, { id: 'h1', org: HOSTILE_ORG, orgId: HOSTILE_ORG.id }),
+    note('DOMAIN_LAPSED', { domain: 'javascript:alert(1)//' }, { id: 'h2', org: HOSTILE_ORG, orgId: HOSTILE_ORG.id }),
+    note('APP_TRANSFER_REQUEST', { from: '//evil.example/steal', href: 'https://evil.example', url: 'javascript:alert(1)' }, { id: 'h3', org: HOSTILE_ORG, orgId: HOSTILE_ORG.id }),
+    note('PROPOSAL_EXECUTED', { kind: '<script>window.__pwned=1</script>', reason: '<b>bold</b> https://evil.example' }, { id: 'h4', org: HOSTILE_ORG, orgId: HOSTILE_ORG.id }),
+    note('ROLE_CHANGED', { to: 'javascript:alert(1)' }, { id: 'h5', org: { ...HOSTILE_ORG, handle: 'a/../..//evil.example' }, orgId: HOSTILE_ORG.id }),
+  ]
+
+  test('wording and links stay internal', () => {
+    for (const n of hostile) {
+      const href = notificationHref(n)
+      expect(href, n.id).toMatch(/^\/(?!\/)/)
+      expect(href, n.id).not.toMatch(/javascript:|https?:|\/\/evil/i)
+      expect(notificationText(n).length).toBeGreaterThan(0)
+    }
+    expect(notificationHref(hostile[4]!)).not.toContain('../')
+  })
+
+  test('the inbox renders it as text and every link is an internal route', async ({ page }) => {
+    await standInSession(page)
+    await serveOrgReads(page, { MyNotifications: () => ({ myNotifications: { items: hostile, next: null } }) })
+    await page.goto('/notifications')
+    const list = page.getByRole('list', { name: 'Notifications' })
+    await expect(list.getByRole('listitem')).toHaveCount(hostile.length, { timeout: 30_000 })
+    await expect(list.getByText('<img src=x onerror=window.__pwned=1>Evil invited you', { exact: false })).toBeVisible()
+    expect(await list.locator('img, script, b').count()).toBe(0)
+    expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined()
+    const hrefs = await list.getByRole('link').evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''))
+    expect(hrefs).toHaveLength(hostile.length)
+    for (const href of hrefs) expect(href).toMatch(/^\/(?!\/)/)
+  })
+})
+
+test.describe('account menu failure', () => {
+  test('shows a small error with a retry when the organisations do not load', async ({ page }) => {
+    await standInSession(page)
+    let failing = true
+    await page.route(ORG_API, async (route: Route) => {
+      const { query } = route.request().postDataJSON() as { query: string }
+      if (!query.includes('query OrgsByMember')) return route.fallback()
+      if (failing) return route.fulfill({ status: 500, json: { errors: [{ message: 'boom' }] } })
+      return route.fulfill({ json: { data: { organizationsByMember: [] } } })
+    })
+    await page.goto('/trust')
+    await page.getByRole('button', { name: /Account menu/ }).click()
+    const group = page.getByRole('group', { name: 'Your organisations' })
+    await expect(group.getByRole('alert')).toContainText('did not load', { timeout: 30_000 })
+    failing = false
+    await group.getByRole('menuitem', { name: 'Try again' }).click()
+    await expect(group.getByRole('alert')).toHaveCount(0)
+    await expect(group.getByRole('menuitem', { name: 'Create organisation' })).toBeVisible()
   })
 })

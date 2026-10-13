@@ -9,7 +9,7 @@ export function roleLabel(role: string): string {
 
 /** The canonical page of an organisation. */
 export function orgPath(handle: string): string {
-  return `/@${handle}`
+  return `/@${encodeURIComponent(handle)}`
 }
 
 export function manageHref(handle: string, section = 'members'): string {

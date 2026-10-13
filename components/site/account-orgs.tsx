@@ -13,12 +13,14 @@ export function AccountOrgs({
   active,
   onPick,
   onClose,
+  onRetry,
   itemClass,
 }: {
   state: Remote<OrgAffiliation[]>
   active: string | null
   onPick: (orgId: string) => void
   onClose: () => void
+  onRetry: () => void
   itemClass: string
 }) {
   const list = state.status === 'ready' ? activeFirst(state.value, active) : []
@@ -32,6 +34,14 @@ export function AccountOrgs({
         Your organisations
       </p>
       {state.status === 'loading' && <p className="text-ink-muted px-3 py-2 text-sm">Loading…</p>}
+      {state.status === 'error' && (
+        <div role="alert" className="text-ink-muted px-3 py-2 text-sm">
+          <p>Your organisations did not load.</p>
+          <button type="button" role="menuitem" onClick={onRetry} className="text-primary-ink font-semibold underline-offset-4 hover:underline">
+            Try again
+          </button>
+        </div>
+      )}
       {list.slice(0, SHOWN).map(({ org, role }) => (
         <Link
           key={org.id}

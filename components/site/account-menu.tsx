@@ -120,6 +120,7 @@ export function AccountMenu({ address, displayName, avatarUrl, profile, onSignOu
             active={active}
             itemClass={itemClass}
             onClose={() => setOpen(false)}
+            onRetry={orgs.reload}
             onPick={(orgId) => {
               writeActiveOrg(orgId)
               setOpen(false)
