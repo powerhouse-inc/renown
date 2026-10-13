@@ -62,7 +62,7 @@ function TileSkeletons() {
 /** Tiles in the first row at desktop (and the first card on mobile): the LCP candidates, loaded eagerly. */
 const EAGER_TILES = 3
 
-const AppsPage: NextPage<AppsPageProps> = ({ category: initialCategory, page, categories, org }) => {
+const AppsPageBody: NextPage<AppsPageProps> = ({ category: initialCategory, page, categories, org }) => {
   const router = useRouter()
   const category = parseCategory(router.query['category'])
   const { state, loadMore, retry } = useAppDirectory({ category: initialCategory, page }, category, org?.id ?? null)
@@ -179,5 +179,8 @@ export const getServerSideProps: GetServerSideProps<AppsPageProps> = async ({ qu
   res.setHeader('Cache-Control', listingCacheControl(page !== null && !categoriesFailed && !orgFailed))
   return { props: { category, page, categories, org } }
 }
+
+/** Keyed by the organisation filter: client navigation between filters remounts the directory with the new server page. */
+const AppsPage: NextPage<AppsPageProps> = (props) => <AppsPageBody key={props.org?.handle ?? ''} {...props} />
 
 export default AppsPage

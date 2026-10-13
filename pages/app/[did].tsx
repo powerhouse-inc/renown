@@ -60,12 +60,14 @@ interface AppPageProps {
   orgPublisher: OrgSummary | null
   /** The latest release attestation, for the publisher card. */
   signOff: ReleaseSignOff | null
+  /** The verified organisation whose name the publisher's lookalikes; null when none or unread. */
+  notAffiliatedWith: OrgSummary | null
   error?: string
 }
 
 const PKH_RE = /^did:pkh:eip155:\d+:(0x[0-9a-fA-F]{40})$/
 
-const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, provenance, orgPublisher, signOff, error }) => {
+const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, provenance, orgPublisher, signOff, notAffiliatedWith, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!app || !art) return <NotFoundPage title="App not found" message="No app on Renown has this identity. Check the link, or browse the directory." />
 
@@ -116,7 +118,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publis
   )
   const sideSections = (
     <>
-      {orgPublisher && <OrgPublisherCard org={orgPublisher} signOff={signOff} />}
+      {orgPublisher && <OrgPublisherCard org={orgPublisher} signOff={signOff} notAffiliatedWith={notAffiliatedWith} />}
       {!orgPublisher && publisherAddress && publisherArt && <PublisherCard publisher={publisher} address={publisherAddress} art={publisherArt} />}
       {pubName && <MoreByPublisher apps={moreByPublisher} name={pubName} />}
       {(support || security) && <AppContacts support={support} security={security} />}
@@ -183,6 +185,7 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
     provenance: null,
     orgPublisher: null,
     signOff: null,
+    notAffiliatedWith: null,
   }
   let app: RenownAppProfile | null = null
   if (APP_DID_RE.test(did)) {
@@ -264,6 +267,7 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
       provenance,
       orgPublisher,
       signOff,
+      notAffiliatedWith: org?.notAffiliatedWith ?? null,
     },
   }
 }

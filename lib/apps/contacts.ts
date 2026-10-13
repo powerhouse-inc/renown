@@ -1,7 +1,9 @@
 // App support and security contacts (renown-package A3 ruling 9): an email
 // address or an https URL, at most 200 characters. Anything else is not shown. Pure.
 
-const EMAIL_RE = /^[^\s@<>()"]+@[^\s@<>()"]+\.[^\s@<>()"]+$/
+// Verbatim from renown-package's renown-app-profile utils: no `?`, `=`, `%` or `&` can reach a mailto: URL.
+const EMAIL_RE =
+  /^[^\s@<>()"',;:]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/
 
 export function contactLink(value: string | null | undefined): { href: string; label: string } | null {
   const text = value?.trim()
