@@ -13,6 +13,8 @@ import { EXAMPLE_DATA } from '../lib/verify/examples'
 import { useTheme, type Theme } from './support/site'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 import { signInTestWallet } from './support/test-session'
+import { installDirectoryFixture, organization, orgMember, orgSummary, serveOrgReads } from './support/org-fixtures'
+import { openManagePage } from './support/org-manage'
 
 // Layout guards: every public page x 390/1280 px x light/dark, and every
 // interactive surface open, must keep the geometric rules in
@@ -51,12 +53,58 @@ const APP = {
   links: [],
 }
 
+const LAYOUT_ORG_ID = 'a0c0ffee-0000-4000-8000-00000000c001'
+// Long name, handle and domain on purpose: the guards must hold for the worst case.
+const LAYOUT_ORG = organization({
+  id: LAYOUT_ORG_ID,
+  did: `did:web:www.renown.id:org:${LAYOUT_ORG_ID}`,
+  handle: 'acme-layout',
+  name: 'The Extraordinarily Long Named Cooperative of Layout Testers Ltd',
+  bio: 'We check that every organisation page keeps its shape, on every screen, in both themes, with long names and longer domains.',
+  website: 'https://acme-layout.example',
+  links: [{ id: 'l1', label: 'GitHub', url: 'https://github.com/acme-layout' }],
+  verifiedDomains: ['a-rather-long-subdomain.acme-layout-verification.example'],
+  apps: [{ appDid: APP_DID, addedAt: '2026-10-02T10:00:00.000Z', frozen: false }],
+  memberCount: 7,
+})
+const LAYOUT_INVITE_TOKEN = 'layoutInviteTokenAAAAAAAAAAAAAAAAAAAAAAAAAA'
+const LONG_MEMBERS = [
+  orgMember({ orgId: LAYOUT_ORG_ID, address: '0x5e00000000000000000000000000000000001b01', role: 'OWNER', displayName: 'Bartholomew Maximilian Featherstonehaugh-Cholmondeley' }),
+  orgMember({ orgId: LAYOUT_ORG_ID, address: '0x5e00000000000000000000000000000000001b02', role: 'PUBLISHER', handle: 'a-very-long-handle-of-thirty-c' }),
+]
+
 test.beforeAll(async () => {
   const users = { data: { renownUsers: [PROFILE] } }
   await fixtureStub({ match: 'renownUsers', variables: '"lena-layout"', response: users })
   await fixtureStub({ match: 'renownUsers', variables: ADDRESS, response: users })
   await fixtureStub({ match: 'appProfile(', variables: APP_DID, response: { data: { appProfile: APP } } })
   await fixtureStub({ match: 'appProfilesByPublisher(', variables: ADDRESS, response: { data: { appProfilesByPublisher: [APP] } } })
+  await installDirectoryFixture()
+  await fixtureStub({ match: 'query OrgByRef', variables: '"acme-layout"', response: { data: { organization: LAYOUT_ORG } } })
+  await fixtureStub({
+    match: 'query OrganizationStats',
+    variables: LAYOUT_ORG_ID,
+    response: { data: { organizationStats: { orgId: LAYOUT_ORG_ID, apps: 1, activeUsers30d: 123456, activeDelegations: 42, attestations30d: 7 } } },
+  })
+  await fixtureStub({ match: 'query AppProfilesByOrg', variables: LAYOUT_ORG_ID, response: { data: { appProfiles: { items: [APP], next: null } } } })
+  await fixtureStub({ match: 'query OrgMembers', variables: LAYOUT_ORG_ID, response: { data: { organizationMembers: LONG_MEMBERS } } })
+  await fixtureStub({
+    match: 'query OrgInviteLinkPreview',
+    variables: LAYOUT_INVITE_TOKEN,
+    response: {
+      data: {
+        orgInviteLink: {
+          org: orgSummary({ id: LAYOUT_ORG_ID, handle: 'acme-layout', name: LAYOUT_ORG.name, verifiedDomains: LAYOUT_ORG.verifiedDomains }),
+          role: 'PUBLISHER',
+          expiresAt: '2036-10-19T10:00:00.000Z',
+          expired: false,
+          revoked: false,
+          full: false,
+          usable: true,
+        },
+      },
+    },
+  })
 })
 
 /** /me for a signed-in test wallet with one connected app, answered in the browser (parallel-safe). */
@@ -117,6 +165,85 @@ interface LayoutPage {
   open: (page: Page) => Promise<void>
 }
 
+/** The members page for a signed-in owner of a long-named organisation (reads answered in the browser). */
+async function openSignedInManage(page: Page): Promise<void> {
+  await openManagePage(page, { role: 'OWNER', section: 'members', org: { name: LAYOUT_ORG.name, teams: [{ id: 't1', orgId: 'x', slug: 'core-platform-and-infrastructure', name: 'Core platform and infrastructure', appDids: [APP_DID], memberAddresses: [] }] } })
+  await expect(page.getByRole('list', { name: 'Members' })).toBeVisible({ timeout: 30_000 })
+}
+
+/** The inbox for a stand-in session, with long notifications. */
+async function openNotifications(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>
+    w.__renownE2eSession = { address: '0x5e00000000000000000000000000000000001c01', calls: [] }
+    w.__renownE2eBearer = 'e2e-layout-bearer'
+  })
+  const org = orgSummary({ id: LAYOUT_ORG_ID, handle: 'acme-layout', name: LAYOUT_ORG.name })
+  const at = '2026-10-12T10:00:00.000Z'
+  await serveOrgReads(page, {
+    MyUnreadNotificationCount: () => ({ myUnreadNotificationCount: 12 }),
+    MyNotifications: () => ({
+      myNotifications: {
+        items: [
+          { id: 'n1', kind: 'RECOVERY_STARTED', orgId: LAYOUT_ORG_ID, org, payload: JSON.stringify({ kind: 'RECOVER', domain: LAYOUT_ORG.verifiedDomains[0] }), createdAt: at, readAt: null },
+          { id: 'n2', kind: 'INVITED', orgId: LAYOUT_ORG_ID, org, payload: JSON.stringify({ role: 'PUBLISHER' }), createdAt: at, readAt: at },
+        ],
+        next: null,
+      },
+    }),
+  })
+  await page.goto('/notifications')
+  await expect(page.getByRole('list', { name: 'Notifications' })).toBeVisible({ timeout: 30_000 })
+}
+
+const openSection = (label: string) => async (page: Page): Promise<SurfaceSpec> => {
+  await page.getByRole('navigation', { name: 'Organisation settings' }).getByRole('link', { name: label }).click()
+  const heading = page.getByRole('heading', { level: 2, name: label })
+  await expect(heading).toBeVisible({ timeout: 30_000 })
+  return { panel: heading.locator('xpath=..') }
+}
+
+const createInviteLink = async (page: Page): Promise<SurfaceSpec> => {
+  await page.route('**/api/org/createOrgInviteLink', (route) =>
+    route.fulfill({
+      json: {
+        data: {
+          link: { id: 'l1', orgId: LAYOUT_ORG_ID, role: 'MEMBER', maxUses: 10, uses: 0, expiresAt: '2036-10-19T10:00:00.000Z', revoked: false, createdBy: '0x', createdAt: '2026-10-12T10:00:00.000Z' },
+          token: 'layoutCreatedTokenAAAAAAAAAAAAAAAAAAAAAAAAA',
+        },
+      },
+    }),
+  )
+  await page.getByRole('button', { name: 'Create invite link' }).click()
+  const panel = page.getByRole('region', { name: 'New invite link' })
+  await expect(panel).toBeVisible({ timeout: 30_000 })
+  return { panel }
+}
+
+/** The site chrome's stand-in session with memberships of long-named organisations. */
+async function standInMenuSession(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>
+    w.__renownE2eSession = { address: '0x5e00000000000000000000000000000000001d01', calls: [] }
+    w.__renownE2eBearer = 'e2e-layout-bearer'
+  })
+  await serveOrgReads(page, {
+    OrgsByMember: () => ({
+      organizationsByMember: [
+        { role: 'OWNER', hidden: false, org: { ...orgSummary({ id: 'org-layout-menu-1', handle: 'acme-layout', name: LAYOUT_ORG.name }), archived: false } },
+        { role: 'PUBLISHER', hidden: false, org: { ...orgSummary({ id: 'org-layout-menu-2', handle: 'beta-layout', name: 'Beta' }), archived: false } },
+      ],
+    }),
+  })
+}
+
+const openAccountMenu = async (page: Page): Promise<SurfaceSpec> => {
+  await page.getByRole('button', { name: /Account menu/ }).click()
+  const panel = page.getByRole('menu', { name: 'Account' })
+  await expect(panel.getByRole('menuitem', { name: /Beta/ })).toBeVisible({ timeout: 30_000 })
+  return { panel }
+}
+
 const visit = (path: string, heading: string) => async (page: Page) => {
   await page.goto(path)
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible({ timeout: 30_000 })
@@ -133,6 +260,11 @@ const PAGES: LayoutPage[] = [
   { name: 'me', open: openSignedInMe },
   { name: 'verify', open: visit('/verify', 'Check who signed it') },
   { name: 'people', open: visit('/people', 'People on Renown') },
+  { name: 'orgs', open: visit('/orgs', 'Organisations on Renown') },
+  { name: 'org', open: visit('/@acme-layout', LAYOUT_ORG.name) },
+  { name: 'invite', open: visit(`/invite/${LAYOUT_INVITE_TOKEN}`, `Join ${LAYOUT_ORG.name}`) },
+  { name: 'org-manage', open: openSignedInManage },
+  { name: 'notifications', open: openNotifications },
 ]
 
 interface LayoutState {
@@ -257,6 +389,11 @@ const openMenu = async (page: Page): Promise<SurfaceSpec> => {
 const STATES: LayoutState[] = [
   { name: 'mobile menu open', page: 'verify', widths: [390], open: openMenu },
   { name: 'mobile menu open', page: 'people', widths: [390], open: openMenu },
+  { name: 'mobile menu open', page: 'org', widths: [390], open: openMenu },
+  { name: 'teams section', inline: true, page: 'org-manage', widths: [390, 1280], open: openSection('Teams') },
+  { name: 'settings section', inline: true, page: 'org-manage', widths: [390, 1280], open: openSection('Settings') },
+  { name: 'invite link created', inline: true, page: 'org-manage', widths: [390, 1280], open: createInviteLink },
+  { name: 'account menu with organisations', page: 'trust', widths: [1280], prepare: standInMenuSession, open: openAccountMenu },
   {
     name: 'genuine result',
     inline: true,
