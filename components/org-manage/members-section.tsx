@@ -29,7 +29,14 @@ export function MembersSection({ ctx }: ManageSectionProps) {
   return (
     <div className="mt-6 space-y-8">
       {admin && <InvitePanel ctx={ctx} invites={invites.state} onChange={invites.reload} />}
-      {admin && <InviteLinksPanel ctx={ctx} links={links.state} onChange={links.reload} />}
+      {admin && (
+        <InviteLinksPanel
+          ctx={ctx}
+          links={links.state}
+          reading={links.pending}
+          onChange={links.reload}
+        />
+      )}
       <MemberList ctx={ctx} members={members.state} onChange={members.reload} />
     </div>
   )

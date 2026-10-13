@@ -8,9 +8,16 @@ import {
   linkUsesProblem,
   parseInvitee,
 } from '../lib/orgs/members'
-import { APP_DID_A, orgInvite, orgInviteLink, orgMember } from './support/org-fixtures'
+import {
+  APP_DID_A,
+  membership,
+  orgInvite,
+  orgInviteLink,
+  orgMember,
+  serveOrgReads,
+} from './support/org-fixtures'
 import { BOB, CAROL, defaultMembers, openManagePage, signedWrite } from './support/org-manage'
-import { fixtureStub } from './support/stub-switchboard-client'
+import { fixtureStub, graphqlError, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 
 test.describe('member rules', () => {
   test('only the roles the viewer may grant, remove or revoke', () => {
@@ -296,6 +303,101 @@ test.describe('manage: members', () => {
       role: 'MEMBER',
     })
     await expect.poll(() => memberReads).toBe(2)
+  })
+
+  test('a write refused because the organisation was archived meanwhile turns the page read-only', async ({
+    page,
+  }) => {
+    const setup = await openManagePage(page, { role: 'ADMIN', section: 'members' })
+    await fixtureStub({
+      match: 'mutation InviteOrgMember',
+      variables: setup.orgId,
+      response: graphqlError('The organization is archived or taken down', 'FORBIDDEN'),
+    })
+    // Later route handlers win: from now on the organisation reads as archived.
+    await serveOrgReads(page, {
+      OrgByRef: () => ({ organization: { ...setup.org, archived: true } }),
+    })
+    await page.getByLabel('Address or handle').fill('@carol-new')
+    await page.getByRole('button', { name: 'Send invite' }).click()
+    await expect(page.getByText('This organisation can no longer be changed.')).toBeVisible()
+    await expect(
+      page.getByText('This organisation is archived; nothing can be changed.'),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send invite' })).toHaveCount(0)
+  })
+
+  test('any other refusal re-reads the organisation, so the role and controls catch up', async ({
+    page,
+  }) => {
+    const setup = await openManagePage(page, { role: 'ADMIN', section: 'members' })
+    await fixtureStub({
+      match: 'mutation InviteOrgMember',
+      variables: setup.orgId,
+      response: graphqlError('Forbidden', 'FORBIDDEN'),
+    })
+    await serveOrgReads(page, {
+      OrgByRef: () => ({
+        organization: {
+          ...setup.org,
+          viewerMembership: membership(setup.orgId, setup.me, 'MEMBER'),
+        },
+      }),
+    })
+    await page.getByLabel('Address or handle').fill('@carol-new')
+    await page.getByRole('button', { name: 'Send invite' }).click()
+    await expect(page.getByText('Your role: Member')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send invite' })).toHaveCount(0)
+  })
+
+  test('creating waits for the re-read after a lost answer; revoking the new link hides it', async ({
+    page,
+  }) => {
+    const setup = await openManagePage(page, { role: 'ADMIN', section: 'members' })
+    const create = page
+      .getByRole('main')
+      .getByRole('button', { name: /Create invite link|Checking the links/ })
+    await expect(create).toHaveText('Create invite link')
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql/renown-orgs**`, async (route) => {
+      const body = route.request().postDataJSON() as { query: string }
+      if (!/^\s*query OrgInviteLinks/.test(body.query)) return route.fallback()
+      await gate
+      return route.fallback()
+    })
+    await page.route('**/api/org/createOrgInviteLink', (route) => route.abort())
+    await create.click()
+    await expect(create).toHaveText('Checking the links…')
+    await expect(create).toBeDisabled()
+    release()
+    await expect(create).toHaveText('Create invite link')
+    await expect(create).toBeEnabled()
+
+    await page.unroute('**/api/org/createOrgInviteLink')
+    const token = 'revokedLinkTokenAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+    await fixtureStub({
+      match: 'mutation CreateOrgInviteLink',
+      variables: setup.orgId,
+      response: {
+        data: { createOrgInviteLink: { link: orgInviteLink({ orgId: setup.orgId }), token } },
+      },
+    })
+    await fixtureStub({
+      match: 'mutation RevokeOrgInviteLink',
+      variables: setup.orgId,
+      response: {
+        data: { revokeOrgInviteLink: orgInviteLink({ orgId: setup.orgId, revoked: true }) },
+      },
+    })
+    await create.click()
+    await expect(page.getByRole('region', { name: 'New invite link' })).toContainText(token)
+    await page
+      .getByRole('list', { name: 'Invite links' })
+      .getByRole('button', { name: 'Revoke link' })
+      .click()
+    await expect(page.getByText('Invite link revoked.')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'New invite link' })).toHaveCount(0)
   })
 
   test('an unknown section is a 404 and the bare manage URL opens members', async ({ request }) => {

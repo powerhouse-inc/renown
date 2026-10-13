@@ -60,7 +60,8 @@ const TEXT: Record<OrgFailureCode, string> = {
   LAST_OWNER: 'An organisation always needs an owner. Add another owner first.',
   LIMIT_REACHED: 'A limit was reached, so nothing was changed.',
   DOMAIN_TAKEN: 'Another organisation has already verified this domain.',
-  DOMAIN_PROOF_MISSING: 'Renown could not find the proof yet. DNS changes can take a while; check again later.',
+  DOMAIN_PROOF_MISSING:
+    'Renown could not find the proof yet. DNS changes can take a while; check again later.',
   ORG_HAS_APPS: 'Transfer every app away before deleting the organisation.',
   APP_FROZEN: 'This app is frozen by its organisation.',
   PROPOSAL_NOT_EXECUTABLE: 'This proposal cannot run yet.',
@@ -71,13 +72,30 @@ const TEXT: Record<OrgFailureCode, string> = {
   NETWORK: 'Renown did not answer. Nothing was changed; try again.',
 }
 
+/**
+ * Why a FORBIDDEN was refused, from the switchboard's own message (it sends no
+ * sub-code): 'replayed' (the signature was already used, spent before any
+ * business check), 'readonly' (the organisation is archived or taken down),
+ * else 'denied' (the caller may not do this). null for every other code.
+ */
+export type OrgForbiddenReason = 'replayed' | 'readonly' | 'denied'
+
+export function orgForbiddenReason(
+  code: OrgFailureCode,
+  serverMessage?: string | null,
+): OrgForbiddenReason | null {
+  if (code !== 'FORBIDDEN') return null
+  const message = (serverMessage ?? '').toLowerCase()
+  if (message.includes('signature already used')) return 'replayed'
+  if (message.includes('archived or taken down')) return 'readonly'
+  return 'denied'
+}
+
 /** What to tell someone about a failed organisation request. Input errors carry the server's own sentence. */
 export function orgErrorText(code: OrgFailureCode, serverMessage?: string | null): string {
   if (code === 'BAD_USER_INPUT' && serverMessage?.trim()) return serverMessage.trim()
-  if (code === 'FORBIDDEN') {
-    const message = (serverMessage ?? '').toLowerCase()
-    if (message.includes('signature already used')) return 'This request was already sent. Reload to see the result.'
-    if (message.includes('archived or taken down')) return 'This organisation can no longer be changed.'
-  }
+  const reason = orgForbiddenReason(code, serverMessage)
+  if (reason === 'replayed') return 'This request was already sent. Reload to see the result.'
+  if (reason === 'readonly') return 'This organisation can no longer be changed.'
   return TEXT[code]
 }

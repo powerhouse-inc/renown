@@ -5,7 +5,6 @@ import { useCallback, useEffect, type ReactNode } from 'react'
 import { useRemote } from '../../hooks/use-remote'
 import { writeActiveOrg } from '../../lib/orgs/active-org'
 import { orgPath, roleLabel } from '../../lib/orgs/format'
-import { orgErrorText } from '../../lib/orgs/errors'
 import { orgRef } from '../../lib/orgs/handles'
 import { manageSection, minRoleText, sectionsFor } from '../../lib/orgs/manage-sections'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
@@ -118,34 +117,41 @@ function ManageOrg({
       </Notice>
     )
   }
+  // The two notices below keep the toasts: a write refused mid-session lands here.
   // Every write to an archived or taken-down organisation is refused, and a
   // taken-down one has no viewerMembership: say so before the membership check.
   if (org.takenDown || org.archived) {
     return (
-      <Notice title={org.name}>
-        <p role="status">
-          {org.takenDown
-            ? 'This organisation was taken down; nothing can be changed.'
-            : 'This organisation is archived; nothing can be changed.'}
-        </p>
-        <Link href="/me" className={buttonClasses('secondary', 'md', 'mt-6')}>
-          Go to Your Renown
-        </Link>
-      </Notice>
+      <>
+        <Notice title={org.name}>
+          <p role="status">
+            {org.takenDown
+              ? 'This organisation was taken down; nothing can be changed.'
+              : 'This organisation is archived; nothing can be changed.'}
+          </p>
+          <Link href="/me" className={buttonClasses('secondary', 'md', 'mt-6')}>
+            Go to Your Renown
+          </Link>
+        </Notice>
+        <ToastRegion toasts={toasts} onDismiss={dismiss} />
+      </>
     )
   }
   const membership = org.viewerMembership
   if (!membership) {
     return (
-      <Notice title={`You are not a member of ${org.name}`}>
-        <p>
-          Only members can open these pages. If you were invited, accept the invite on Your Renown
-          first.
-        </p>
-        <Link href={orgPath(org.handle)} className={buttonClasses('secondary', 'md', 'mt-6')}>
-          View its public page
-        </Link>
-      </Notice>
+      <>
+        <Notice title={`You are not a member of ${org.name}`}>
+          <p>
+            Only members can open these pages. If you were invited, accept the invite on Your Renown
+            first.
+          </p>
+          <Link href={orgPath(org.handle)} className={buttonClasses('secondary', 'md', 'mt-6')}>
+            View its public page
+          </Link>
+        </Notice>
+        <ToastRegion toasts={toasts} onDismiss={dismiss} />
+      </>
     )
   }
 
@@ -170,11 +176,13 @@ function ManageOrg({
       return null
     }
     show('error', options.errorText?.[result.code] ?? result.message)
-    // Archived or taken down meanwhile: re-read, so the shell shows it read-only.
-    if (
-      result.code === 'FORBIDDEN' &&
-      result.message === orgErrorText('FORBIDDEN', 'archived or taken down')
-    ) {
+    if (result.reason === 'replayed') {
+      // The signed request was already applied once: re-read what it changed.
+      options.recheck?.()
+    } else if (result.code === 'FORBIDDEN') {
+      // Refused for the viewer (role changed, removed) or the organisation
+      // (archived, taken down) meanwhile: re-read it so the header, the nav and
+      // the controls match what the switchboard allows now.
       reloadOrg()
     }
     return null

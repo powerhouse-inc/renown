@@ -4,11 +4,17 @@
 // services/org-client-write.ts posts them to /api/org/<mutation>. The one
 // bearer write is markNotificationsRead (it changes only the caller's inbox).
 import { ClientError, GraphQLClient } from 'graphql-request'
-import { isOrgErrorCode, type OrgFailureCode } from '../lib/orgs/errors'
+import {
+  isOrgErrorCode,
+  orgForbiddenReason,
+  type OrgFailureCode,
+  type OrgForbiddenReason,
+} from '../lib/orgs/errors'
 import { switchboardOrigin } from './media'
 import type { OrgRole } from './org-signed-messages'
 
 export type { OrgRole }
+export { orgForbiddenReason, type OrgForbiddenReason }
 
 export type OrgMemberStatus =
   | 'INVITED'
@@ -284,6 +290,11 @@ export class OrgApiError extends Error {
   ) {
     super(message)
     this.name = 'OrgApiError'
+  }
+
+  /** On FORBIDDEN: replayed signature, archived/taken-down organisation, or denied. */
+  get reason(): OrgForbiddenReason | null {
+    return this.unauthenticated ? null : orgForbiddenReason(this.code, this.message)
   }
 }
 

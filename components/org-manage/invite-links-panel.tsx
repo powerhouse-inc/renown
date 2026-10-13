@@ -18,17 +18,21 @@ import { Panel, RemoteView } from './manage-ui'
 export function InviteLinksPanel({
   ctx,
   links,
+  reading,
   onChange,
 }: {
   ctx: ManageContext
   links: Remote<OrgInviteLink[]>
+  /** The list is being (re-)read: creating waits for it, so a lost answer is checked before a retry. */
+  reading: boolean
   onChange: () => void
 }) {
   const now = useNow()
   const [role, setRole] = useState<OrgRole>('MEMBER')
   const [uses, setUses] = useState('10')
   const [days, setDays] = useState<number>(7)
-  const [created, setCreated] = useState<string | null>(null)
+  /** The new link, shown once, with the id of the link it belongs to. */
+  const [created, setCreated] = useState<{ id: string; url: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const usesProblem = linkUsesProblem(uses)
@@ -52,7 +56,7 @@ export function InviteLinksPanel({
     )
     setBusy(null)
     if (done) {
-      setCreated(inviteLinkUrl(window.location.origin, done.token))
+      setCreated({ id: done.link.id, url: inviteLinkUrl(window.location.origin, done.token) })
       setCopied(false)
       onChange()
     }
@@ -67,7 +71,11 @@ export function InviteLinksPanel({
       { recheck: onChange },
     )
     setBusy(null)
-    if (done) onChange()
+    if (done) {
+      // The one-time panel must not offer a dead link.
+      if (created?.id === link.id) setCreated(null)
+      onChange()
+    }
   }
 
   return (
@@ -123,10 +131,10 @@ export function InviteLinksPanel({
         </Field>
         <button
           type="submit"
-          disabled={busy === 'create'}
+          disabled={busy === 'create' || reading}
           className={buttonClasses('primary', 'md', 'justify-self-start sm:col-span-3')}
         >
-          {busy === 'create' ? 'Creating…' : 'Create invite link'}
+          {busy === 'create' ? 'Creating…' : reading ? 'Checking the links…' : 'Create invite link'}
         </button>
       </form>
       {created && (
@@ -138,12 +146,12 @@ export function InviteLinksPanel({
           <p className="text-ink text-sm font-semibold">
             Copy the link now: Renown shows it only once.
           </p>
-          <p className="text-ink mt-2 font-mono text-[13px] break-all">{created}</p>
+          <p className="text-ink mt-2 font-mono text-[13px] break-all">{created.url}</p>
           <button
             type="button"
             onClick={() => {
               Promise.resolve()
-                .then(() => navigator.clipboard.writeText(created))
+                .then(() => navigator.clipboard.writeText(created.url))
                 .then(
                   () => setCopied(true),
                   () => setCopied(false),

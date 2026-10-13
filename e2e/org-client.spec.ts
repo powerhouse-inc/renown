@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { buildSchema, parse, validate } from 'graphql'
 import { GraphQLClient } from 'graphql-request'
-import { isOrgErrorCode, orgErrorText, statusForOrgError } from '../lib/orgs/errors'
+import { isOrgErrorCode, orgErrorText, orgForbiddenReason, statusForOrgError } from '../lib/orgs/errors'
 import { handleFromName, orgHandleProblem, orgRef } from '../lib/orgs/handles'
 import { argsProblem, isOrgMutationName, mutationDocument, ORG_MUTATIONS, type OrgMutationName } from '../services/org-mutations'
 import { canonicalJson, ORG_ROLES, orgMessage, parseOrgRole, roleAtLeast } from '../services/org-signed-messages'
@@ -125,6 +125,11 @@ test.describe('org helpers', () => {
     expect(orgErrorText('FORBIDDEN', 'signature already used')).toBe('This request was already sent. Reload to see the result.')
     expect(orgErrorText('FORBIDDEN', 'The organization is archived or taken down')).toBe('This organisation can no longer be changed.')
     expect(orgErrorText('FORBIDDEN', 'Forbidden')).toMatch(/device clock/)
+    expect(orgForbiddenReason('FORBIDDEN', 'Signature already used')).toBe('replayed')
+    expect(orgForbiddenReason('FORBIDDEN', 'The organization is archived or taken down')).toBe('readonly')
+    expect(orgForbiddenReason('FORBIDDEN', 'Forbidden')).toBe('denied')
+    expect(orgForbiddenReason('NOT_FOUND', 'archived or taken down')).toBeNull()
+    expect(new OrgApiError('FORBIDDEN', 'The organization is archived or taken down').reason).toBe('readonly')
     expect(orgErrorText('LAST_OWNER', 'ignored')).toBe('An organisation always needs an owner. Add another owner first.')
   })
 })

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toOrgApiError, type OrgApiError } from '../services/orgs'
 
-export type Remote<T> = { status: 'loading' } | { status: 'ready'; value: T } | { status: 'error'; error: OrgApiError }
+export type Remote<T> =
+  | { status: 'loading' }
+  | { status: 'ready'; value: T }
+  | { status: 'error'; error: OrgApiError }
 
 interface Answer<T> {
   /** The key the answer belongs to. */
@@ -17,7 +20,16 @@ interface Answer<T> {
  * (after a write returned it). State is only set in promise callbacks. `load`
  * must be stable (useCallback). A null key reads nothing (loading).
  */
-export function useRemote<T>(key: string | null, load: () => Promise<T>): { state: Remote<T>; reload: () => void; set: (value: T) => void } {
+export function useRemote<T>(
+  key: string | null,
+  load: () => Promise<T>,
+): {
+  state: Remote<T>
+  /** True until the answer to the current key and reload attempt arrives (a reload keeps showing the last value meanwhile). */
+  pending: boolean
+  reload: () => void
+  set: (value: T) => void
+} {
   const [attempt, setAttempt] = useState(0)
   const [answer, setAnswer] = useState<Answer<T> | null>(null)
   const full = key === null ? null : `${key}#${attempt}`
@@ -30,7 +42,8 @@ export function useRemote<T>(key: string | null, load: () => Promise<T>): { stat
         if (!cancelled) setAnswer({ base: key, full, state: { status: 'ready', value } })
       },
       (error: unknown) => {
-        if (!cancelled) setAnswer({ base: key, full, state: { status: 'error', error: toOrgApiError(error) } })
+        if (!cancelled)
+          setAnswer({ base: key, full, state: { status: 'error', error: toOrgApiError(error) } })
       },
     )
     return () => {
@@ -41,7 +54,8 @@ export function useRemote<T>(key: string | null, load: () => Promise<T>): { stat
   const reload = useCallback(() => setAttempt((n) => n + 1), [])
   const set = useCallback(
     (value: T) => {
-      if (key !== null && full !== null) setAnswer({ base: key, full, state: { status: 'ready', value } })
+      if (key !== null && full !== null)
+        setAnswer({ base: key, full, state: { status: 'ready', value } })
     },
     [key, full],
   )
@@ -49,5 +63,6 @@ export function useRemote<T>(key: string | null, load: () => Promise<T>): { stat
   let state: Remote<T> = { status: 'loading' }
   if (answer && answer.full === full) state = answer.state
   else if (answer && answer.base === key && answer.state.status === 'ready') state = answer.state
-  return { state, reload, set }
+  const pending = full !== null && answer?.full !== full
+  return { state, pending, reload, set }
 }
