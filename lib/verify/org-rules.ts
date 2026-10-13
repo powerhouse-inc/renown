@@ -2,7 +2,7 @@
 // (renown-package A2 ruling 11). /verify adds that as one more check. Pure
 // apart from the injected lookup.
 import { sentence, shortAddress } from './format'
-import type { Check, OrgCredentialReason, OrgLookups, Report } from './types'
+import type { AppPublisherOrgRef, Check, OrgCredentialReason, OrgLookups, Report } from './types'
 
 function reasonText(reason: OrgCredentialReason, issuer: string, org: string): string {
   switch (reason) {
@@ -17,9 +17,15 @@ function reasonText(reason: OrgCredentialReason, issuer: string, org: string): s
   }
 }
 
-/** The "Allowed by the organisation" check for a delegation credential; null when no organisation publishes the app or no reads are available. */
-export async function orgRulesCheck(orgs: OrgLookups | undefined, credentialId: string, issuer: string, orgName: string | null): Promise<Check | null> {
-  if (!orgs) return null
+/**
+ * The "Allowed by the organisation" check for a delegation credential; null when no
+ * organisation publishes the app or no reads are available. `publisherOrg` is the app's
+ * publishing organisation: null when Renown said none does (the rules are not asked, so a
+ * renown-orgs outage never degrades a personal app's verdict), undefined when that read failed.
+ */
+export async function orgRulesCheck(orgs: OrgLookups | undefined, credentialId: string, issuer: string, publisherOrg: AppPublisherOrgRef | null | undefined): Promise<Check | null> {
+  if (!orgs || publisherOrg === null) return null
+  const orgName = publisherOrg?.name ?? null
   const id = 'org-rules'
   const label = 'Allowed by the organisation'
   const found = await orgs.credentialStatus(credentialId)

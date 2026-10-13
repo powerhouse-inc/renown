@@ -33,6 +33,8 @@ interface World {
   orgDown?: boolean
   /** Only the publishing-organisation read fails. */
   publisherDown?: boolean
+  /** No organisation publishes the app (a person-published app). */
+  personalApp?: boolean
   credentials?: StoredCredential[]
   /** Organisation ids asked for (releaseAttestation / releaseAttestations calls). */
   calls?: string[]
@@ -46,8 +48,11 @@ function deps(world: World): VerifyDeps {
     appProfile: async () => ({ ok: true, value: { documentId: 'doc-app', name: 'Acme Ledger', logoRef: null } }),
   }
   const orgs: OrgLookups = {
-    credentialStatus: async () => (world.orgDown ? { ok: false } : { ok: true, value: world.status ?? null }),
-    appPublisherOrg: async () => (world.publisherDown ? { ok: false } : { ok: true, value: ORG }),
+    credentialStatus: async () => {
+      world.calls?.push('rules')
+      return world.orgDown ? { ok: false } : { ok: true, value: world.status ?? null }
+    },
+    appPublisherOrg: async () => (world.publisherDown ? { ok: false } : { ok: true, value: world.personalApp ? null : ORG }),
     releaseAttestation: async (id) => {
       world.calls?.push(`id:${id}`)
       if (world.orgDown) return { ok: false }
@@ -237,6 +242,39 @@ test.describe('organisation rules on credentials', () => {
     const personal = await verifyCredential(credential, deps({ status: null }))
     expect(status(personal)['org-rules']).toBeUndefined()
     expect((await verifyCredential(credential, deps({ orgDown: true }))).verdict).toBe('unchecked')
+  })
+
+  test('a person-published app never asks for organisation rules, so a renown-orgs outage cannot degrade it', async () => {
+    const wallet = makeWallet()
+    const credential = await makeCredential({ wallet, subject: APP, issuedAt: new Date(NOW.getTime() - 60_000) })
+    const calls: string[] = []
+    const report = await verifyCredential(credential, deps({ personalApp: true, orgDown: true, calls }))
+    expect(report.verdict).toBe('genuine')
+    expect(status(report)['org-rules']).toBeUndefined()
+    expect(calls).toEqual([])
+    // The publisher read itself failed: the rules are still asked (an organisation may publish it).
+    const unknownPublisher: string[] = []
+    await verifyCredential(credential, deps({ publisherDown: true, status: null, calls: unknownPublisher }))
+    expect(unknownPublisher).toEqual(['rules'])
+
+    const key = await makeAppKey()
+    const tokenCredential = (await makeCredential({ wallet, subject: key.did, app: 'Vault' })) as { id: string; issuanceDate: string; expirationDate: string }
+    const row: StoredCredential = {
+      credentialId: tokenCredential.id,
+      issuerEthereumAddress: wallet.address,
+      credentialSubjectId: key.did,
+      credentialSubjectApp: 'Vault',
+      issuanceDate: tokenCredential.issuanceDate,
+      expirationDate: tokenCredential.expirationDate,
+      revoked: false,
+      revokedAt: null,
+      revocationReason: null,
+    }
+    const token = await makeBearerToken(key, wallet.address)
+    const tokenCalls: string[] = []
+    const tokenReport = await verifyToken(token, { ...deps({ credentials: [row], personalApp: true, orgDown: true, calls: tokenCalls }), now: new Date() })
+    expect(tokenReport.verdict).toBe('genuine')
+    expect(tokenCalls).toEqual([])
   })
 
   test('every rules reason turns a genuine bearer token into "revoked"', async () => {

@@ -299,5 +299,5 @@ export async function verifyOperation(
     ],
   }
   if (delegation.outcome !== 'authorised' || !delegation.credential) return report
-  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, user, app.publisherOrg?.name ?? null))
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, user, app.publisherOrg))
 }

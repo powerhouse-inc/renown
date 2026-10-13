@@ -184,5 +184,5 @@ export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report
   ]
   const report: Report = { kind: 'token', verdict, summary: sentence(sentences[reason]), checks, signer, app, times }
   if (delegation.outcome !== 'authorised' || !delegation.credential) return report
-  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, claims.address, app.publisherOrg?.name ?? null))
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, claims.address, app.publisherOrg))
 }

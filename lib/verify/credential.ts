@@ -334,7 +334,7 @@ export async function verifyCredential(
   const report: Report = { kind: 'credential', verdict, summary: sentence(summary[verdict]), checks, signer, app, times }
   // A forged credential proves nothing to check rules for; a session is not an app.
   if (forged || session) return report
-  return withOrgRules(report, await orgRulesCheck(deps.orgs, credential.id, issuer, app.publisherOrg?.name ?? null))
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, credential.id, issuer, app.publisherOrg))
 }
 
 /** /verify for a credential id: the stored copy, re-checked like a pasted credential. */
