@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
             { source: "/media/:documentId/:field", destination: "/api/media/:documentId/:field" },
             // renown.id/@handle is the canonical profile URL.
             { source: "/@:handle", destination: "/profile/:handle?by=handle" },
+            // did:web:<host>:org:<id> resolves to https://<host>/org/<id>/did.json.
+            { source: "/org/:id/did.json", destination: "/api/org-did/:id" },
         ];
     },
     async headers() {

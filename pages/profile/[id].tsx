@@ -6,6 +6,11 @@ import { PageMeta } from '../../components/site/page-meta'
 import { Container } from '../../components/site/primitives'
 import { SiteLayout } from '../../components/site/site-layout'
 import { NotFoundPage } from '../../components/ui/not-found-page'
+import { OrgPage } from '../../components/org/org-page'
+import { MemberOf } from '../../components/profile/member-of'
+import { orgPath } from '../../lib/orgs/format'
+import { loadOrgPageData, type OrgPageData } from '../../lib/orgs/org-page-data'
+import { fetchOrganization, organizationsByMember, type OrgAffiliation, type Organization } from '../../services/orgs'
 import { profileJsonLd } from '../../lib/json-ld'
 import { HERO_ART, identityArtSvgs, type IdentityArtSvgs } from '../../lib/identity-art'
 import { profileCompleteness } from '../../lib/me/completeness'
@@ -38,6 +43,10 @@ interface ProfilePageProps {
   ogImage: string | null
   /** QR code of canonicalUrl for the share menu (computed here, on the server). */
   qr: QrCode | null
+  /** Set when /@handle belongs to an organisation: the page renders OrgPage instead. */
+  org: OrgPageData | null
+  /** The person's public organisation memberships. */
+  memberOf: OrgAffiliation[]
   error?: string
 }
 
@@ -45,8 +54,9 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
-const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, apps, stats, canonicalUrl, ogImage, qr, error }) => {
+const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, apps, stats, canonicalUrl, ogImage, qr, org, memberOf, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
+  if (org) return <OrgPage data={org} />
   if (!profile || !art) {
     return <NotFoundPage title="Profile not found" message="No Renown profile has this name or address. Check the link, or browse apps to find people who publish them." />
   }
@@ -66,7 +76,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, ap
   ]
   // Only http(s) links are ever shown; the rest count as no links at all.
   const links = (profile.links ?? []).filter((link) => linkTarget(link.url))
-  const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0
+  const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0 || memberOf.length > 0
   const path = profilePath(profile)
   const url = canonicalUrl ?? path
   const image = profile.avatar && canonicalUrl ? mediaUrl(profile.documentId, 'avatar', new URL(canonicalUrl).origin, profile.avatar) : null
@@ -104,6 +114,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, ap
               <>
                 <ProfileAbout bio={profile.bio ?? null} links={links} />
                 <ProfileApps apps={apps} />
+                <MemberOf orgs={memberOf} />
                 <ProfileActivity groups={groups} />
               </>
             ) : (
@@ -127,13 +138,20 @@ function optional<T>(promise: Promise<T>, fallback: T): Promise<T> {
 export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (context) => {
   const id = String(context.params?.id ?? '')
   const byHandle = context.query.by === 'handle'
-  const empty = { profile: null, ensVerified: false, art: null, apps: [], stats: [], canonicalUrl: null, ogImage: null, qr: null }
+  const empty = { profile: null, ensVerified: false, art: null, apps: [], stats: [], canonicalUrl: null, ogImage: null, qr: null, org: null, memberOf: [] }
   if (!id) return { props: { ...empty, error: 'No profile identifier provided' } }
 
   let profile: RenownProfile | null
+  // Handles are one namespace for people and organisations: /@handle asks both at once.
+  let orgLookup: Promise<Organization | null | 'unavailable'> | null = null
   try {
     if (byHandle) {
-      profile = await fetchProfile({ driveId: DEFAULT_DRIVE_ID, handle: id.toLowerCase() })
+      const handle = id.toLowerCase()
+      orgLookup = withTimeout(fetchOrganization({ handle }, null, context.req), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
+        console.error('Failed to fetch organization from switchboard:', error instanceof Error ? error.message : error)
+        return 'unavailable' as const
+      })
+      profile = await fetchProfile({ driveId: DEFAULT_DRIVE_ID, handle })
     } else if (ADDRESS_RE.test(id)) {
       profile = await fetchProfile({ driveId: `renown-${id.toLowerCase()}`, ethAddress: id.toLowerCase() })
     } else {
@@ -148,6 +166,22 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
     context.res.setHeader('Cache-Control', 'no-store')
     context.res.setHeader('Retry-After', '30')
     return { props: { ...empty, error: 'Profiles are temporarily unavailable. Please try again in a moment.' } }
+  }
+  if (!profile && orgLookup) {
+    const org = await orgLookup
+    if (org === 'unavailable') {
+      // No person has this handle, and organisations could not be asked (outage, timeout or
+      // RATE_LIMITED): never a cacheable 404.
+      context.res.statusCode = 503
+      context.res.setHeader('Cache-Control', 'no-store')
+      context.res.setHeader('Retry-After', '30')
+      return { props: { ...empty, error: 'Profiles are temporarily unavailable. Please try again in a moment.' } }
+    }
+    if (org) {
+      if (org.handle !== id) return { redirect: { destination: orgPath(org.handle), permanent: false } }
+      context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
+      return { props: { ...empty, org: await loadOrgPageData(org, context.req) } }
+    }
   }
   if (!profile) {
     context.res.statusCode = 404
@@ -165,10 +199,11 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   const ogImage = wallet ? ogImageUrl({ variant: 'profile', address }, origin) : ogImageUrl({ variant: 'default' }, origin)
   context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   // Secondary sections: each drops out on failure or timeout; the profile always renders.
-  const [ensVerified, apps, stats] = await Promise.all([
+  const [ensVerified, apps, stats, memberOf] = await Promise.all([
     isEnsVerified(profile.username, profile.ethAddress),
     wallet ? optional(getAppProfilesByPublisher(address.toLowerCase()), []) : Promise.resolve([]),
     wallet ? optional(getUserStats(address), []) : Promise.resolve([]),
+    wallet ? optional(organizationsByMember(address.toLowerCase(), null, context.req), []) : Promise.resolve([]),
   ])
   // The same URL as <link rel=canonical> (PageMeta), so share, QR and JSON-LD agree with it.
   const canonicalUrl = siteCanonicalUrl(profilePath(profile))
@@ -183,6 +218,8 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
       canonicalUrl,
       ogImage,
       qr: qrCode(canonicalUrl),
+      org: null,
+      memberOf,
     },
   }
 }

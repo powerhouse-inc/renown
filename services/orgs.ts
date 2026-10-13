@@ -425,15 +425,16 @@ export function isOrgSearchable(query: string): boolean {
   return query === '' || Array.from(query).length >= 2
 }
 
-/** An organisation by id or handle; null when there is none. */
+/** An organisation by id or handle; null when there is none. `request`: the incoming SSR request (D23). */
 export async function fetchOrganization(
   ref: { id: string } | { handle: string },
   bearer?: string | null,
+  request?: OrgServerRequest | null,
 ): Promise<Organization | null> {
   const data = await orgsRequest<{ organization: Organization | null }>(
     `query OrgByRef($id: String, $handle: String) { organization(id: $id, handle: $handle) { ${ORG_FIELDS} } }`,
     ref,
-    { bearer },
+    { bearer, request },
   )
   return data.organization
 }
@@ -454,11 +455,12 @@ export async function searchOrganizations(
 export async function organizationsByMember(
   address: string,
   bearer?: string | null,
+  request?: OrgServerRequest | null,
 ): Promise<OrgAffiliation[]> {
   const data = await orgsRequest<{ organizationsByMember: OrgAffiliation[] }>(
     `query OrgsByMember($address: String!) { organizationsByMember(address: $address) { role hidden org { ${ORG_SUMMARY_FIELDS} archived } } }`,
     { address: address.toLowerCase() },
-    { bearer },
+    { bearer, request },
   )
   return data.organizationsByMember
 }
@@ -468,11 +470,12 @@ export async function organizationMembers(
   orgId: string,
   includeInactive: boolean,
   bearer?: string | null,
+  request?: OrgServerRequest | null,
 ): Promise<OrgMember[]> {
   const data = await orgsRequest<{ organizationMembers: OrgMember[] }>(
     `query OrgMembers($orgId: String!, $includeInactive: Boolean) { organizationMembers(orgId: $orgId, includeInactive: $includeInactive) { ${MEMBER_FIELDS} } }`,
     includeInactive ? { orgId, includeInactive } : { orgId },
-    { bearer },
+    { bearer, request },
   )
   return data.organizationMembers
 }
@@ -558,19 +561,27 @@ export async function markNotificationsRead(
   return data.markNotificationsRead
 }
 
-export async function fetchOrganizationStats(orgId: string): Promise<OrganizationStats | null> {
+export async function fetchOrganizationStats(
+  orgId: string,
+  request?: OrgServerRequest | null,
+): Promise<OrganizationStats | null> {
   const data = await orgsRequest<{ organizationStats: OrganizationStats | null }>(
     'query OrganizationStats($orgId: String!) { organizationStats(orgId: $orgId) { orgId apps activeUsers30d activeDelegations attestations30d } }',
     { orgId },
+    { request },
   )
   return data.organizationStats
 }
 
 /** The did:web document JSON (a string), or null when unknown, archived or taken down. */
-export async function fetchOrganizationDidDocument(orgId: string): Promise<string | null> {
+export async function fetchOrganizationDidDocument(
+  orgId: string,
+  request?: OrgServerRequest | null,
+): Promise<string | null> {
   const data = await orgsRequest<{ organizationDidDocument: string | null }>(
     'query OrgDidDocument($orgId: String!) { organizationDidDocument(orgId: $orgId) }',
     { orgId },
+    { request },
   )
   return data.organizationDidDocument
 }

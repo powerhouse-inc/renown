@@ -62,18 +62,29 @@ export interface AppProfilePage {
 
 /**
  * One page of app profiles, newest first (`limit` 1-50), optionally only those
- * in `category` (matched case-insensitively). A failed read throws; callers
- * decide whether that hides a section or shows an outage.
+ * in `category` (matched case-insensitively) or published by organisation
+ * `orgId`. The org filter has its own query document, so the directory keeps
+ * working against a switchboard that predates it. A failed read throws;
+ * callers decide whether that hides a section or shows an outage.
  */
 export async function listAppProfiles({
   limit,
   after,
   category,
+  orgId,
 }: {
   limit: number
   after?: string | null
   category?: string | null
+  orgId?: string | null
 }): Promise<AppProfilePage> {
+  if (orgId) {
+    const data = await client().request<{ appProfiles: AppProfilePage }>(
+      `query AppProfilesByOrg($limit: Int, $after: String, $category: String, $orgId: String) { appProfiles(limit: $limit, after: $after, category: $category, orgId: $orgId) { items { ${APP_PROFILE_FIELDS} } next } }`,
+      { limit, after: after ?? null, category: category ?? null, orgId },
+    )
+    return data.appProfiles
+  }
   const data = await client().request<{ appProfiles: AppProfilePage }>(
     `query AppProfiles($limit: Int, $after: String, $category: String) { appProfiles(limit: $limit, after: $after, category: $category) { items { ${APP_PROFILE_FIELDS} } next } }`,
     { limit, after: after ?? null, category: category ?? null },

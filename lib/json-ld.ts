@@ -2,6 +2,7 @@
 // PageMeta (which escapes "<"). Only public, already-shown facts; descriptions
 // are plain text (markdown syntax stripped).
 import type { RenownAppProfile } from '../services/app-profiles'
+import type { Organization } from '../services/orgs'
 import type { RenownProfile } from '../services/switchboard'
 import { linkTarget } from '../utils/link-service'
 import { clipText, markdownPlainText } from '../utils/markdown-lite'
@@ -70,5 +71,30 @@ export function appJsonLd({ app, name, url, image, publisher }: AppJsonLdInput):
     ...(website && { installUrl: website }),
     ...(sameAs.length > 0 && { sameAs }),
     ...(publisher && { publisher: { '@type': 'Person', name: publisher.name, url: publisher.url } }),
+  }
+}
+
+export interface OrganizationJsonLdInput {
+  org: Pick<Organization, 'name' | 'handle' | 'did' | 'bio' | 'links' | 'verifiedDomains'>
+  /** Absolute canonical URL of the organisation page. */
+  url: string
+  /** Absolute avatar URL (/media), when the organisation has one. */
+  image: string | null
+}
+
+/** Organization for an organisation page; its verified domains count as sameAs. */
+export function organizationJsonLd({ org, url, image }: OrganizationJsonLdInput): object {
+  const sameAs = [...safeUrls(org.links), ...org.verifiedDomains.map((domain) => `https://${domain}`)]
+  const description = markdownPlainText(org.bio ?? '')
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: org.name,
+    url,
+    alternateName: `@${org.handle}`,
+    identifier: org.did,
+    ...(description && { description }),
+    ...(image && { logo: image }),
+    ...(sameAs.length > 0 && { sameAs }),
   }
 }
