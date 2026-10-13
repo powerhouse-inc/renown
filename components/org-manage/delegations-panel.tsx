@@ -12,7 +12,7 @@ import { withBearer } from '../../services/orgs'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageContext } from './manage-context'
 import { useConfirm } from './confirm-dialog'
-import { Panel, RemoteView } from './manage-ui'
+import { LONG_LABEL, Panel, RemoteView } from './manage-ui'
 
 const live = (c: OrgCredential) => c.status.counts && !c.revoked
 
@@ -157,7 +157,7 @@ export function DelegationsPanel({
                               ),
                           })
                         }
-                        className={buttonClasses('ghost', 'md', 'text-danger-ink')}
+                        className={buttonClasses('ghost', 'md', `text-danger-ink ${LONG_LABEL}`)}
                       >
                         Suspend every delegation from {who}
                       </button>

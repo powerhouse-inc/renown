@@ -20,7 +20,7 @@ import {
 import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageContext, ManageSectionProps } from './manage-context'
-import { Panel, RemoteView } from './manage-ui'
+import { LONG_LABEL, Panel, RemoteView } from './manage-ui'
 
 type AppName = (did: string) => string
 
@@ -221,7 +221,7 @@ function OrgAppsPanel({
                         type="button"
                         disabled={busy === app.appDid || reading || !!pendingProposal}
                         onClick={() => void freeze(app)}
-                        className={buttonClasses('ghost', 'md')}
+                        className={buttonClasses('ghost', 'md', LONG_LABEL)}
                       >
                         {app.frozen ? `Propose unfreezing ${name}` : `Propose freezing ${name}`}
                       </button>

@@ -5,7 +5,7 @@ import { orgDomains, type OrgDomain } from '../../services/org-security'
 import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageSectionProps } from './manage-context'
-import { ConfirmButton, Panel, RemoteView } from './manage-ui'
+import { ConfirmButton, LONG_LABEL, Panel, RemoteView } from './manage-ui'
 
 const OWNERS_ONLY = 'Only owners can remove a verified domain.'
 
@@ -129,7 +129,7 @@ export function DomainsSection({ ctx }: ManageSectionProps) {
                           {domain.status === 'VERIFIED' ? 'Verified' : domain.status === 'LAPSED' ? 'Lapsed' : 'Pending'}
                         </Badge>
                         {domain.status !== 'VERIFIED' && (
-                          <button type="button" disabled={busy === domain.id} onClick={() => void check(domain)} className={buttonClasses('secondary', 'md')}>
+                          <button type="button" disabled={busy === domain.id} onClick={() => void check(domain)} className={buttonClasses('secondary', 'md', LONG_LABEL)}>
                             Check {domain.domain} now
                           </button>
                         )}

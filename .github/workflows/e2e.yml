@@ -59,6 +59,14 @@ jobs:
           e2e/org-manage-members.spec.ts
           e2e/org-manage-teams-settings.spec.ts
           e2e/org-account.spec.ts
+          e2e/org-security-client.spec.ts
+          e2e/org-manage-apps.spec.ts
+          e2e/org-manage-security.spec.ts
+          e2e/org-manage-integrations.spec.ts
+          e2e/org-manage-oidc-audit.spec.ts
+          e2e/app-provenance.spec.ts
+          e2e/verify-orgs.spec.ts
+          e2e/org-reports.spec.ts
           --workers=2
 
       # Always uploaded: the layout cases attach a full-page screenshot each (the gallery).

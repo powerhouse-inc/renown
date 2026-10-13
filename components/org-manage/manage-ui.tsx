@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Remote } from '../../hooks/use-remote'
 import { orgErrorText } from '../../lib/orgs/errors'
+import { cx } from '../../utils/cx'
 import { buttonClasses } from '../site/primitives'
 
 /** A titled block of a manage section (h3 region). */
@@ -28,7 +29,7 @@ export function Panel({
             {title}
           </h3>
           {description && (
-            <p className="text-ink-muted mt-1 max-w-[70ch] text-sm leading-6">{description}</p>
+            <p className="text-ink-muted mt-1 max-w-[70ch] text-sm leading-6 break-words">{description}</p>
           )}
         </div>
         {actions}
@@ -77,6 +78,9 @@ export function RemoteView<T>({
 }
 
 /** A destructive action that asks once more in place before it runs. */
+/** For buttons whose label carries a long unbreakable value (a DID, a domain): wrap instead of widening the page. */
+export const LONG_LABEL = 'h-auto! min-h-10 max-w-full py-2 text-left whitespace-normal! break-all'
+
 export function ConfirmButton({
   label,
   confirm,
@@ -95,14 +99,14 @@ export function ConfirmButton({
         type="button"
         disabled={busy}
         onClick={() => setAsking(true)}
-        className={buttonClasses('ghost', 'md', 'text-danger-ink')}
+        className={buttonClasses('ghost', 'md', cx('text-danger-ink', LONG_LABEL))}
       >
         {label}
       </button>
     )
   }
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
+    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-2">
       <button
         type="button"
         disabled={busy}
@@ -110,7 +114,7 @@ export function ConfirmButton({
           setAsking(false)
           onConfirm()
         }}
-        className={buttonClasses('secondary', 'md', 'border-danger-ink/50 text-danger-ink')}
+        className={buttonClasses('secondary', 'md', cx('border-danger-ink/50 text-danger-ink', LONG_LABEL))}
       >
         {confirm}
       </button>

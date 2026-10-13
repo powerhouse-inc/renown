@@ -9,11 +9,13 @@ import {
   trappedFixedElements,
   type SurfaceSpec,
 } from './support/layout-invariants'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { EXAMPLE_DATA } from '../lib/verify/examples'
+import { RELEASE_DOMAIN, RELEASE_TYPES } from '../lib/verify/attestation'
 import { useTheme, type Theme } from './support/site'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 import { signInTestWallet } from './support/test-session'
-import { installDirectoryFixture, organization, orgMember, orgSummary, serveOrgReads } from './support/org-fixtures'
+import { auditEntry, installDirectoryFixture, organization, orgCredential, orgDomain, orgMember, orgProposal, orgSummary, serveOrgReads } from './support/org-fixtures'
 import { openManagePage } from './support/org-manage'
 
 // Layout guards: every public page x 390/1280 px x light/dark, and every
@@ -72,6 +74,8 @@ const LONG_MEMBERS = [
   orgMember({ orgId: LAYOUT_ORG_ID, address: '0x5e00000000000000000000000000000000001b01', role: 'OWNER', displayName: 'Bartholomew Maximilian Featherstonehaugh-Cholmondeley' }),
   orgMember({ orgId: LAYOUT_ORG_ID, address: '0x5e00000000000000000000000000000000001b02', role: 'PUBLISHER', handle: 'a-very-long-handle-of-thirty-c' }),
 ]
+const LAYOUT_ORG_APP = 'did:key:z6MkLayoutAcmeAppxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
+let attestationJson = ''
 
 test.beforeAll(async () => {
   const users = { data: { renownUsers: [PROFILE] } }
@@ -87,6 +91,26 @@ test.beforeAll(async () => {
     response: { data: { organizationStats: { orgId: LAYOUT_ORG_ID, apps: 1, activeUsers30d: 123456, activeDelegations: 42, attestations30d: 7 } } },
   })
   await fixtureStub({ match: 'query AppProfilesByOrg', variables: LAYOUT_ORG_ID, response: { data: { appProfiles: { items: [APP], next: null } } } })
+  await fixtureStub({ match: 'query AppProfile(', variables: LAYOUT_ORG_APP, response: { data: { appProfile: { ...APP, appDid: LAYOUT_ORG_APP, documentId: 'doc-layout-org-app', name: 'An Organisation App With A Rather Long Name', publisherDid: LAYOUT_ORG.did } } } })
+  await fixtureStub({
+    match: 'query AppProvenance',
+    variables: LAYOUT_ORG_APP,
+    response: {
+      data: {
+        appProfile: {
+          frozen: true,
+          supportContact: 'a-very-long-support-mailbox-name@acme-layout-verification.example',
+          securityContact: 'https://acme-layout-verification.example/a/long/security/disclosure/path',
+          publisherOrg: { id: LAYOUT_ORG_ID, did: LAYOUT_ORG.did, handle: 'acme-layout', name: LAYOUT_ORG.name, verifiedDomains: LAYOUT_ORG.verifiedDomains },
+        },
+      },
+    },
+  })
+  await fixtureStub({ match: 'query OrgByRef', variables: `"id":"${LAYOUT_ORG_ID}"`, response: { data: { organization: LAYOUT_ORG } } })
+  const signer = privateKeyToAccount(generatePrivateKey())
+  const message = { appDid: APP_DID, version: '12.40.3-beta.7', artifactDigest: `sha256:${'c'.repeat(64)}`, orgId: '', issuedAt: '2026-10-12T10:00:00.000Z' }
+  const signature = await signer.signTypedData({ domain: RELEASE_DOMAIN, types: RELEASE_TYPES, primaryType: 'ReleaseAttestation', message })
+  attestationJson = JSON.stringify({ ...message, signer: signer.address, signature }, null, 2)
   await fixtureStub({ match: 'query OrgMembers', variables: LAYOUT_ORG_ID, response: { data: { organizationMembers: LONG_MEMBERS } } })
   await fixtureStub({
     match: 'query OrgInviteLinkPreview',
@@ -244,6 +268,34 @@ const openAccountMenu = async (page: Page): Promise<SurfaceSpec> => {
   return { panel }
 }
 
+/** Every B2 section's reads, answered with long values (registered before the manage page opens). */
+async function serveSecurityReads(page: Page): Promise<void> {
+  const blank = { address: null, demoteToAdmin: null, appDid: null, toKind: null, toId: null, handle: null, domain: null }
+  const later = new Date(Date.now() + 2 * 86_400_000).toISOString()
+  await serveOrgReads(page, {
+    OrgProposals: (v) => ({
+      orgProposals: [
+        orgProposal({ orgId: String(v.orgId), kind: 'CHANGE_HANDLE', payload: { ...blank, handle: 'a-very-long-handle-of-thirty-c' }, executableAt: later, expiresAt: new Date(Date.now() + 10 * 86_400_000).toISOString() }),
+        orgProposal({ orgId: String(v.orgId), id: 'p2', kind: 'RECOVER', payload: { ...blank, address: '0x5e00000000000000000000000000000000001e01', domain: LAYOUT_ORG.verifiedDomains[0] }, status: 'CANCELLED' }),
+      ],
+    }),
+    OrgCredentials: () => ({ orgCredentials: [orgCredential({ appDid: APP_DID }), orgCredential({ credentialId: 'urn:uuid:00000000-0000-4000-8000-0000000000e2', appDid: APP_DID, status: { credentialId: 'x', appDid: APP_DID, orgId: 'o', counts: false, reason: 'ISSUER_NOT_PUBLISHER' } })] }),
+    OrgWorkloads: () => ({ orgWorkloads: [] }),
+    OrgDomains: (v) => ({ orgDomains: [orgDomain({ orgId: String(v.orgId), domain: LAYOUT_ORG.verifiedDomains[0] })] }),
+    OrgWebhooks: () => ({ orgWebhooks: [] }),
+    OrgOidcClients: () => ({ orgOidcClients: [] }),
+    OrgAuditLog: () => ({ orgAuditLog: { items: [auditEntry({ details: JSON.stringify({ handle: 'a-very-long-handle-of-thirty-c', reason: 'A long reason that the table has to wrap instead of widening the page' }) })], next: null } }),
+    AppTransfers: () => ({ appTransfers: [] }),
+  })
+}
+
+const openReportDialog = async (page: Page): Promise<SurfaceSpec> => {
+  await page.getByRole('button', { name: 'Report', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: `Report ${LAYOUT_ORG.name}` })
+  await expect(panel.getByRole('button', { name: /Sign in to report|Send report/ })).toBeVisible({ timeout: 30_000 })
+  return { panel, overlay: panel.locator('xpath=..') }
+}
+
 const visit = (path: string, heading: string) => async (page: Page) => {
   await page.goto(path)
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible({ timeout: 30_000 })
@@ -264,6 +316,8 @@ const PAGES: LayoutPage[] = [
   { name: 'org', open: visit('/@acme-layout', LAYOUT_ORG.name) },
   { name: 'invite', open: visit(`/invite/${LAYOUT_INVITE_TOKEN}`, `Join ${LAYOUT_ORG.name}`) },
   { name: 'org-manage', open: openSignedInManage },
+  { name: 'org-app', open: visit(`/app/${LAYOUT_ORG_APP}`, 'An Organisation App With A Rather Long Name') },
+  { name: 'apps-by-org', open: visit('/apps?org=acme-layout', 'Apps on Renown') },
   { name: 'notifications', open: openNotifications },
 ]
 
@@ -392,6 +446,20 @@ const STATES: LayoutState[] = [
   { name: 'mobile menu open', page: 'org', widths: [390], open: openMenu },
   { name: 'teams section', inline: true, page: 'org-manage', widths: [390, 1280], open: openSection('Teams') },
   { name: 'settings section', inline: true, page: 'org-manage', widths: [390, 1280], open: openSection('Settings') },
+  { name: 'apps section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Apps') },
+  { name: 'security section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Security') },
+  { name: 'domains section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Domains') },
+  { name: 'webhooks section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Webhooks') },
+  { name: 'sign-in clients section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Sign-in clients') },
+  { name: 'audit log section', inline: true, page: 'org-manage', widths: [390, 1280], prepare: serveSecurityReads, open: openSection('Audit log') },
+  { name: 'report dialog open', page: 'org', widths: [390, 1280], open: openReportDialog },
+  {
+    name: 'release attestation result',
+    inline: true,
+    page: 'verify',
+    widths: [390, 1280],
+    open: (page) => checkText(attestationJson, 'Genuine')(page),
+  },
   { name: 'invite link created', inline: true, page: 'org-manage', widths: [390, 1280], open: createInviteLink },
   { name: 'account menu with organisations', page: 'trust', widths: [1280], prepare: standInMenuSession, open: openAccountMenu },
   {
