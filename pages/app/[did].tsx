@@ -1,22 +1,30 @@
 import type { GetServerSideProps, NextPage } from 'next'
 import { AppTile } from '../../components/app/app-tile'
 import { MarkdownLite } from '../../components/app/markdown-lite'
+import { AppContacts } from '../../components/app-page/app-contacts'
+import { FrozenBanner } from '../../components/app-page/frozen-banner'
 import { AppHero } from '../../components/app-page/app-hero'
 import { AppIdentityPanel } from '../../components/app-page/app-identity-panel'
 import { MoreByPublisher, PublisherCard, publisherName } from '../../components/app-page/app-publisher'
 import { AppStatsSection } from '../../components/app-page/app-stats'
+import { OrgPublisherCard, type ReleaseSignOff } from '../../components/app-page/org-publisher-card'
 import { LinkChips } from '../../components/identity/link-chip'
 import { PageSection } from '../../components/identity/page-section'
 import { PageMeta } from '../../components/site/page-meta'
 import { Container } from '../../components/site/primitives'
 import { SiteLayout } from '../../components/site/site-layout'
 import { NotFoundPage } from '../../components/ui/not-found-page'
+import { contactLink } from '../../lib/apps/contacts'
 import { HERO_ART, identityArtSvgs, PUBLISHER_ART, type IdentityArtSvgs } from '../../lib/identity-art'
 import { appJsonLd } from '../../lib/json-ld'
+import { orgPath, shortAddress } from '../../lib/orgs/format'
+import { profileDisplayName } from '../../lib/profile-identity'
 import { qrCode, type QrCode } from '../../lib/qr'
-import { APP_DID_RE, fetchAppProfile, getAppProfilesByPublisher, listAppProfiles, type RenownAppProfile } from '../../services/app-profiles'
+import { APP_DID_RE, fetchAppProfile, fetchAppProvenance, type AppProvenance, getAppProfilesByPublisher, listAppProfiles, type RenownAppProfile } from '../../services/app-profiles'
 import { getAppStats, type AppStats } from '../../services/app-stats'
 import { coverImageUrl, mediaUrl } from '../../services/media'
+import { releaseAttestations } from '../../services/org-security'
+import { fetchOrganization, isOrgRateLimited, type OrgSummary } from '../../services/orgs'
 import { getProfile, type RenownProfile } from '../../services/switchboard'
 import { linkTarget } from '../../utils/link-service'
 import { clipText, markdownPlainText } from '../../utils/markdown-lite'
@@ -46,12 +54,18 @@ interface AppPageProps {
   ogImage: string | null
   /** QR code of canonicalUrl for the share menu (computed on the server). */
   qr: QrCode | null
+  /** Organisation, freeze and contacts; null when they could not be read. */
+  provenance: AppProvenance | null
+  /** The publishing organisation (with its avatar when it could be read). */
+  orgPublisher: OrgSummary | null
+  /** The latest release attestation, for the publisher card. */
+  signOff: ReleaseSignOff | null
   error?: string
 }
 
 const PKH_RE = /^did:pkh:eip155:\d+:(0x[0-9a-fA-F]{40})$/
 
-const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, error }) => {
+const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publisher, publisherAddress, moreByPublisher, moreInCategory, canonicalUrl, ogImage, qr, provenance, orgPublisher, signOff, error }) => {
   if (error) return <NotFoundPage title="Something went wrong" message={error} />
   if (!app || !art) return <NotFoundPage title="App not found" message="No app on Renown has this identity. Check the link, or browse the directory." />
 
@@ -64,9 +78,14 @@ const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publis
   const url = canonicalUrl ?? path
   const origin = canonicalUrl ? new URL(canonicalUrl).origin : ''
   const image = app.logoRef && origin ? mediaUrl(app.documentId, 'logo', origin, app.logoRef) : null
-  const pubName = publisherAddress ? publisherName(publisher, publisherAddress) : null
-  const publisherLd =
-    publisherAddress && pubName ? { name: pubName, url: `${origin}${publisher ? profilePath(publisher) : `/profile/${publisherAddress}`}` } : null
+  const pubName = orgPublisher ? orgPublisher.name : publisherAddress ? publisherName(publisher, publisherAddress) : null
+  const publisherLd = orgPublisher
+    ? { name: orgPublisher.name, url: `${origin}${orgPath(orgPublisher.handle)}`, type: 'Organization' as const }
+    : publisherAddress && pubName
+      ? { name: pubName, url: `${origin}${publisher ? profilePath(publisher) : `/profile/${publisherAddress}`}` }
+      : null
+  const support = contactLink(provenance?.supportContact)
+  const security = contactLink(provenance?.securityContact)
 
   // Only http(s) links are ever shown; the rest count as no links at all.
   const links = app.links.filter((link) => linkTarget(link.url))
@@ -97,8 +116,10 @@ const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publis
   )
   const sideSections = (
     <>
-      {publisherAddress && publisherArt && <PublisherCard publisher={publisher} address={publisherAddress} art={publisherArt} />}
+      {orgPublisher && <OrgPublisherCard org={orgPublisher} signOff={signOff} />}
+      {!orgPublisher && publisherAddress && publisherArt && <PublisherCard publisher={publisher} address={publisherAddress} art={publisherArt} />}
       {pubName && <MoreByPublisher apps={moreByPublisher} name={pubName} />}
+      {(support || security) && <AppContacts support={support} security={security} />}
       <AppIdentityPanel appDid={app.appDid} />
     </>
   )
@@ -117,6 +138,7 @@ const AppPage: NextPage<AppPageProps> = ({ app, art, publisherArt, stats, publis
 
       <Container className="max-w-[1120px] pt-6 pb-20 md:pt-10">
         <AppHero app={app} name={name} art={art} website={website} shareUrl={url} qr={qr} />
+        {provenance?.frozen && <FrozenBanner org={orgPublisher} />}
         {hasMain ? (
           <div data-layout="split" className="mt-12 grid gap-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
             <div data-column="main" className="min-w-0 space-y-12">
@@ -158,6 +180,9 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
     canonicalUrl: null,
     ogImage: null,
     qr: null,
+    provenance: null,
+    orgPublisher: null,
+    signOff: null,
   }
   let app: RenownAppProfile | null = null
   if (APP_DID_RE.test(did)) {
@@ -179,16 +204,50 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
 
   const publisherAddress = PKH_RE.exec(app.publisherDid ?? '')?.[1]?.toLowerCase() ?? null
   const others = (apps: RenownAppProfile[]) => apps.filter((other) => other.appDid !== app.appDid)
-  const [publisher, stats, byPublisher, inCategory] = await Promise.all([
+  // Throttled org reads (D23) leave the page without its provenance: render it, but do not let the edge cache that.
+  let throttled = false
+  const orgOptional = <T,>(promise: Promise<T>, fallback: T): Promise<T> =>
+    withTimeout(promise, SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
+      if (isOrgRateLimited(error)) throttled = true
+      return fallback
+    })
+  // Organisation provenance has its own query: a switchboard without it loses only this part.
+  const provenance = await optional(fetchAppProvenance(did), null)
+  const publisherOrg = provenance?.publisherOrg ?? null
+  const [publisher, stats, byPublisher, inCategory, org, latest] = await Promise.all([
     publisherAddress ? optional(getProfile({ driveId: `renown-${publisherAddress}`, ethAddress: publisherAddress }), null) : Promise.resolve(null),
     optional(getAppStats(did), null),
-    publisherAddress ? optional(getAppProfilesByPublisher(publisherAddress), []) : Promise.resolve([]),
+    publisherAddress
+      ? optional(getAppProfilesByPublisher(publisherAddress), [])
+      : publisherOrg
+        ? optional(listAppProfiles({ limit: 5, orgId: publisherOrg.id }).then((page) => page.items), [])
+        : Promise.resolve([]),
     app.category ? optional(listAppProfiles({ limit: 4, category: app.category }).then((page) => page.items), []) : Promise.resolve([]),
+    publisherOrg ? orgOptional(fetchOrganization({ id: publisherOrg.id }, null, context.req), null) : Promise.resolve(null),
+    publisherOrg ? orgOptional(releaseAttestations(did, 1, context.req).then((page) => page.items[0] ?? null), null) : Promise.resolve(null),
   ])
+  const signerAddress = latest?.signer.toLowerCase() ?? null
+  const signer = signerAddress ? await optional(getProfile({ driveId: `renown-${signerAddress}`, ethAddress: signerAddress }), null) : null
+  const orgPublisher: OrgSummary | null = org
+    ? { id: org.id, did: org.did, handle: org.handle, name: org.name, avatar: org.avatar, verifiedDomains: org.verifiedDomains }
+    : publisherOrg
+      ? { ...publisherOrg, avatar: null }
+      : null
+  const signOff: ReleaseSignOff | null =
+    latest && signerAddress
+      ? {
+          version: latest.version,
+          issuedAt: latest.issuedAt,
+          signerName: signer ? profileDisplayName(signer) : shortAddress(signerAddress),
+          signerHref: signer ? profilePath(signer) : `/profile/${signerAddress}`,
+          signerRole: latest.signerRole,
+          stillMember: latest.signerStillMember,
+        }
+      : null
   const origin = siteOrigin(context.req.headers.host)
   // The same URL as <link rel=canonical> (PageMeta), so share, QR and JSON-LD agree with it.
   const canonicalUrl = siteCanonicalUrl(`/app/${did}`)
-  context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
+  context.res.setHeader('Cache-Control', throttled ? 'no-store' : 'public, s-maxage=30, stale-while-revalidate=120')
   return {
     props: {
       app,
@@ -202,6 +261,9 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
       canonicalUrl,
       ogImage: ogImageUrl({ variant: 'app', did }, origin),
       qr: qrCode(canonicalUrl),
+      provenance,
+      orgPublisher,
+      signOff,
     },
   }
 }

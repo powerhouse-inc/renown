@@ -51,7 +51,7 @@ export interface AppJsonLdInput {
   url: string
   image: string | null
   /** The publisher's name and profile URL, when known. */
-  publisher: { name: string; url: string } | null
+  publisher: { name: string; url: string; type?: 'Person' | 'Organization' } | null
 }
 
 /** SoftwareApplication for an app page. */
@@ -70,7 +70,7 @@ export function appJsonLd({ app, name, url, image, publisher }: AppJsonLdInput):
     ...(image && { image }),
     ...(website && { installUrl: website }),
     ...(sameAs.length > 0 && { sameAs }),
-    ...(publisher && { publisher: { '@type': 'Person', name: publisher.name, url: publisher.url } }),
+    ...(publisher && { publisher: { '@type': publisher.type ?? 'Person', name: publisher.name, url: publisher.url } }),
   }
 }
 

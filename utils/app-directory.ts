@@ -1,5 +1,6 @@
 // URL state and paging helpers for the /apps directory (pure; shared by the
 // page's getServerSideProps and its client-side updates).
+import { ORG_HANDLE_RE } from '../lib/orgs/handles'
 import type { RenownAppProfile } from '../services/app-profiles'
 
 /** Apps per page (first SSR page and every "Load more"). */
@@ -33,4 +34,11 @@ export function appsHref(category: string | null): string {
 export function appendApps(existing: RenownAppProfile[], incoming: RenownAppProfile[]): RenownAppProfile[] {
   const seen = new Set(existing.map((app) => app.appDid))
   return [...existing, ...incoming.filter((app) => !seen.has(app.appDid))]
+}
+
+/** The `?org=` handle filter: the first value, trimmed, "@" dropped, lowercased; null when it is not a handle. */
+export function parseOrgParam(value: string | string[] | undefined | null): string | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  const handle = (raw ?? '').trim().replace(/^@/, '').toLowerCase()
+  return ORG_HANDLE_RE.test(handle) ? handle : null
 }

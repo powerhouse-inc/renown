@@ -11,6 +11,7 @@ import {
   type OrgPartyKind,
   type OrgProposal,
   type OrgRole,
+  type OrgServerRequest,
   type OrgSummary,
 } from './orgs'
 
@@ -239,10 +240,11 @@ export async function appTransfers(filter: { appDid?: string; orgId?: string; ad
 }
 
 /** An app's release attestations, newest first (public; limit 1-50). */
-export async function releaseAttestations(appDid: string, limit = 1): Promise<ReleaseAttestationPage> {
+export async function releaseAttestations(appDid: string, limit = 1, request?: OrgServerRequest | null): Promise<ReleaseAttestationPage> {
   const data = await orgsRequest<{ releaseAttestations: ReleaseAttestationPage }>(
     `query ReleaseAttestations($appDid: String!, $limit: Int) { releaseAttestations(appDid: $appDid, limit: $limit) { items { ${ATTESTATION_FIELDS} } next } }`,
     { appDid, limit },
+    { request },
   )
   return data.releaseAttestations
 }

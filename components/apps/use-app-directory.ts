@@ -44,6 +44,7 @@ function fromPage(category: string | null, page: AppProfilePage | null): Loaded 
 export function useAppDirectory(
   initial: { category: string | null; page: AppProfilePage | null },
   category: string | null,
+  orgId: string | null = null,
 ): AppDirectory {
   const [loaded, setLoaded] = useState<Loaded>(() => fromPage(initial.category, initial.page))
   const [retrying, setRetrying] = useState(false)
@@ -53,7 +54,7 @@ export function useAppDirectory(
 
   const fetchFirst = useCallback((target: string | null): number => {
     const id = ++request.current
-    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, category: target }), CLIENT_DATA_TIMEOUT_MS)
+    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, category: target, orgId }), CLIENT_DATA_TIMEOUT_MS)
       .then((page) => {
         if (id === request.current) setLoaded(fromPage(target, page))
       })
@@ -71,7 +72,7 @@ export function useAppDirectory(
         }
       })
     return id
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
     if (!sameCategory(category, loaded.category)) fetchFirst(category)
@@ -91,7 +92,7 @@ export function useAppDirectory(
     const id = request.current
     const { category: target, next } = loaded
     setLoaded((l) => ({ ...l, more: 'loading' }))
-    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, after: next, category: target }), CLIENT_DATA_TIMEOUT_MS)
+    withTimeout(listAppProfiles({ limit: APPS_PAGE_SIZE, after: next, category: target, orgId }), CLIENT_DATA_TIMEOUT_MS)
       .then((page) => {
         if (id !== request.current) return settleStale(target)
         setLoaded((l) => ({ ...l, items: appendApps(l.items, page.items), next: page.next, more: 'idle' }))
@@ -101,7 +102,7 @@ export function useAppDirectory(
         if (id === request.current) setLoaded((l) => ({ ...l, more: 'error' }))
         else settleStale(target)
       })
-  }, [loaded, busy, settleStale])
+  }, [loaded, busy, settleStale, orgId])
 
   const retry = useCallback(() => {
     setRetrying(true)

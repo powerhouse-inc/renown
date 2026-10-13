@@ -118,3 +118,31 @@ export async function getAppProfilesByPublisher(address: string): Promise<Renown
     return []
   }
 }
+
+export interface AppPublisherOrg {
+  id: string
+  did: string
+  handle: string
+  name: string
+  verifiedDomains: string[]
+}
+
+/** What renown-package A2/A3 added to app profiles: the publishing organisation, a freeze, contacts. */
+export interface AppProvenance {
+  frozen: boolean
+  supportContact: string | null
+  securityContact: string | null
+  publisherOrg: AppPublisherOrg | null
+}
+
+/**
+ * The provenance of an app, in its own query so a switchboard that predates
+ * these fields fails only this read. Throws on failure.
+ */
+export async function fetchAppProvenance(appDid: string): Promise<AppProvenance | null> {
+  const data = await client().request<{ appProfile: AppProvenance | null }>(
+    `query AppProvenance($appDid: String!) { appProfile(appDid: $appDid) { frozen supportContact securityContact publisherOrg { id did handle name verifiedDomains } } }`,
+    { appDid },
+  )
+  return data.appProfile
+}
