@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { useNow } from '../../hooks/use-now'
 import { useRemote } from '../../hooks/use-remote'
 import { shortDid } from '../../lib/orgs/format'
+import { UNCONFIRMED_CHECKING_TEXT } from '../../lib/orgs/errors'
 import { expiryText } from '../../lib/orgs/members'
 import { partyText, personTransfers } from '../../lib/orgs/transfers'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
@@ -10,13 +11,14 @@ import { appTransfers, type AppTransfer } from '../../services/org-security'
 import { RemoteView } from '../org-manage/manage-ui'
 import { buttonClasses } from '../site/primitives'
 import type { MeSession } from './use-me-session'
+import { withBearer } from '../../services/orgs'
 
 type SignedIn = Extract<MeSession, { state: 'signed-in' }>
 
 /** Apps offered to this wallet, and apps it offered to an organisation (spec 3.7). */
 export function AppTransfers({ session, onToast }: { session: SignedIn; onToast: (tone: 'success' | 'error', text: string) => void }) {
   const { address, getBearer } = session
-  const load = useCallback(async () => appTransfers({ address: address.toLowerCase() }, await getBearer()), [address, getBearer])
+  const load = useCallback(async () => withBearer(getBearer, (bearer) => appTransfers({ address: address.toLowerCase() }, bearer)), [address, getBearer])
   const transfers = useRemote(`me-transfers:${address.toLowerCase()}`, load)
   const now = useNow()
   const [busy, setBusy] = useState<string | null>(null)
@@ -28,9 +30,11 @@ export function AppTransfers({ session, onToast }: { session: SignedIn; onToast:
     if (result.ok) {
       onToast('success', success)
       transfers.reload()
-    } else {
+    } else if (result.unconfirmed) {
       // A lost answer may have been applied: re-read before anyone retries.
-      if (result.unconfirmed) transfers.reload()
+      onToast('error', UNCONFIRMED_CHECKING_TEXT)
+      transfers.reload()
+    } else {
       onToast('error', result.message)
     }
   }

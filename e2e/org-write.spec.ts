@@ -175,7 +175,13 @@ test.describe('signedOrgWrite', () => {
         now,
         fetchImpl: offline,
       }),
-    ).toMatchObject({ ok: false, code: 'NETWORK', unconfirmed: true })
+    ).toMatchObject({
+      ok: false,
+      code: 'NETWORK',
+      unconfirmed: true,
+      // a lost answer may have been applied: never "Nothing was changed"
+      message: "We couldn't confirm whether that went through. Check before you try again.",
+    })
     const refused = (async () =>
       new Response(JSON.stringify({ error: 'x', code: 'LAST_OWNER' }), {
         status: 409,

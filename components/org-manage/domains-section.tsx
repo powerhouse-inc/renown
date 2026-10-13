@@ -6,6 +6,7 @@ import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageSectionProps } from './manage-context'
 import { ConfirmButton, LONG_LABEL, Panel, RemoteView } from './manage-ui'
+import { withBearer } from '../../services/orgs'
 
 const OWNERS_ONLY = 'Only owners can remove a verified domain.'
 
@@ -33,7 +34,7 @@ function Proof({ domain }: { domain: OrgDomain }) {
 
 export function DomainsSection({ ctx }: ManageSectionProps) {
   const { org, getBearer } = ctx
-  const load = useCallback(async () => orgDomains(org.id, await getBearer()), [org.id, getBearer])
+  const load = useCallback(async () => withBearer(getBearer, (bearer) => orgDomains(org.id, bearer)), [org.id, getBearer])
   const domains = useRemote(`domains:${org.id}`, load)
   const [text, setText] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
@@ -61,7 +62,7 @@ export function DomainsSection({ ctx }: ManageSectionProps) {
 
   async function check(domain: OrgDomain) {
     setBusy(domain.id)
-    const done = await ctx.run<OrgDomain>('checkOrgDomain', { orgId: org.id, domainId: domain.id }, `${domain.domain} is verified.`)
+    const done = await ctx.run<OrgDomain>('checkOrgDomain', { orgId: org.id, domainId: domain.id }, `${domain.domain} is verified.`, { recheck: domains.reload })
     setBusy(null)
     if (done) {
       domains.reload()
@@ -73,6 +74,7 @@ export function DomainsSection({ ctx }: ManageSectionProps) {
     setBusy(domain.id)
     const done = await ctx.run<boolean>('removeOrgDomain', { orgId: org.id, domainId: domain.id }, `${domain.domain} was removed.`, {
       errorText: { FORBIDDEN: OWNERS_ONLY },
+      recheck: domains.reload,
     })
     setBusy(null)
     if (done !== null) {

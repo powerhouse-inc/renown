@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAnchorScroll } from '../../hooks/use-anchor-scroll'
 import { useOwnProfile } from '../../hooks/use-own-profile'
 import { profileCompleteness } from '../../lib/me/completeness'
 import { identityDid, type Connection, type ConnectionGroup } from '../../lib/me/connections'
@@ -14,6 +15,8 @@ import { OrgMemberships } from './org-memberships'
 import { RevokeDialog, type RevokeTarget } from './revoke-dialog'
 import { useConnections } from './use-connections'
 import type { MeSession } from './use-me-session'
+
+const isMeAnchor = (id: string) => id === 'organisations' || id === 'app-transfers'
 
 type SignedIn = Extract<MeSession, { state: 'signed-in' }>
 
@@ -50,6 +53,10 @@ export function MeDashboard({ session }: { session: SignedIn }) {
   const { address } = session
   const { profile, loaded: profileLoaded, timedOut: profileTimedOut } = useOwnProfile(address)
   const connections = useConnections(address, session)
+  // Links land on /me#organisations and /me#app-transfers (notifications, the account
+  // menu, vetra.io's transfer handover). Those sections mount with the wallet shell, after
+  // the browser's fragment scroll: scroll once the approvals above them have settled.
+  useAnchorScroll(connections.status !== 'loading', isMeAnchor, 'start')
   const now = useNow()
   const { toasts, show, dismiss } = useToasts()
   const [target, setTarget] = useState<RevokeTarget | null>(null)

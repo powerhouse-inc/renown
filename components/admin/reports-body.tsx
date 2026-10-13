@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { useCallback, useState } from 'react'
 import { useRemote } from '../../hooks/use-remote'
+import { UNCONFIRMED_CHECKING_TEXT } from '../../lib/orgs/errors'
 import { orgPath, shortAddress } from '../../lib/orgs/format'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
 import { orgReports, type OrgReport, type OrgReportReason, type OrgReportResolution, type OrgReportStatus } from '../../services/org-security'
+import { withBearer } from '../../services/orgs'
 import { cx } from '../../utils/cx'
 import { formatAbsolute } from '../../utils/relative-time'
 import { useMeSession, type MeSession } from '../me/use-me-session'
@@ -130,7 +132,7 @@ function Reports({ session }: { session: SignedIn }) {
   const { toasts, show, dismiss } = useToasts()
   const [status, setStatus] = useState<OrgReportStatus>('OPEN')
   const [busy, setBusy] = useState<string | null>(null)
-  const load = useCallback(async () => orgReports(status, await getBearer()), [status, getBearer])
+  const load = useCallback(async () => withBearer(getBearer, (bearer) => orgReports(status, bearer)), [status, getBearer])
   const reports = useRemote(`reports:${status}`, load)
 
   async function resolve(report: OrgReport, resolution: OrgReportResolution, note: string) {
@@ -141,12 +143,18 @@ function Reports({ session }: { session: SignedIn }) {
     if (result.ok) {
       show('success', 'Resolved.')
       reports.reload()
+    } else if (result.unconfirmed) {
+      // A lost answer may have been applied: re-read before anyone resolves it again.
+      show('error', UNCONFIRMED_CHECKING_TEXT)
+      reports.reload()
     } else {
       show('error', result.message)
     }
   }
 
-  if (reports.state.status === 'error' && reports.state.error.code === 'FORBIDDEN') return <NotFound />
+  // Refused by the switchboard (not an admin): the 404 content. An expired bearer was
+  // already retried once with a fresh one (withBearer); if it still fails, say so instead.
+  if (reports.state.status === 'error' && reports.state.error.code === 'FORBIDDEN' && !reports.state.error.unauthenticated) return <NotFound />
   return (
     <Container className="min-h-[60vh] max-w-[860px] pt-12 pb-24 md:pt-16">
       <h1 className="text-ink text-h1">Reports</h1>

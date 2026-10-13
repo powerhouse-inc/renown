@@ -3,6 +3,7 @@ import { useNow } from '../../hooks/use-now'
 import { useRemote } from '../../hooks/use-remote'
 import { MAX_WEBHOOKS, ORG_WEBHOOK_EVENTS, webhookUrlProblem } from '../../lib/orgs/webhooks'
 import { orgWebhookDeliveries, orgWebhooks, type OrgWebhook, type OrgWebhookCreated, type OrgWebhookDelivery } from '../../services/org-security'
+import { withBearer } from '../../services/orgs'
 import { formatRelative } from '../../utils/relative-time'
 import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
@@ -24,7 +25,7 @@ function deliveryText(d: OrgWebhookDelivery): string {
 function Deliveries({ ctx, hook }: { ctx: ManageContext; hook: OrgWebhook }) {
   const { org, getBearer } = ctx
   const now = useNow()
-  const load = useCallback(async () => orgWebhookDeliveries(org.id, hook.id, await getBearer()), [org.id, hook.id, getBearer])
+  const load = useCallback(async () => withBearer(getBearer, (bearer) => orgWebhookDeliveries(org.id, hook.id, bearer)), [org.id, hook.id, getBearer])
   const deliveries = useRemote(`deliveries:${hook.id}`, load)
   return (
     <div className="mt-3">
@@ -52,7 +53,7 @@ function Deliveries({ ctx, hook }: { ctx: ManageContext; hook: OrgWebhook }) {
 
 export function WebhooksSection({ ctx }: ManageSectionProps) {
   const { org, getBearer } = ctx
-  const load = useCallback(async () => orgWebhooks(org.id, await getBearer()), [org.id, getBearer])
+  const load = useCallback(async () => withBearer(getBearer, (bearer) => orgWebhooks(org.id, bearer)), [org.id, getBearer])
   const hooks = useRemote(`webhooks:${org.id}`, load)
   const [url, setUrl] = useState('')
   const [events, setEvents] = useState<string[]>([])
@@ -86,7 +87,7 @@ export function WebhooksSection({ ctx }: ManageSectionProps) {
 
   async function test(hook: OrgWebhook) {
     setBusy(hook.id)
-    const delivery = await ctx.run<OrgWebhookDelivery>('testOrgWebhook', { orgId: org.id, webhookId: hook.id }, 'Test event sent.')
+    const delivery = await ctx.run<OrgWebhookDelivery>('testOrgWebhook', { orgId: org.id, webhookId: hook.id }, 'Test event sent.', { recheck: hooks.reload })
     setBusy(null)
     if (delivery) {
       const delivered = delivery.status === 'DELIVERED'
@@ -97,14 +98,14 @@ export function WebhooksSection({ ctx }: ManageSectionProps) {
 
   async function update(hook: OrgWebhook, enabled: boolean) {
     setBusy(hook.id)
-    const done = await ctx.run<OrgWebhook>('updateOrgWebhook', { orgId: org.id, webhookId: hook.id, enabled }, enabled ? 'Webhook enabled.' : 'Webhook disabled.')
+    const done = await ctx.run<OrgWebhook>('updateOrgWebhook', { orgId: org.id, webhookId: hook.id, enabled }, enabled ? 'Webhook enabled.' : 'Webhook disabled.', { recheck: hooks.reload })
     setBusy(null)
     if (done) hooks.reload()
   }
 
   async function remove(hook: OrgWebhook) {
     setBusy(hook.id)
-    const done = await ctx.run<boolean>('deleteOrgWebhook', { orgId: org.id, webhookId: hook.id }, 'Webhook deleted.')
+    const done = await ctx.run<boolean>('deleteOrgWebhook', { orgId: org.id, webhookId: hook.id }, 'Webhook deleted.', { recheck: hooks.reload })
     setBusy(null)
     if (done !== null) hooks.reload()
   }
@@ -172,16 +173,16 @@ export function WebhooksSection({ ctx }: ManageSectionProps) {
                       {!hook.enabled && <Badge>Disabled</Badge>}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <button type="button" disabled={busy === hook.id} onClick={() => void test(hook)} className={buttonClasses('secondary', 'md')}>
+                      <button type="button" disabled={busy === hook.id} aria-label={`Send a test event to ${hook.url}`} onClick={() => void test(hook)} className={buttonClasses('secondary', 'md')}>
                         Send a test event
                       </button>
-                      <button type="button" aria-expanded={open === hook.id} onClick={() => setOpen(open === hook.id ? null : hook.id)} className={buttonClasses('ghost', 'md')}>
+                      <button type="button" aria-expanded={open === hook.id} aria-label={`${open === hook.id ? 'Hide deliveries for' : 'Show deliveries for'} ${hook.url}`} onClick={() => setOpen(open === hook.id ? null : hook.id)} className={buttonClasses('ghost', 'md')}>
                         {open === hook.id ? 'Hide deliveries' : 'Show deliveries'}
                       </button>
-                      <button type="button" disabled={busy === hook.id} onClick={() => void update(hook, !hook.enabled)} className={buttonClasses('ghost', 'md')}>
+                      <button type="button" disabled={busy === hook.id} aria-label={`${hook.enabled ? 'Disable' : 'Enable'} webhook ${hook.url}`} onClick={() => void update(hook, !hook.enabled)} className={buttonClasses('ghost', 'md')}>
                         {hook.enabled ? 'Disable' : 'Enable'}
                       </button>
-                      <ConfirmButton label="Delete" confirm="Yes, delete it" busy={busy === hook.id} onConfirm={() => void remove(hook)} />
+                      <ConfirmButton label="Delete" ariaLabel={`Delete webhook ${hook.url}`} confirm="Yes, delete it" busy={busy === hook.id} onConfirm={() => void remove(hook)} />
                     </div>
                     {open === hook.id && <Deliveries ctx={ctx} hook={hook} />}
                   </li>

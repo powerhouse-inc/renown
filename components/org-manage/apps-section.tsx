@@ -14,6 +14,7 @@ import { roleAtLeast } from '../../services/org-signed-messages'
 import {
   fetchOrganization,
   toOrgApiError,
+  withBearer,
   type OrgApp,
   type OrgProposal,
 } from '../../services/orgs'
@@ -398,7 +399,7 @@ function BringAppPanel({ ctx, onDone }: { ctx: ManageContext; onDone: () => void
   const apps = useRemote(`bring:${address}`, load)
   // The viewer's own transfers (they may read them at any role): a lost answer is re-read here.
   const loadMine = useCallback(
-    async () => appTransfers({ address }, await getBearer()),
+    async () => withBearer(getBearer, (bearer) => appTransfers({ address }, bearer)),
     [address, getBearer],
   )
   const mine = useRemote(`bring-transfers:${address}`, loadMine)
@@ -521,11 +522,11 @@ export function AppsSection({ ctx }: ManageSectionProps) {
   const profiles = useRemote(`org-app-profiles:${org.id}`, loadProfiles)
   const admin = roleAtLeast(ctx.role, 'ADMIN')
   const loadTransfers = useCallback(
-    async () => appTransfers({ orgId: org.id }, await getBearer()),
+    async () => withBearer(getBearer, (bearer) => appTransfers({ orgId: org.id }, bearer)),
     [org.id, getBearer],
   )
   const loadProposals = useCallback(
-    async () => orgProposals(org.id, await getBearer()),
+    async () => withBearer(getBearer, (bearer) => orgProposals(org.id, bearer)),
     [org.id, getBearer],
   )
   // Only owners propose app changes, so only they read the proposals.

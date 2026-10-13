@@ -3,7 +3,7 @@ import { useRemote } from '../../hooks/use-remote'
 import { memberLabel, plural } from '../../lib/orgs/format'
 import { MAX_TEAMS, sameSet, slugFromName, teamPatch, teamProblems } from '../../lib/orgs/teams'
 import { roleAtLeast } from '../../services/org-signed-messages'
-import { organizationMembers, type OrgMember, type OrgTeam } from '../../services/orgs'
+import { organizationMembers, withBearer, type OrgMember, type OrgTeam } from '../../services/orgs'
 import { Field, inputClass } from '../profile-edit/field'
 import { buttonClasses } from '../site/primitives'
 import type { ManageContext, ManageSectionProps } from './manage-context'
@@ -158,7 +158,7 @@ function TeamEditor({ ctx, team, members, onDone }: { ctx: ManageContext; team: 
 export function TeamsSection({ ctx }: ManageSectionProps) {
   const admin = roleAtLeast(ctx.role, 'ADMIN')
   const { org, getBearer } = ctx
-  const loadMembers = useCallback(async () => organizationMembers(org.id, false, await getBearer()), [org.id, getBearer])
+  const loadMembers = useCallback(async () => withBearer(getBearer, (bearer) => organizationMembers(org.id, false, bearer)), [org.id, getBearer])
   const members = useRemote(admin ? `team-members:${org.id}` : null, loadMembers)
   const [editing, setEditing] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)

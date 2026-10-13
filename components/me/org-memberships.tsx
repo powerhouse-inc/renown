@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { useNow } from '../../hooks/use-now'
 import { useRemote } from '../../hooks/use-remote'
 import { manageHref, orgPath, roleLabel } from '../../lib/orgs/format'
+import { UNCONFIRMED_CHECKING_TEXT } from '../../lib/orgs/errors'
 import { expiryText } from '../../lib/orgs/members'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
 import type { OrgMutationName } from '../../services/org-mutations'
@@ -50,6 +51,10 @@ export function OrgMemberships({
     if (result.ok) {
       onToast('success', success)
       after()
+    } else if (result.unconfirmed) {
+      // A lost answer may have been applied: re-read before anyone retries.
+      onToast('error', UNCONFIRMED_CHECKING_TEXT)
+      refresh()
     } else {
       onToast('error', result.message)
     }

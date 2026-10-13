@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { useRemote } from '../../hooks/use-remote'
 import { writeActiveOrg } from '../../lib/orgs/active-org'
+import { UNCONFIRMED_WRITE_TEXT } from '../../lib/orgs/errors'
 import { orgPath, roleLabel } from '../../lib/orgs/format'
 import { orgRef } from '../../lib/orgs/handles'
 import { manageSection, minRoleText, sectionsFor } from '../../lib/orgs/manage-sections'
@@ -23,8 +24,9 @@ import { SECTION_COMPONENTS } from './section-components'
 
 type SignedIn = Extract<MeSession, { state: 'signed-in' }>
 
-const UNCONFIRMED_TEXT =
-  'Renown did not answer, so the change may have gone through. The page was checked again; look before you retry.'
+/** A lost answer after the page re-read what the write would have changed. */
+const UNCONFIRMED_RECHECKED_TEXT =
+  "We couldn't confirm whether that went through. The page was checked again; look before you retry."
 
 function Notice({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -171,8 +173,13 @@ function ManageOrg({
     if (result.unconfirmed) {
       // The answer was lost, not the request: it may have been applied. Re-read
       // before anyone retries (writes are not idempotent).
-      options.recheck?.()
-      show('error', UNCONFIRMED_TEXT)
+      // Say "checked again" only when a re-read actually ran.
+      if (options.recheck) {
+        options.recheck()
+        show('error', UNCONFIRMED_RECHECKED_TEXT)
+      } else {
+        show('error', UNCONFIRMED_WRITE_TEXT)
+      }
       return null
     }
     show('error', options.errorText?.[result.code] ?? result.message)

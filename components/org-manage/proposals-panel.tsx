@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
+import { useAnchorScroll } from '../../hooks/use-anchor-scroll'
 import { useNow } from '../../hooks/use-now'
 import { useRemote, type Remote } from '../../hooks/use-remote'
 import { memberLabel, shortAddress } from '../../lib/orgs/format'
@@ -251,18 +252,7 @@ export function OwnersPanel({
   )
 }
 
-/** The proposal named by the page's #fragment, scrolled to once it rendered. */
-function useAnchorScroll(ready: boolean) {
-  useEffect(() => {
-    if (!ready || typeof window === 'undefined') return
-    const hash = window.location.hash.slice(1)
-    if (!hash.startsWith('proposal-')) return
-    const target = document.getElementById(decodeURIComponent(hash))
-    if (!target) return
-    target.scrollIntoView({ block: 'center' })
-    target.focus({ preventScroll: true })
-  }, [ready])
-}
+const isProposalAnchor = (id: string) => id.startsWith('proposal-')
 
 /** Every proposal, pending first, with where it stands and what the viewer may do. */
 export function ProposalsPanel({
@@ -279,7 +269,7 @@ export function ProposalsPanel({
   const now = useNow(30_000)
   const [busy, setBusy] = useState<string | null>(null)
   const { ask, dialog } = useConfirm()
-  useAnchorScroll(proposals.state.status === 'ready' && members.state.status === 'ready')
+  useAnchorScroll(proposals.state.status === 'ready' && members.state.status === 'ready', isProposalAnchor)
 
   async function act(
     p: OrgProposal,

@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
 import { notificationHref, notificationText } from '../lib/orgs/notifications'
 import type { OrgNotification } from '../services/orgs'
-import { orgInvite, orgSummary, serveOrgReads } from './support/org-fixtures'
+import { appTransfer, orgInvite, orgSummary, serveOrgReads } from './support/org-fixtures'
 import { signedWrite } from './support/org-manage'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './support/stub-switchboard-client'
 import { signInTestWallet } from './support/test-session'
@@ -309,6 +309,61 @@ test.describe('/me organisations', () => {
     await row.getByRole('button', { name: 'Leave Acme Home' }).click()
     await row.getByRole('button', { name: 'Yes, leave Acme Home' }).click()
     expect(await signedWrite(wallet, 'leaveOrganization', home.id)).toEqual({ orgId: home.id })
+  })
+})
+
+test.describe('/me lost answers and anchors', () => {
+  const CHECKING = "We couldn't confirm whether that went through — checking…"
+
+  test('a lost answer on /me says it may have gone through and re-reads (memberships, transfers)', async ({ page }) => {
+    const wallet = await signInTestWallet(page, { bearer: 'e2e-me-lost' })
+    const me = wallet.address.toLowerCase()
+    const home = { ...orgSummary({ id: crypto.randomUUID(), handle: 'acme-lost', name: 'Acme Lost' }), archived: false }
+    const reads = { orgs: 0, transfers: 0 }
+    await serveOrgReads(page, {
+      OrgsByMember: () => {
+        reads.orgs += 1
+        return { organizationsByMember: [{ role: 'PUBLISHER', hidden: false, org: home }] }
+      },
+      MyOrgInvites: () => ({ myOrgInvites: [] }),
+      AppTransfers: () => {
+        reads.transfers += 1
+        return { appTransfers: [appTransfer({ id: 'tr-lost', toKind: 'PERSON', toId: me, fromKind: 'ORG', fromId: home.id })] }
+      },
+    })
+    await page.route('**/api/org/leaveOrganization', (route) => route.abort())
+    await page.route('**/api/org/acceptAppTransfer', (route) => route.abort())
+    await page.goto('/me')
+    const row = page.getByRole('list', { name: 'Your organisations' }).getByRole('listitem').filter({ hasText: 'Acme Lost' })
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    const orgReads = reads.orgs
+    await row.getByRole('button', { name: 'Leave Acme Lost' }).click()
+    await row.getByRole('button', { name: 'Yes, leave Acme Lost' }).click()
+    await expect(page.getByText(CHECKING).first()).toBeVisible()
+    await expect.poll(() => reads.orgs).toBeGreaterThan(orgReads)
+
+    const accept = page.getByRole('region', { name: 'App transfers' }).getByRole('button', { name: /^Accept / })
+    await expect(accept).toBeEnabled({ timeout: 30_000 })
+    const transferReads = reads.transfers
+    await accept.click()
+    await expect.poll(() => reads.transfers).toBeGreaterThan(transferReads)
+    await expect(page.getByText('Nothing was changed', { exact: false })).toHaveCount(0)
+  })
+
+  test('/me#app-transfers and /me#organisations scroll to their sections once the wallet shell renders', async ({ page }) => {
+    test.setTimeout(90_000) // two cold /me loads
+    await signInTestWallet(page, { bearer: 'e2e-me-anchor' })
+    await serveOrgReads(page, {
+      OrgsByMember: () => ({ organizationsByMember: [] }),
+      MyOrgInvites: () => ({ myOrgInvites: [] }),
+      AppTransfers: () => ({ appTransfers: [] }),
+    })
+    await page.setViewportSize({ width: 1280, height: 600 })
+    await page.goto('/me#app-transfers')
+    await expect(page.getByRole('heading', { name: 'App transfers' })).toBeInViewport({ timeout: 30_000 })
+    await page.goto('/trust')
+    await page.goto('/me#organisations')
+    await expect(page.getByRole('heading', { name: 'Organisations', exact: true })).toBeInViewport({ timeout: 30_000 })
   })
 })
 

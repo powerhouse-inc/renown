@@ -35,7 +35,7 @@ function ProfilePanel({ ctx }: { ctx: ManageContext }) {
     setSubmitted(true)
     if (!dirty || uploading || Object.values(problems).some(Boolean)) return
     setBusy(true)
-    const done = await ctx.run<Organization>('updateOrganization', { orgId: ctx.org.id, ...patch }, 'Profile saved.')
+    const done = await ctx.run<Organization>('updateOrganization', { orgId: ctx.org.id, ...patch }, 'Profile saved.', { recheck: ctx.reloadOrg })
     setBusy(false)
     if (done) {
       const next = settingsFormFrom(done)
@@ -90,7 +90,7 @@ function VisibilityPanel({ ctx }: { ctx: ManageContext }) {
 
   async function update(name: 'setOrgListed' | 'updateOrganization', args: Record<string, unknown>, success: string) {
     setBusy(true)
-    const done = await ctx.run<Organization>(name, { orgId: ctx.org.id, ...args }, success)
+    const done = await ctx.run<Organization>(name, { orgId: ctx.org.id, ...args }, success, { recheck: ctx.reloadOrg })
     setBusy(false)
     if (done) ctx.reloadOrg()
   }
@@ -134,10 +134,12 @@ function HandlePanel({ ctx }: { ctx: ManageContext }) {
             ? 'This handle is reserved.'
             : null))
     : null
+  // Not before the availability answer: a taken handle would only fail later, at the proposal.
+  const checking = availability === 'checking'
 
   async function propose(event: FormEvent) {
     event.preventDefault()
-    if (!handle || problem) return
+    if (!handle || problem || checking) return
     setBusy(true)
     const done = await ctx.run<OrgProposal>('proposeOrgChange', { orgId: ctx.org.id, kind: 'CHANGE_HANDLE', payload: { handle } }, 'Handle change proposed. Follow it under Security.', { recheck: ctx.reloadOrg })
     setBusy(false)
@@ -156,7 +158,7 @@ function HandlePanel({ ctx }: { ctx: ManageContext }) {
             <input id="settings-handle" className={inputClass} value={text} onChange={(e) => setText(e.target.value)} autoCapitalize="none" spellCheck={false} />
           </Field>
         </div>
-        <button type="submit" disabled={busy || ctx.orgReading || !handle || Boolean(problem)} className={buttonClasses('primary', 'md', 'sm:mt-[1.625rem]')}>
+        <button type="submit" disabled={busy || ctx.orgReading || !handle || Boolean(problem) || checking} className={buttonClasses('primary', 'md', 'sm:mt-[1.625rem]')}>
           {busy ? 'Proposing…' : 'Propose handle change'}
         </button>
       </form>

@@ -220,6 +220,7 @@ test.describe('manage: members', () => {
     page,
     browser,
   }) => {
+    test.setTimeout(90_000) // two cold manage pages
     await openManagePage(page, {
       role: 'ADMIN',
       section: 'members',
@@ -258,7 +259,7 @@ test.describe('manage: members', () => {
     await page.route('**/api/org/createOrgInviteLink', (route) => route.abort())
     await page.getByRole('button', { name: 'Create invite link' }).click()
     await expect(
-      page.getByText('Renown did not answer, so the change may have gone through.', {
+      page.getByText("We couldn't confirm whether that went through. The page was checked again", {
         exact: false,
       }),
     ).toBeVisible()

@@ -69,8 +69,14 @@ const TEXT: Record<OrgFailureCode, string> = {
   SERVICE_UNAVAILABLE: 'Renown is unavailable right now. Try again in a moment.',
   DECLINED: 'Signature declined. Nothing was changed.',
   NO_WALLET: 'Connect the wallet you signed in with to make changes.',
-  NETWORK: 'Renown did not answer. Nothing was changed; try again.',
+  NETWORK: 'Renown did not answer. Try again in a moment.',
 }
+
+/** A signed write whose answer was lost: it may have been applied (writes are not idempotent). */
+export const UNCONFIRMED_WRITE_TEXT = "We couldn't confirm whether that went through. Check before you try again."
+
+/** The same, on a surface that re-reads what the write would have changed. */
+export const UNCONFIRMED_CHECKING_TEXT = "We couldn't confirm whether that went through — checking…"
 
 /**
  * Why a FORBIDDEN was refused, from the switchboard's own message (it sends no

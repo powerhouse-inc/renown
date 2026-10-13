@@ -4,6 +4,7 @@ import {
   isOrgErrorCode,
   orgErrorText,
   orgForbiddenReason,
+  UNCONFIRMED_WRITE_TEXT,
   type OrgFailureCode,
   type OrgForbiddenReason,
 } from '../lib/orgs/errors'
@@ -38,7 +39,8 @@ function failure(
     ok: false,
     code,
     field,
-    message: orgErrorText(code, serverMessage),
+    // A lost answer never says "nothing was changed": the write may have been applied.
+    message: unconfirmed ? UNCONFIRMED_WRITE_TEXT : orgErrorText(code, serverMessage),
     ...(unconfirmed ? { unconfirmed: true as const } : {}),
     ...(reason ? { reason } : {}),
   }
