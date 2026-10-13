@@ -32,7 +32,7 @@ test.describe('crawling', () => {
     const response = await request.get('/sitemap.xml')
     expect(response.headers()['content-type']).toMatch(/application\/xml/)
     const xml = await response.text()
-    for (const path of ['/developers', '/trust', '/ecosystem', '/apps', '/people', '/verify']) expect(xml).toContain(`${path}</loc>`)
+    for (const path of ['/developers', '/trust', '/ecosystem', '/apps', '/people', '/orgs', '/verify']) expect(xml).toContain(`${path}</loc>`)
     expect(xml).toContain(`/app/${APP_DID}</loc>`)
   })
 

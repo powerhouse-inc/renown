@@ -1,7 +1,7 @@
 import type { AppProfilePage } from '../services/app-profiles'
 
 /** Public, indexable site paths (pages Phase B/C add are listed here too). */
-export const STATIC_PATHS = ['/', '/apps', '/people', '/verify', '/developers', '/trust', '/ecosystem']
+export const STATIC_PATHS = ['/', '/apps', '/people', '/orgs', '/verify', '/developers', '/trust', '/ecosystem']
 
 /** Most app profile URLs listed in the sitemap. */
 export const SITEMAP_APP_CAP = 1000

@@ -33,6 +33,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { label: 'Apps', href: '/apps' },
       { label: 'People', href: '/people' },
+      { label: 'Organisations', href: '/orgs' },
       { label: 'Your Renown', href: '/me' },
       { label: 'Verify a signature', href: '/verify' },
       { label: 'Trust', href: '/trust' },

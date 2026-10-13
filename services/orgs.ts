@@ -443,10 +443,12 @@ export async function fetchOrganization(
 export async function searchOrganizations(
   query: string,
   after: string | null = null,
+  request?: OrgServerRequest | null,
 ): Promise<OrgSearchPage> {
   const data = await orgsRequest<{ organizationSearch: OrgSearchPage }>(
     `query OrgSearch($query: String, $limit: Int, $after: String) { organizationSearch(query: $query, limit: $limit, after: $after) { items { ${ORG_CARD_FIELDS} } next } }`,
     { query, limit: ORGS_PAGE_SIZE, after },
+    { request },
   )
   return data.organizationSearch
 }
