@@ -292,11 +292,37 @@ export interface OrgServerRequest {
   socket?: { remoteAddress?: string | undefined } | null
 }
 
-/** The visitor's address: the first X-Forwarded-For hop (ingress appends its own), else the socket's. */
+const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/
+const IPV6 = /^(?=.*:.*:)[0-9a-f:]{2,39}$|^::ffff:(?:\d{1,3}\.){3}\d{1,3}$/i
+
+/** An IPv4 or IPv6 literal (no node:net: this module also runs in the browser). */
+function isIpLiteral(value: string): boolean {
+  return IPV4.test(value) || (IPV6.test(value) && !value.includes(':::'))
+}
+
+function firstValue(raw: string | string[] | undefined): string | undefined {
+  return Array.isArray(raw) ? raw[0] : raw
+}
+
+/**
+ * The visitor's address, from sources the visitor cannot set: x-vercel-forwarded-for
+ * (Vercel sets it; first value), x-real-ip (set by the proxy), the LAST hop of
+ * x-forwarded-for (the proxy appends the real peer; earlier hops are client-controlled),
+ * then the socket's address. null when none is an IP literal.
+ */
 export function visitorIp(request: OrgServerRequest): string | null {
-  const raw = request.headers['x-forwarded-for']
-  const forwarded = (Array.isArray(raw) ? raw[0] : raw)?.split(',')[0]?.trim()
-  return forwarded || request.socket?.remoteAddress || null
+  const forwarded = firstValue(request.headers['x-forwarded-for'])?.split(',')
+  const candidates = [
+    firstValue(request.headers['x-vercel-forwarded-for'])?.split(',')[0],
+    firstValue(request.headers['x-real-ip']),
+    forwarded?.[forwarded.length - 1],
+    request.socket?.remoteAddress,
+  ]
+  for (const candidate of candidates) {
+    const value = candidate?.trim()
+    if (value && isIpLiteral(value)) return value
+  }
+  return null
 }
 
 /**

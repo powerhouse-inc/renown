@@ -1,0 +1,1671 @@
+scalar JSONObject
+
+scalar AttachmentRef
+
+scalar Unknown
+
+scalar Address
+
+scalar Amount_Tokens
+
+scalar EthereumAddress
+
+scalar Amount_Percentage
+
+scalar EmailAddress
+
+scalar Date
+
+scalar DateTime
+
+scalar URL
+
+scalar Amount_Money
+
+scalar OLabel
+
+scalar Currency
+
+scalar PHID
+
+scalar OID
+
+scalar Amount_Fiat
+
+scalar Amount_Currency
+
+scalar Amount_Crypto
+
+scalar Amount
+
+scalar Upload
+
+type PHOperationContext {
+  signer: Signer
+}
+
+type Signer {
+  user: SignerUser
+  app: SignerApp
+  signatures: [String!]!
+}
+
+type SignerUser {
+  address: String!
+  networkId: String!
+  chainId: Int!
+}
+
+type SignerApp {
+  name: String!
+  key: String!
+}
+
+type Operation {
+  id: String!
+  type: String!
+  index: Int!
+  timestampUtcMs: DateTime!
+  hash: String!
+  skip: Int
+  inputText: String
+  error: String
+  context: PHOperationContext
+}
+
+interface IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  operations(first: Int, skip: Int): [Operation!]!
+  stateJSON: JSONObject
+}
+
+type DocumentModel_CodeExample {
+  id: ID!
+  value: String!
+}
+
+type DocumentModel_OperationError {
+  id: ID!
+  code: String
+  name: String
+  description: String
+  template: String
+}
+
+type DocumentModel_Operation {
+  id: ID!
+  name: String
+  schema: String
+  description: String
+  template: String
+  errors: [DocumentModel_OperationError!]!
+  examples: [DocumentModel_CodeExample!]!
+  reducer: String
+  scope: String
+}
+
+type DocumentModel_Module {
+  id: ID!
+  name: String!
+  description: String
+  operations: [DocumentModel_Operation!]!
+}
+
+type DocumentModel_State {
+  schema: String!
+  initialValue: String!
+  examples: [DocumentModel_CodeExample!]!
+}
+
+type DocumentModel_ScopeState {
+  global: DocumentModel_State!
+  local: DocumentModel_State!
+}
+
+type DocumentModel_Author {
+  name: String!
+  website: String
+}
+
+type DocumentModel_DocumentSpecification {
+  version: Int!
+  state: DocumentModel_ScopeState!
+  modules: [DocumentModel_Module!]!
+  changeLog: [String!]!
+}
+
+type DocumentModel_DocumentModelGlobalState {
+  name: String!
+  id: String!
+  extension: String!
+  description: String!
+  author: DocumentModel_Author!
+  specifications: [DocumentModel_DocumentSpecification!]!
+}
+
+type DocumentModel implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  stateJSON: JSONObject
+}
+
+type DocumentDrive_FolderNode {
+  id: String!
+  name: String!
+  kind: String!
+  parentFolder: String
+}
+
+type DocumentDrive_FileNode {
+  id: String!
+  name: String!
+  kind: String!
+  documentType: String!
+  parentFolder: String
+}
+
+union DocumentDrive_Node = DocumentDrive_FolderNode | DocumentDrive_FileNode
+
+type DocumentDrive_DocumentDriveState {
+  name: String!
+  nodes: [DocumentDrive_Node!]!
+  icon: String
+}
+
+type DocumentDrive_ListenerFilter {
+  documentType: [String!]!
+  documentId: [ID!]
+  scope: [String!]
+  branch: [String!]
+}
+
+enum DocumentDrive_TransmitterType {
+  Internal
+  SwitchboardPush
+  PullResponder
+  SecureConnect
+  MatrixConnect
+  RESTWebhook
+}
+
+type DocumentDrive_ListenerCallInfo {
+  transmitterType: DocumentDrive_TransmitterType
+  name: String
+  data: String
+}
+
+type DocumentDrive_Listener {
+  listenerId: ID!
+  label: String
+  block: Boolean!
+  system: Boolean!
+  filter: DocumentDrive_ListenerFilter!
+  callInfo: DocumentDrive_ListenerCallInfo
+}
+
+enum DocumentDrive_TriggerType {
+  PullResponder
+}
+
+type DocumentDrive_PullResponderTriggerData {
+  listenerId: ID!
+  url: String!
+  interval: String!
+}
+
+union DocumentDrive_TriggerData = DocumentDrive_PullResponderTriggerData
+
+type DocumentDrive_Trigger {
+  id: ID!
+  type: DocumentDrive_TriggerType!
+  data: DocumentDrive_TriggerData
+}
+
+type DocumentDrive_DocumentDriveLocalState {
+  sharingType: String
+  listeners: [DocumentDrive_Listener!]!
+  triggers: [DocumentDrive_Trigger!]!
+  availableOffline: Boolean!
+}
+
+type DocumentDrive implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: DocumentDrive_DocumentDriveState!
+  state: DocumentDrive_DocumentDriveState!
+  stateJSON: JSONObject
+}
+
+type ReactorDrive_ReactorDriveState {
+  name: String!
+  icon: String
+}
+
+type ReactorDrive_ReactorDriveLocalState {
+  sharingType: String!
+  availableOffline: Boolean!
+}
+
+type ReactorDrive implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: ReactorDrive_ReactorDriveState!
+  state: ReactorDrive_ReactorDriveState!
+  stateJSON: JSONObject
+}
+
+"""
+A member address list gated by the group document's own auth scope. Addresses
+are stored as given and compared case-insensitively, matching how { address }
+principals are compared during auth evaluation.
+"""
+type ReactorGroup_ReactorGroupState {
+  """Display name of the group."""
+  name: String!
+  """Free-text description of the group's purpose."""
+  description: String!
+  """
+  Member wallet addresses. No duplicates under case-insensitive comparison.
+  """
+  members: [String!]!
+}
+
+type ReactorGroup implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: ReactorGroup_ReactorGroupState!
+  state: ReactorGroup_ReactorGroupState!
+  stateJSON: JSONObject
+}
+
+type RenownAppProfile_RenownAppProfileState {
+  appDid: String
+  publisherDid: String
+  name: String
+  tagline: String
+  "Legacy logo: an https URL or a raster data URL; logoRef wins when set"
+  logo: String
+  website: String
+  "Markdown subset, at most 2000 characters; rendered sanitized"
+  description: String
+  "At most 40 characters"
+  category: String
+  "Uploaded square logo"
+  logoRef: AttachmentRef
+  "Uploaded 3:1 cover image"
+  coverRef: AttachmentRef
+  "Support contact: an email address or an https URL, at most 200 characters"
+  supportContact: String
+  "Security contact (vulnerability reports): an email address or an https URL, at most 200 characters"
+  securityContact: String
+  "At most 8 links, in display order"
+  links: [RenownAppProfile_RenownAppLink!]!
+  "Publisher-defined metrics, at most 16, in display order"
+  metrics: [RenownAppProfile_RenownAppMetric!]!
+}
+
+type RenownAppProfile_RenownAppLink {
+  id: OID!
+  label: String!
+  url: URL!
+}
+
+enum RenownAppProfile_RenownMetricAggregation {
+  SUM
+  MAX
+  AVG
+  COUNT_USERS
+}
+
+type RenownAppProfile_RenownAppMetric {
+  id: OID!
+  "The metric name the app reports: ^[A-Za-z][A-Za-z0-9_.:-]{0,63}$"
+  key: String!
+  "1-40 characters"
+  label: String!
+  "At most 16 characters, e.g. notes"
+  unit: String
+  "At most 200 characters"
+  description: String
+  aggregation: RenownAppProfile_RenownMetricAggregation!
+  "Shown on the app page and on user profiles"
+  public: Boolean!
+}
+
+type RenownAppProfile implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownAppProfile_RenownAppProfileState!
+  state: RenownAppProfile_RenownAppProfileState!
+  stateJSON: JSONObject
+}
+
+type RenownCredential_Issuer {
+  id: String!
+  ethereumAddress: EthereumAddress!
+}
+
+type RenownCredential_CredentialSubject {
+  id: String
+  app: String!
+}
+
+type RenownCredential_CredentialStatus {
+  id: String!
+  type: String!
+}
+
+type RenownCredential_CredentialSchema {
+  id: String!
+  type: String!
+}
+
+type RenownCredential_EIP712Domain {
+  version: String!
+  chainId: Int!
+}
+
+type RenownCredential_EIP712 {
+  domain: RenownCredential_EIP712Domain!
+  primaryType: String!
+}
+
+type RenownCredential_Proof {
+  verificationMethod: String!
+  ethereumAddress: EthereumAddress!
+  created: DateTime!
+  proofPurpose: String!
+  type: String!
+  proofValue: String!
+  eip712: RenownCredential_EIP712!
+}
+
+type RenownCredential_RenownCredentialState {
+  "W3C VC Fields - EIP-712 Signed Verifiable Credential"
+  context: [String!]!
+  id: String!
+  type: [String!]!
+  issuer: RenownCredential_Issuer!
+  issuanceDate: DateTime!
+  expirationDate: DateTime
+  credentialSubject: RenownCredential_CredentialSubject!
+  credentialStatus: RenownCredential_CredentialStatus
+  credentialSchema: RenownCredential_CredentialSchema!
+  proof: RenownCredential_Proof!
+  "Revocation tracking"
+  revoked: Boolean!
+  revokedAt: DateTime
+  revocationReason: String
+}
+
+type RenownCredential implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownCredential_RenownCredentialState!
+  state: RenownCredential_RenownCredentialState!
+  stateJSON: JSONObject
+}
+
+type RenownOidcClient_RenownOidcClientState {
+  name: String
+  redirectUris: [URL!]!
+  allowedSubjects: [String!]!
+  allowAnySubject: Boolean!
+  clientSecretHash: String
+  status: RenownOidcClient_RenownOidcClientStatus!
+}
+
+enum RenownOidcClient_RenownOidcClientStatus {
+  ACTIVE
+  DISABLED
+}
+
+type RenownOidcClient implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownOidcClient_RenownOidcClientState!
+  state: RenownOidcClient_RenownOidcClientState!
+  stateJSON: JSONObject
+}
+
+type RenownOrganization_RenownOrganizationState {
+  "Lowercase; unique across users and organizations (enforced by the write path)"
+  handle: String
+  "1-64 characters"
+  name: String
+  "At most 280 characters"
+  bio: String
+  "An http(s) URL"
+  website: String
+  "attachment://v1:<sha256>"
+  avatar: String
+  "At most 8, in display order"
+  links: [RenownOrganization_RenownOrgLink!]!
+  "Opted in to the organization directory"
+  listed: Boolean!
+  "Active, non-hidden members are shown publicly"
+  membersPublic: Boolean!
+  archived: Boolean!
+  takenDown: Boolean!
+  "Lowercase address of the creator; set once by INIT_ORGANIZATION"
+  createdBy: EthereumAddress
+  "Every membership record ever created (rows are never removed)"
+  members: [RenownOrganization_RenownOrgMember!]!
+  "At most 50 flat teams"
+  teams: [RenownOrganization_RenownOrgTeam!]!
+  apps: [RenownOrganization_RenownOrgApp!]!
+  domains: [RenownOrganization_RenownOrgDomain!]!
+  "Delegation credential ids suspended by the organization"
+  suspendedCredentialIds: [String!]!
+}
+
+type RenownOrganization_RenownOrgLink {
+  id: OID!
+  label: String!
+  url: String!
+}
+
+enum RenownOrganization_RenownOrgRole {
+  OWNER
+  ADMIN
+  PUBLISHER
+  MEMBER
+}
+
+enum RenownOrganization_RenownOrgMemberStatus {
+  INVITED
+  ACTIVE
+  DECLINED
+  LEFT
+  REMOVED
+  REVOKED
+}
+
+type RenownOrganization_RenownOrgAppScope {
+  all: Boolean!
+  appDids: [String!]!
+}
+
+type RenownOrganization_RenownOrgMember {
+  id: OID!
+  "Lowercase"
+  address: EthereumAddress!
+  role: RenownOrganization_RenownOrgRole!
+  status: RenownOrganization_RenownOrgMemberStatus!
+  appScope: RenownOrganization_RenownOrgAppScope!
+  hidden: Boolean!
+  joinedAt: DateTime
+  updatedAt: DateTime!
+}
+
+type RenownOrganization_RenownOrgTeam {
+  id: OID!
+  slug: String!
+  name: String!
+  appDids: [String!]!
+  memberIds: [OID!]!
+}
+
+type RenownOrganization_RenownOrgApp {
+  appDid: String!
+  addedAt: DateTime!
+  frozen: Boolean!
+}
+
+enum RenownOrganization_RenownOrgDomainStatus {
+  PENDING
+  VERIFIED
+  LAPSED
+}
+
+type RenownOrganization_RenownOrgDomain {
+  id: OID!
+  domain: String!
+  status: RenownOrganization_RenownOrgDomainStatus!
+  verifiedAt: DateTime
+}
+
+type RenownOrganization implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownOrganization_RenownOrganizationState!
+  state: RenownOrganization_RenownOrganizationState!
+  stateJSON: JSONObject
+}
+
+type RenownUserStats_RenownUserStatsState {
+  userDid: String
+  stats: [RenownUserStats_RenownUserStat!]!
+}
+
+type RenownUserStats_RenownUserStat {
+  id: OID!
+  appDid: String!
+  metric: String!
+  value: Float!
+  updatedAt: DateTime!
+}
+
+type RenownUserStats implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownUserStats_RenownUserStatsState!
+  state: RenownUserStats_RenownUserStatsState!
+  stateJSON: JSONObject
+}
+
+type RenownUser_RenownUserState {
+  "Add your global state fields here"
+  username: String
+  ethAddress: EthereumAddress
+  userImage: String
+  "Display name, 1-64 characters"
+  displayName: String
+  "Unique handle; uniqueness is enforced by the write path, not the reducer"
+  handle: String
+  "Short bio, at most 280 characters"
+  bio: String
+  "Profile links, at most 8, in display order"
+  links: [RenownUser_RenownUserLink!]!
+  "Uploaded avatar; userImage stays the external (ENS) image URL"
+  avatar: AttachmentRef
+  "Opted in to people search; documents created before the field existed have no value, read as false"
+  listed: Boolean
+}
+
+type RenownUser_RenownUserLink {
+  id: OID!
+  label: String!
+  url: URL!
+}
+
+type RenownUser implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: RenownUser_RenownUserState!
+  state: RenownUser_RenownUserState!
+  stateJSON: JSONObject
+}
+
+"""
+Configuration for a Drive App contributed by the package. Drive apps render a
+custom view at the drive level (instead of, or alongside, the document file
+tree) and can opt into which document types they accept.
+"""
+type AppModule_AppModuleState {
+  """
+  Display name of the drive app. Also used as the source for the generated folder name under `apps/`.
+  """
+  name: String!
+  """
+  Lifecycle status. While DRAFT the app definition is editable and codegen is skipped; switching to CONFIRMED triggers app scaffold generation.
+  """
+  status: AppModule_StatusType!
+  """
+  Document type ids this app handles. `null` means the app accepts any document type; an empty list means it accepts none.
+  """
+  allowedDocumentTypes: [String!]
+  """
+  Whether the app surface accepts dropped files from the user. Defaults to true.
+  """
+  isDragAndDropEnabled: Boolean!
+}
+
+"""
+Lifecycle status of a module definition.
+- DRAFT: still being edited; codegen does not run.
+- CONFIRMED: locked in; codegen produces the corresponding scaffold.
+"""
+enum AppModule_StatusType {
+  DRAFT
+  CONFIRMED
+}
+
+type AppModule implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: AppModule_AppModuleState!
+  state: AppModule_AppModuleState!
+  stateJSON: JSONObject
+}
+
+"""
+Configuration for a document editor contributed by the package. The editor is
+registered against every document type listed in `documentTypes`; Connect picks
+the first matching editor when opening a document.
+"""
+type DocumentEditor_DocumentEditorState {
+  """
+  Display name of the editor. Also determines the generated folder name under `editors/`.
+  """
+  name: String!
+  """
+  Document types this editor can edit. Each entry has a stable id so it can be removed individually.
+  """
+  documentTypes: [DocumentEditor_DocumentTypeItem!]!
+  """
+  Lifecycle status. While DRAFT the editor definition is editable and codegen is skipped; switching to CONFIRMED triggers scaffold generation.
+  """
+  status: DocumentEditor_StatusType!
+}
+
+"""
+A document type id (e.g. 'powerhouse/document-drive') attached to the editor with a stable entry id.
+"""
+type DocumentEditor_DocumentTypeItem {
+  """Stable identifier for the entry; used to remove it."""
+  id: OID!
+  """Document type id this editor handles (e.g. 'my-org/invoice')."""
+  documentType: String!
+}
+
+"""
+Lifecycle status of a module definition.
+- DRAFT: still being edited; codegen does not run.
+- CONFIRMED: locked in; codegen produces the corresponding scaffold.
+"""
+enum DocumentEditor_StatusType {
+  DRAFT
+  CONFIRMED
+}
+
+type DocumentEditor implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: DocumentEditor_DocumentEditorState!
+  state: DocumentEditor_DocumentEditorState!
+  stateJSON: JSONObject
+}
+
+"""
+Configuration for a processor contributed by the package. A processor receives
+operations from documents of matching types and runs server-side logic (e.g.
+building a read model, indexing, syncing to an external system).
+"""
+type ProcessorModule_ProcessorModuleState {
+  """
+  Display name of the processor. Also determines the generated folder name under `processors/`.
+  """
+  name: String!
+  """
+  Processor implementation kind (e.g. 'read-model', 'relational-db'). Determines which scaffold codegen emits.
+  """
+  type: String!
+  """
+  Document types this processor subscribes to. Each entry has a stable id so it can be removed individually.
+  """
+  documentTypes: [ProcessorModule_DocumentTypeItem!]!
+  """
+  Lifecycle status. While DRAFT the processor definition is editable and codegen is skipped; switching to CONFIRMED triggers scaffold generation.
+  """
+  status: ProcessorModule_StatusType!
+  """
+  Drive-app names this processor is attached to. The processor runs in the context of each listed app.
+  """
+  processorApps: [String!]!
+}
+
+"""
+A document type id (e.g. 'my-org/invoice') attached to the processor with a stable entry id.
+"""
+type ProcessorModule_DocumentTypeItem {
+  """Stable identifier for the entry; used to remove it."""
+  id: OID!
+  """Document type id this processor subscribes to."""
+  documentType: String!
+}
+
+"""
+Lifecycle status of a module definition.
+- DRAFT: still being edited; codegen does not run.
+- CONFIRMED: locked in; codegen produces the corresponding scaffold.
+"""
+enum ProcessorModule_StatusType {
+  DRAFT
+  CONFIRMED
+}
+
+type ProcessorModule implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: ProcessorModule_ProcessorModuleState!
+  state: ProcessorModule_ProcessorModuleState!
+  stateJSON: JSONObject
+}
+
+"""
+Configuration for a GraphQL subgraph contributed by the package. The subgraph
+is served by Switchboard and stitched into the unified Powerhouse API.
+"""
+type SubgraphModule_SubgraphModuleState {
+  """
+  Display name of the subgraph. Also determines the generated folder name under `subgraphs/` and the route segment Switchboard mounts it at.
+  """
+  name: String!
+  """
+  Lifecycle status. While DRAFT the subgraph definition is editable and codegen is skipped; switching to CONFIRMED triggers scaffold generation.
+  """
+  status: SubgraphModule_StatusType!
+}
+
+"""
+Lifecycle status of a module definition.
+- DRAFT: still being edited; codegen does not run.
+- CONFIRMED: locked in; codegen produces the corresponding scaffold.
+"""
+enum SubgraphModule_StatusType {
+  DRAFT
+  CONFIRMED
+}
+
+type SubgraphModule implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: SubgraphModule_SubgraphModuleState!
+  state: SubgraphModule_SubgraphModuleState!
+  stateJSON: JSONObject
+}
+
+"""
+Package metadata used to publish a Vetra Reactor Package to npm and surface
+it inside Connect/Switchboard. All fields are optional so a package can be
+created empty and filled in incrementally during development.
+"""
+type VetraPackage_VetraPackageState {
+  """
+  Human-readable package name (e.g. 'Pizza Plaza'). Distinct from the npm package id.
+  """
+  name: String
+  """
+  One-paragraph summary of what the package provides. Shown on package listing pages.
+  """
+  description: String
+  """
+  Free-form category label used to group packages in directories (e.g. 'Finance', 'Productivity').
+  """
+  category: String
+  """
+  Author/maintainer information surfaced in the published package metadata.
+  """
+  author: VetraPackage_Author!
+  """
+  Search keywords associated with the package. Each keyword has a stable id so it can be removed individually.
+  """
+  keywords: [VetraPackage_Keyword!]!
+  """Public source code URL (typically a GitHub repository)."""
+  githubUrl: URL
+  """Published npm package URL. Set once the package has been released."""
+  npmUrl: URL
+}
+
+"""Author/maintainer of the Vetra Package."""
+type VetraPackage_Author {
+  """Display name of the author or organization."""
+  name: String
+  """Author's website URL."""
+  website: URL
+}
+
+"""A single search keyword attached to the package."""
+type VetraPackage_Keyword {
+  """Stable identifier for the keyword entry; used to remove it."""
+  id: OID!
+  """Display label for the keyword (e.g. 'invoicing', 'defi')."""
+  label: String!
+}
+
+type VetraPackage implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  operations(skip: Int, first: Int): [Operation!]!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  initialState: VetraPackage_VetraPackageState!
+  state: VetraPackage_VetraPackageState!
+  stateJSON: JSONObject
+}
+
+type GqlDocument implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  operations(first: Int, skip: Int): [Operation!]!
+  stateJSON: JSONObject
+}
+
+type DriveDocument implements IDocument {
+  id: String!
+  name: String!
+  documentType: String!
+  revision: Int!
+  createdAtUtcIso: DateTime!
+  lastModifiedAtUtcIso: DateTime!
+  operations(first: Int, skip: Int): [Operation!]!
+  stateJSON: JSONObject
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  PUBLISHER
+  MEMBER
+}
+
+"EXPIRED is computed: an INVITED record older than 14 days."
+enum OrgMemberStatus {
+  INVITED
+  ACTIVE
+  DECLINED
+  LEFT
+  REMOVED
+  REVOKED
+  EXPIRED
+}
+
+enum OrgHandleProblem {
+  INVALID
+  RESERVED
+  TAKEN
+}
+
+enum OrgSecurityWarning {
+  SINGLE_OWNER
+}
+
+"""
+Proof for callers without a bearer: personal_sign by address over
+orgMessage(<field name>, <orgId argument or ->, <the other arguments>, timestamp)
+from sdk/orgs.ts. timestamp: ISO-8601 with a zone, within 10 minutes of the server clock.
+A present auth is always checked and never falls back to the bearer.
+"""
+input OrgAuthInput {
+  address: String!
+  signature: String!
+  timestamp: String!
+}
+
+input OrgLinkInput {
+  id: String!
+  label: String!
+  url: String!
+}
+
+input OrgAppScopeInput {
+  all: Boolean!
+  appDids: [String!]!
+}
+
+type OrgLink {
+  id: String!
+  label: String!
+  url: String!
+}
+
+type OrgAppScope {
+  all: Boolean!
+  appDids: [String!]!
+}
+
+type OrgSummary {
+  id: String!
+  did: String!
+  handle: String!
+  name: String!
+  avatar: String
+  verifiedDomains: [String!]!
+}
+
+type OrgApp {
+  appDid: String!
+  addedAt: String!
+  frozen: Boolean!
+}
+
+type OrgTeam {
+  id: String!
+  orgId: String!
+  slug: String!
+  name: String!
+  appDids: [String!]!
+  memberAddresses: [String!]!
+}
+
+type OrgMembership {
+  orgId: String!
+  address: String!
+  role: OrgRole!
+  status: OrgMemberStatus!
+  "The membership's own scope (all for owners and admins)."
+  appScope: OrgAppScope!
+  "appScope plus the app DIDs of the member's teams."
+  effectiveScope: OrgAppScope!
+  "Slugs of the member's teams."
+  teams: [String!]!
+}
+
+type Organization {
+  id: String!
+  "did:web:<RENOWN_ORG_DID_HOST>:org:<id>"
+  did: String!
+  handle: String!
+  name: String!
+  bio: String
+  website: String
+  "attachment://v1:<sha256>; served at <renown>/media/<id>/avatar"
+  avatar: String
+  links: [OrgLink!]!
+  listed: Boolean!
+  membersPublic: Boolean!
+  archived: Boolean!
+  takenDown: Boolean!
+  createdBy: String!
+  createdAt: String!
+  updatedAt: String!
+  verifiedDomains: [String!]!
+  "Another organization with a verified domain and the same name (case-insensitive), shown when this one has none."
+  notAffiliatedWith: OrgSummary
+  ownerCount: Int!
+  memberCount: Int!
+  securityWarnings: [OrgSecurityWarning!]!
+  apps: [OrgApp!]!
+  "Only for active members of the organization; [] otherwise."
+  teams: [OrgTeam!]!
+  "The caller's ACTIVE membership, when the caller proves an address."
+  viewerMembership: OrgMembership
+}
+
+type OrgMember {
+  "The membership record id; also the invite id while INVITED."
+  id: String!
+  orgId: String!
+  address: String!
+  role: OrgRole!
+  status: OrgMemberStatus!
+  appScope: OrgAppScope!
+  hidden: Boolean!
+  invitedBy: String
+  invitedAt: String!
+  joinedAt: String
+  endedAt: String
+  updatedAt: String!
+  "invitedAt + 14 days while INVITED or EXPIRED; null otherwise."
+  expiresAt: String
+  teams: [String!]!
+  handle: String
+  displayName: String
+  avatar: String
+}
+
+type OrgAffiliation {
+  org: Organization!
+  role: OrgRole!
+  hidden: Boolean!
+}
+
+type OrgSearchPage {
+  items: [Organization!]!
+  next: String
+}
+
+type OrgInvite {
+  id: String!
+  orgId: String!
+  org: OrgSummary!
+  address: String!
+  role: OrgRole!
+  status: OrgMemberStatus!
+  invitedBy: String
+  createdAt: String!
+  expiresAt: String!
+}
+
+type OrgInviteLink {
+  id: String!
+  orgId: String!
+  role: OrgRole!
+  maxUses: Int!
+  uses: Int!
+  expiresAt: String!
+  revoked: Boolean!
+  createdBy: String!
+  createdAt: String!
+}
+
+type OrgInviteLinkCreated {
+  link: OrgInviteLink!
+  "Shown once; only its SHA-256 is stored."
+  token: String!
+}
+
+type OrgInviteLinkPreview {
+  org: OrgSummary!
+  role: OrgRole!
+  expiresAt: String!
+  expired: Boolean!
+  revoked: Boolean!
+  "maxUses reached"
+  full: Boolean!
+  usable: Boolean!
+}
+
+type OrgHandleAvailability {
+  "As it would be stored (trimmed, lowercased)"
+  handle: String!
+  available: Boolean!
+  reason: OrgHandleProblem
+}
+
+type OrgAuditEntry {
+  id: String!
+  orgId: String!
+  at: String!
+  "Lowercase address, or system"
+  actor: String!
+  action: String!
+  "JSON object"
+  details: String!
+}
+
+type OrgAuditPage {
+  items: [OrgAuditEntry!]!
+  next: String
+}
+
+type Query {
+  "By id or by handle (exactly one). Taken-down organizations come back with their profile emptied."
+  organization(id: String, handle: String, auth: OrgAuthInput): Organization
+  "Listed organizations; query (2-40 characters) prefix-matches handle or name, absent or blank lists all. limit 1-50 (default 20)."
+  organizationSearch(query: String, limit: Int, after: String): OrgSearchPage!
+  "Public memberships, or all ACTIVE ones (hidden included) when the caller proves address."
+  organizationsByMember(address: String!, auth: OrgAuthInput): [OrgAffiliation!]!
+  "Active members see everyone active (hidden included); admins with includeInactive see every record; others see the public list."
+  organizationMembers(orgId: String!, includeInactive: Boolean, auth: OrgAuthInput): [OrgMember!]!
+  "Public: an ACTIVE membership's role, status and scopes; null otherwise."
+  orgMembership(orgId: String!, address: String!): OrgMembership
+  "Admins: pending (INVITED and EXPIRED) direct invites."
+  orgInvites(orgId: String!, auth: OrgAuthInput): [OrgInvite!]!
+  "Admins: invite links, newest first."
+  orgInviteLinks(orgId: String!, auth: OrgAuthInput): [OrgInviteLink!]!
+  "The caller's pending invites."
+  myOrgInvites(auth: OrgAuthInput): [OrgInvite!]!
+  "Public preview of an invite link token."
+  orgInviteLink(token: String!): OrgInviteLinkPreview
+  orgHandleAvailability(handle: String!): OrgHandleAvailability!
+  "Admins: newest first. limit 1-100 (default 50)."
+  orgAuditLog(orgId: String!, limit: Int, after: String, auth: OrgAuthInput): OrgAuditPage!
+}
+
+type Mutation {
+  createOrganization(handle: String!, name: String!, bio: String, website: String, links: [OrgLinkInput!], listed: Boolean, membersPublic: Boolean, auth: OrgAuthInput): Organization!
+  "Admins. Absent or null keeps a field, an empty string clears bio, website or avatar, links replaces the list."
+  updateOrganization(orgId: String!, name: String, bio: String, website: String, avatar: String, links: [OrgLinkInput!], membersPublic: Boolean, auth: OrgAuthInput): Organization!
+  setOrgListed(orgId: String!, listed: Boolean!, auth: OrgAuthInput): Organization!
+  "invitee: a 0x address or a Renown user handle. role up to ADMIN (ADMIN needs an owner)."
+  inviteOrgMember(orgId: String!, invitee: String!, role: OrgRole!, auth: OrgAuthInput): OrgInvite!
+  respondToOrgInvite(orgId: String!, inviteId: String!, accept: Boolean!, auth: OrgAuthInput): OrgMember!
+  revokeOrgInvite(orgId: String!, inviteId: String!, auth: OrgAuthInput): OrgInvite!
+  "role MEMBER or PUBLISHER; maxUses 1-100; expiresAt within 30 days."
+  createOrgInviteLink(orgId: String!, role: OrgRole!, maxUses: Int!, expiresAt: String!, auth: OrgAuthInput): OrgInviteLinkCreated!
+  revokeOrgInviteLink(orgId: String!, linkId: String!, auth: OrgAuthInput): OrgInviteLink!
+  acceptOrgInviteLink(token: String!, auth: OrgAuthInput): OrgMember!
+  leaveOrganization(orgId: String!, auth: OrgAuthInput): Boolean!
+  removeOrgMember(orgId: String!, address: String!, auth: OrgAuthInput): OrgMember!
+  "role up to ADMIN; owners change through proposals."
+  setOrgMemberRole(orgId: String!, address: String!, role: OrgRole!, auth: OrgAuthInput): OrgMember!
+  setOrgMemberAppScope(orgId: String!, address: String!, appScope: OrgAppScopeInput!, auth: OrgAuthInput): OrgMember!
+  setMyOrgMembershipHidden(orgId: String!, hidden: Boolean!, auth: OrgAuthInput): OrgMember!
+  createOrgTeam(orgId: String!, slug: String!, name: String!, appDids: [String!], auth: OrgAuthInput): OrgTeam!
+  updateOrgTeam(orgId: String!, teamId: String!, slug: String, name: String, appDids: [String!], auth: OrgAuthInput): OrgTeam!
+  deleteOrgTeam(orgId: String!, teamId: String!, auth: OrgAuthInput): Boolean!
+  "addresses: ACTIVE members; replaces the team's members."
+  setOrgTeamMembers(orgId: String!, teamId: String!, addresses: [String!]!, auth: OrgAuthInput): OrgTeam!
+}
+
+enum OrgProposalKind {
+  ADD_OWNER
+  REMOVE_OWNER
+  TRANSFER_APP_OUT
+  CHANGE_HANDLE
+  DELETE_ORG
+  RECOVER
+  FREEZE_APP
+  UNFREEZE_APP
+}
+
+enum OrgProposalStatus {
+  PENDING
+  EXECUTED
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+enum OrgPartyKind {
+  PERSON
+  ORG
+}
+
+"Per kind: ADD_OWNER address; REMOVE_OWNER address, demoteToAdmin; TRANSFER_APP_OUT appDid, toKind, toId; CHANGE_HANDLE handle; DELETE_ORG nothing; FREEZE_APP and UNFREEZE_APP appDid. RECOVER only through startOrgRecovery."
+input OrgProposalPayloadInput {
+  address: String
+  demoteToAdmin: Boolean
+  appDid: String
+  toKind: OrgPartyKind
+  toId: String
+  handle: String
+}
+
+type OrgProposalPayload {
+  address: String
+  demoteToAdmin: Boolean
+  appDid: String
+  toKind: OrgPartyKind
+  toId: String
+  handle: String
+  domain: String
+}
+
+type OrgProposal {
+  id: String!
+  orgId: String!
+  kind: OrgProposalKind!
+  payload: OrgProposalPayload!
+  proposer: String!
+  approvals: [String!]!
+  threshold: Int!
+  status: OrgProposalStatus!
+  createdAt: String!
+  "Set once approvals reach the threshold: max(createdAt + delay, when the threshold was reached)."
+  executableAt: String
+  expiresAt: String!
+  executedAt: String
+  "Why it FAILED or was CANCELLED"
+  reason: String
+}
+
+extend type Query {
+  "Admins and owners; newest first."
+  orgProposals(orgId: String!, status: OrgProposalStatus, auth: OrgAuthInput): [OrgProposal!]!
+}
+
+extend type Mutation {
+  proposeOrgChange(orgId: String!, kind: OrgProposalKind!, payload: OrgProposalPayloadInput!, auth: OrgAuthInput): OrgProposal!
+  approveOrgProposal(orgId: String!, proposalId: String!, auth: OrgAuthInput): OrgProposal!
+  cancelOrgProposal(orgId: String!, proposalId: String!, auth: OrgAuthInput): OrgProposal!
+  "Runs a matured proposal; a proposal whose preconditions no longer hold comes back FAILED with a reason."
+  executeOrgProposal(orgId: String!, proposalId: String!, auth: OrgAuthInput): OrgProposal!
+}
+
+enum OrgDomainStatus {
+  PENDING
+  VERIFIED
+  LAPSED
+}
+
+type OrgDomain {
+  id: String!
+  orgId: String!
+  domain: String!
+  status: OrgDomainStatus!
+  verifiedAt: String
+  lastCheckedAt: String
+  failures: Int!
+  createdAt: String!
+  "DNS TXT record name: _renown.<domain>"
+  txtName: String!
+  "DNS TXT record value: renown-org=<orgId>;token=<token>"
+  txtValue: String!
+  "https://<domain>/.well-known/renown.json"
+  wellKnownUrl: String!
+  "A renown.json body that proves the domain"
+  wellKnownJson: String!
+}
+
+extend type Query {
+  "Admins."
+  orgDomains(orgId: String!, auth: OrgAuthInput): [OrgDomain!]!
+}
+
+extend type Mutation {
+  "Admins; at most 10 domains. DOMAIN_TAKEN when another organization has it verified."
+  addOrgDomain(orgId: String!, domain: String!, auth: OrgAuthInput): OrgDomain!
+  "Admins. DOMAIN_PROOF_MISSING when neither the TXT record nor renown.json proves it."
+  checkOrgDomain(orgId: String!, domainId: String!, auth: OrgAuthInput): OrgDomain!
+  removeOrgDomain(orgId: String!, domainId: String!, auth: OrgAuthInput): Boolean!
+  "Anyone signed in: a RECOVER proposal (no approvals, recovery delay) proven by a domain verified for at least 14 days."
+  startOrgRecovery(orgId: String!, domain: String!, newOwner: String!, auth: OrgAuthInput): OrgProposal!
+}
+
+"A service account of the organisation: a renown-workload identity registered for it."
+type OrgWorkload {
+  did: String!
+  repository: String!
+  productionBranch: String!
+  ownerAddress: String!
+  disabled: Boolean!
+  createdAt: String!
+}
+
+extend type Query {
+  "Admins: the organisation's service accounts (workload identities)."
+  orgWorkloads(orgId: String!, auth: OrgAuthInput): [OrgWorkload!]!
+}
+
+extend type Mutation {
+  "Admins: a disabled identity gets no tokens."
+  setOrgWorkloadDisabled(orgId: String!, did: String!, disabled: Boolean!, auth: OrgAuthInput): OrgWorkload!
+}
+
+enum OrgCredentialReason {
+  ISSUER_NOT_MEMBER
+  ISSUER_NOT_PUBLISHER
+  SUSPENDED
+  APP_FROZEN
+}
+
+type OrgCredentialStatus {
+  credentialId: String!
+  appDid: String
+  orgId: String
+  "Whether organisation rules let the delegation count (revocation and expiry are reported by renownCredentials)."
+  counts: Boolean!
+  reason: OrgCredentialReason
+}
+
+type OrgCredential {
+  credentialId: String!
+  documentId: String!
+  appDid: String!
+  issuer: String!
+  issuerRole: OrgRole
+  issuerStatus: OrgMemberStatus
+  issuanceDate: String!
+  expirationDate: String
+  revoked: Boolean!
+  status: OrgCredentialStatus!
+}
+
+extend type Query {
+  "Admins: delegations for the organisation's apps (newest 500)."
+  orgCredentials(orgId: String!, auth: OrgAuthInput): [OrgCredential!]!
+  "Public: whether a delegation credential counts under organisation rules; null for an unknown credential."
+  orgCredentialStatus(credentialId: String!): OrgCredentialStatus
+}
+
+extend type Mutation {
+  "Admins: exactly one of credentialIds (at most 100) and memberAddress (all of that member's live delegations for org apps). Returns the newly suspended ids."
+  suspendOrgCredentials(orgId: String!, credentialIds: [String!], memberAddress: String, auth: OrgAuthInput): [String!]!
+  unsuspendOrgCredential(orgId: String!, credentialId: String!, auth: OrgAuthInput): Boolean!
+}
+
+enum AppTransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+type AppTransfer {
+  id: String!
+  appDid: String!
+  fromKind: OrgPartyKind!
+  "Lowercase address (PERSON) or organization id (ORG)."
+  fromId: String!
+  toKind: OrgPartyKind!
+  toId: String!
+  status: AppTransferStatus!
+  createdAt: String!
+  "PENDING transfers expire 14 days after they were made."
+  expiresAt: String!
+  decidedAt: String
+  decidedBy: String
+  "The TRANSFER_APP_OUT proposal that made it."
+  proposalId: String
+}
+
+extend type Query {
+  "Transfers the caller is part of: by orgId (admins), by address (that address), or by appDid (either side's)."
+  appTransfers(appDid: String, orgId: String, address: String, auth: OrgAuthInput): [AppTransfer!]!
+}
+
+extend type Mutation {
+  "The app's personal publisher offers it to an organization; an admin of that organization accepts."
+  proposeAppTransfer(appDid: String!, toOrgId: String!, auth: OrgAuthInput): AppTransfer!
+  "The recipient (the person, or an admin of the organization) accepts: the app, its profile and its workload identity move. Errors also APP_FROZEN."
+  acceptAppTransfer(transferId: String!, auth: OrgAuthInput): AppTransfer!
+  "The recipient declines (DECLINED) or the source withdraws (CANCELLED)."
+  declineAppTransfer(transferId: String!, auth: OrgAuthInput): AppTransfer!
+}
+
+type ReleaseAttestation {
+  id: String!
+  appDid: String!
+  version: String!
+  "sha256:<64 lowercase hex>"
+  artifactDigest: String!
+  "The owning organization when signed; empty for person-owned apps."
+  orgId: String!
+  "Lowercase address."
+  signer: String!
+  "The signer's role when the attestation was accepted; null for person-owned apps."
+  signerRole: OrgRole
+  "Organization apps: the signer's membership of that time is still ACTIVE (never ended since). Person apps: the signer still publishes the app."
+  signerStillMember: Boolean!
+  "Exactly as signed (ISO-8601 with a zone, never normalised): the stored fields verify against signature."
+  issuedAt: String!
+  signature: String!
+  "When renown-orgs accepted it."
+  createdAt: String!
+}
+
+type ReleaseAttestationPage {
+  items: [ReleaseAttestation!]!
+  next: String
+}
+
+extend type Query {
+  "Public: an app's release attestations, newest first; limit 1-50 (20 when omitted)."
+  releaseAttestations(appDid: String!, limit: Int, after: String): ReleaseAttestationPage!
+  "Public: one attestation, for /verify's cross-check; null when unknown."
+  releaseAttestation(id: String!): ReleaseAttestation
+}
+
+extend type Mutation {
+  """
+  Stores an EIP-712 ReleaseAttestation (domain Renown Release / 1 / chain 1; sdk RELEASE_DOMAIN and RELEASE_TYPES)
+  signed by signer (EOA, or ERC-1271/6492 smart wallet): the signature is the authentication. The signer must publish
+  the app at submit time: its personal publisher (orgId empty) or an ACTIVE PUBLISHER+ of the owning organization
+  whose scope covers it (orgId that organization). issuedAt: a real ISO-8601 time with a zone, at most 5 minutes ahead, at most 30 days old, kept exactly as sent. One per
+  app, version and signer (resubmitting the same signature returns it); at most 100 per app per day (LIMIT_REACHED).
+  Errors also APP_FROZEN.
+  """
+  attestRelease(appDid: String!, version: String!, artifactDigest: String!, orgId: String!, issuedAt: String!, signer: String!, signature: String!): ReleaseAttestation!
+}
+
+type OrganizationStats {
+  orgId: String!
+  apps: Int!
+  "Each app's distinct users with a metric report in the last 30 days, summed: an upper bound (a user of two apps counts twice)."
+  activeUsers30d: Int!
+  "Unrevoked, unexpired delegations for the organization's apps that count under organization rules (the newest 2000 live ones are checked)."
+  activeDelegations: Int!
+  "Release attestations accepted in the last 30 days."
+  attestations30d: Int!
+}
+
+extend type Query {
+  "Public totals; null when the organization is unknown or taken down."
+  organizationStats(orgId: String!): OrganizationStats
+  "Public: the DID document (JSON) of did:web:<host>:org:<orgId>; null when unknown, archived or taken down (did.json answers 404)."
+  organizationDidDocument(orgId: String!): String
+}
+
+enum OrgNotificationKind {
+  INVITED
+  INVITE_ACCEPTED
+  ROLE_CHANGED
+  REMOVED
+  PROPOSAL_CREATED
+  PROPOSAL_NEEDS_APPROVAL
+  PROPOSAL_EXECUTED
+  PROPOSAL_CANCELLED
+  RECOVERY_STARTED
+  APP_TRANSFER_REQUEST
+  APP_TRANSFER_DONE
+  APP_FROZEN
+  DOMAIN_LAPSED
+  "An active member delegated a key for one of the organisation's apps (sent to admins)."
+  DELEGATION_ADDED
+}
+
+type OrgNotification {
+  id: String!
+  kind: OrgNotificationKind!
+  orgId: String!
+  "Null when the organisation no longer exists"
+  org: OrgSummary
+  "JSON object"
+  payload: String!
+  createdAt: String!
+  readAt: String
+}
+
+type OrgNotificationPage {
+  items: [OrgNotification!]!
+  next: String
+}
+
+extend type Query {
+  "The caller's notifications, newest first; limit 1-50 (default 20)."
+  myNotifications(unreadOnly: Boolean, limit: Int, after: String, auth: OrgAuthInput): OrgNotificationPage!
+  myUnreadNotificationCount(auth: OrgAuthInput): Int!
+}
+
+extend type Mutation {
+  "Exactly one of ids (the caller's own) and all: true. Returns how many became read."
+  markNotificationsRead(ids: [String!], all: Boolean, auth: OrgAuthInput): Int!
+}
+
+enum OrgWebhookDeliveryStatus {
+  PENDING
+  "Held while the organisation is taken down; due again once it is restored"
+  PAUSED
+  DELIVERED
+  FAILED
+}
+
+type OrgWebhook {
+  id: String!
+  orgId: String!
+  url: String!
+  events: [String!]!
+  enabled: Boolean!
+  consecutiveFailures: Int!
+  createdAt: String!
+}
+
+type OrgWebhookCreated {
+  webhook: OrgWebhook!
+  "Shown once"
+  secret: String!
+}
+
+type OrgWebhookDelivery {
+  id: String!
+  webhookId: String!
+  eventId: String!
+  eventType: String!
+  status: OrgWebhookDeliveryStatus!
+  attempts: Int!
+  responseStatus: Int
+  lastError: String
+  createdAt: String!
+  nextAttemptAt: String
+  deliveredAt: String
+}
+
+extend type Query {
+  "Admins."
+  orgWebhooks(orgId: String!, auth: OrgAuthInput): [OrgWebhook!]!
+  "Admins: newest first; limit 1-100 (default 20)."
+  orgWebhookDeliveries(orgId: String!, webhookId: String!, limit: Int, auth: OrgAuthInput): [OrgWebhookDelivery!]!
+}
+
+extend type Mutation {
+  "Admins; at most 10 endpoints; an https URL on port 443 or 8443 that resolves to public addresses; events from the documented list."
+  createOrgWebhook(orgId: String!, url: String!, events: [String!]!, auth: OrgAuthInput): OrgWebhookCreated!
+  "enabled: true also resets consecutiveFailures."
+  updateOrgWebhook(orgId: String!, webhookId: String!, url: String, events: [String!], enabled: Boolean, auth: OrgAuthInput): OrgWebhook!
+  deleteOrgWebhook(orgId: String!, webhookId: String!, auth: OrgAuthInput): Boolean!
+  "Sends a ping event at once (one attempt)."
+  testOrgWebhook(orgId: String!, webhookId: String!, auth: OrgAuthInput): OrgWebhookDelivery!
+}
+
+enum OrgOidcClientStatus {
+  ACTIVE
+  DISABLED
+}
+
+"An OIDC client owned by an organisation: only its active members may sign in to it."
+type OrgOidcClient {
+  clientId: String!
+  orgId: String!
+  name: String!
+  redirectUris: [String!]!
+  status: OrgOidcClientStatus!
+  createdAt: String!
+}
+
+type OrgOidcClientCredentials {
+  clientId: String!
+  "Shown once; only its hash is stored."
+  clientSecret: String!
+}
+
+extend type Query {
+  "Admins: the organisation's own OIDC clients (never their secrets); DISABLED while the organisation is archived or taken down."
+  orgOidcClients(orgId: String!, auth: OrgAuthInput): [OrgOidcClient!]!
+}
+
+extend type Mutation {
+  "Admins: a confidential client only the organisation's active members may sign in to. At most 20 per organisation, disabled ones included (LIMIT_REACHED)."
+  registerOrgOidcClient(orgId: String!, name: String!, redirectUris: [String!]!, auth: OrgAuthInput): OrgOidcClientCredentials!
+  "Admins: renames, changes redirect URIs (removals before additions) or disables/enables the client."
+  updateOrgOidcClient(orgId: String!, clientId: String!, name: String, addRedirectUris: [String!], removeRedirectUris: [String!], status: OrgOidcClientStatus, auth: OrgAuthInput): OrgOidcClient!
+  "Admins: a new secret, shown once; the old one stops working."
+  rotateOrgOidcClientSecret(orgId: String!, clientId: String!, auth: OrgAuthInput): OrgOidcClientCredentials!
+}
+
+enum OrgReportReason {
+  IMPERSONATION
+  HANDLE_DISPUTE
+  SPAM
+  ABUSE
+  OTHER
+}
+
+enum OrgReportStatus {
+  OPEN
+  RESOLVED
+}
+
+enum OrgReportResolution {
+  DISMISS
+  "takenDown=true: notice page; out of the directory, search, claims and did.json; OIDC clients and webhooks stop"
+  TAKE_DOWN
+  "Renames the organisation to org-<first 8 of id>; the old handle is reserved 30 days for the org verified for <handle>.<tld>"
+  RELEASE_HANDLE
+  "takenDown=false; paused webhook deliveries resume. Also on a report resolved TAKE_DOWN"
+  RESTORE
+}
+
+type OrgReport {
+  id: String!
+  orgId: String!
+  "Null when the organisation no longer exists"
+  org: OrgSummary
+  reporter: String!
+  reason: OrgReportReason!
+  details: String
+  status: OrgReportStatus!
+  resolution: OrgReportResolution
+  resolvedBy: String
+  resolvedAt: String
+  note: String
+  createdAt: String!
+}
+
+extend type Query {
+  "Platform admins (RENOWN_PLATFORM_ADMINS) only; newest first."
+  orgReports(status: OrgReportStatus, auth: OrgAuthInput): [OrgReport!]!
+  "Admins: a JSON array of the newest 10 000 audit entries, newest first; 10 exports an hour per caller."
+  orgAuditExport(orgId: String!, auth: OrgAuthInput): String!
+}
+
+extend type Mutation {
+  "Anyone signed in; details at most 1000 characters; 5 reports per address per day."
+  reportOrganization(orgId: String!, reason: OrgReportReason!, details: String, auth: OrgAuthInput): Boolean!
+  "Platform admins only; each report is resolved once and audited on the organisation."
+  resolveOrgReport(reportId: String!, resolution: OrgReportResolution!, note: String, auth: OrgAuthInput): OrgReport!
+}

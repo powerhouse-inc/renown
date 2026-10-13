@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test'
-import { parse } from 'graphql'
+import { readFileSync } from 'node:fs'
+import { buildSchema, parse, validate } from 'graphql'
 import { GraphQLClient } from 'graphql-request'
 import { isOrgErrorCode, orgErrorText, statusForOrgError } from '../lib/orgs/errors'
 import { handleFromName, orgHandleProblem, orgRef } from '../lib/orgs/handles'
 import { argsProblem, isOrgMutationName, mutationDocument, ORG_MUTATIONS, type OrgMutationName } from '../services/org-mutations'
 import { canonicalJson, ORG_ROLES, orgMessage, parseOrgRole, roleAtLeast } from '../services/org-signed-messages'
+import * as orgs from '../services/orgs'
 import { isOrgRateLimited, isOrgSearchable, OrgApiError, orgsRequest, parseOrgQuery, serverReadHeaders, toOrgApiError } from '../services/orgs'
 import { fixtureStub, graphqlError, STUB_SWITCHBOARD_URL, stubRequests } from './support/stub-switchboard-client'
 
@@ -155,22 +157,51 @@ test.describe('orgsRequest', () => {
 })
 
 test.describe('orgsRequest server-side reads and 401', () => {
-  test('server read headers: token only when set, visitor IP from the first forwarded hop', () => {
-    const req = { headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }, socket: { remoteAddress: '10.0.0.9' } }
-    expect(serverReadHeaders(req, { RENOWN_TRUSTED_READ_TOKEN: 'secret' })).toEqual({
+  test('server read headers: token only when set, visitor IP from trusted sources only', () => {
+    const env = { RENOWN_TRUSTED_READ_TOKEN: 'secret' }
+    const ip = (headers: Record<string, string | string[] | undefined>, remoteAddress?: string) =>
+      serverReadHeaders({ headers, socket: { remoteAddress } }, {})['X-Renown-Client-IP']
+    expect(serverReadHeaders({ headers: { 'x-real-ip': '203.0.113.7' } }, env)).toEqual({
       'X-Renown-Read-Token': 'secret',
       'X-Renown-Client-IP': '203.0.113.7',
     })
-    expect(serverReadHeaders(req, {})).toEqual({ 'X-Renown-Client-IP': '203.0.113.7' })
-    expect(serverReadHeaders({ headers: {}, socket: { remoteAddress: '198.51.100.2' } }, {})).toEqual({ 'X-Renown-Client-IP': '198.51.100.2' })
-    expect(serverReadHeaders({ headers: { 'x-forwarded-for': ['192.0.2.1'] } }, {})).toEqual({ 'X-Renown-Client-IP': '192.0.2.1' })
+    expect(serverReadHeaders({ headers: {} }, env)).toEqual({ 'X-Renown-Read-Token': 'secret' })
+    // order: x-vercel-forwarded-for, x-real-ip, last x-forwarded-for hop, socket
+    expect(ip({ 'x-vercel-forwarded-for': '203.0.113.1, 10.0.0.1', 'x-real-ip': '203.0.113.2', 'x-forwarded-for': '9.9.9.9, 203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.1')
+    expect(ip({ 'x-real-ip': '203.0.113.2', 'x-forwarded-for': '203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.2')
+    // a spoofed first hop is ignored: the proxy-appended last hop counts
+    expect(ip({ 'x-forwarded-for': '1.2.3.4, 203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.3')
+    expect(ip({ 'x-forwarded-for': ['1.2.3.4, 203.0.113.4'] })).toBe('203.0.113.4')
+    expect(ip({}, '198.51.100.2')).toBe('198.51.100.2')
+    expect(ip({ 'x-forwarded-for': '2001:db8::1' })).toBe('2001:db8::1')
+    // not an IP literal: omitted (falls through, else no header)
+    expect(ip({ 'x-forwarded-for': 'evil\r\nx: y' })).toBeUndefined()
+    expect(ip({ 'x-real-ip': 'not-an-ip', 'x-forwarded-for': '999.1.1.1' })).toBeUndefined()
     expect(serverReadHeaders({ headers: {} }, {})).toEqual({})
+  })
+
+  test('the browser path never reads the trusted token', async () => {
+    const probe = 'query OrgClientBrowser($id: String) { organization(id: $id) { id } }'
+    const before = process.env.RENOWN_TRUSTED_READ_TOKEN
+    process.env.RENOWN_TRUSTED_READ_TOKEN = 'must-not-leak'
+    ;(globalThis as { window?: unknown }).window = {}
+    try {
+      await orgsRequest(probe, { id: 'org-client-browser' }, { endpoint: ORGS, request: { headers: { 'x-real-ip': '203.0.113.5' } } })
+    } finally {
+      delete (globalThis as { window?: unknown }).window
+      if (before === undefined) delete process.env.RENOWN_TRUSTED_READ_TOKEN
+      else process.env.RENOWN_TRUSTED_READ_TOKEN = before
+    }
+    const seen = await stubRequests('OrgClientBrowser')
+    const sent = seen.find((r) => r.variables.id === 'org-client-browser')
+    expect(sent?.headers['x-renown-read-token']).toBeUndefined()
+    expect(sent?.headers['x-renown-client-ip']).toBeUndefined()
   })
 
   test('orgsRequest forwards them from a server request, and a RATE_LIMITED read is distinct', async () => {
     const probe = 'query OrgClientServer($id: String) { organization(id: $id) { id } }'
     await fixtureStub({ id: 'org-client-rl', match: 'OrgClientServer', variables: 'org-client-rl', response: graphqlError('Slow down', 'RATE_LIMITED') })
-    const request = { headers: { 'x-forwarded-for': '203.0.113.9' } }
+    const request = { headers: { 'x-real-ip': '203.0.113.9' } }
     const limited = await orgsRequest(probe, { id: 'org-client-rl' }, { endpoint: ORGS, request }).catch((e: unknown) => e)
     expect(isOrgRateLimited(limited)).toBe(true)
     expect(isOrgRateLimited(new OrgApiError('NETWORK', 'x'))).toBe(false)
@@ -183,5 +214,43 @@ test.describe('orgsRequest server-side reads and 401', () => {
     const probe = 'query OrgClient401($id: String) { organization(id: $id) { id } }'
     const failed = await orgsRequest(probe, { id: 'org-client-401' }, { endpoint: ORGS, bearer: 'stale' }).catch((e: unknown) => e)
     expect(failed).toMatchObject({ code: 'FORBIDDEN', message: 'Sign in again' })
+  })
+})
+
+test.describe('org documents against the served SDL', () => {
+  test('every read and mutation document validates', async () => {
+    const schema = buildSchema(readFileSync('e2e/fixtures/sdl-renown-orgs.graphql', 'utf8'))
+    const sent: string[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (_url: unknown, init?: { body?: string }) => {
+      sent.push((JSON.parse(String(init?.body)) as { query: string }).query)
+      return new Response(JSON.stringify({ data: {} }), { headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+    try {
+      const calls = [
+        orgs.fetchOrganization({ handle: 'acme' }),
+        orgs.searchOrganizations('a'),
+        orgs.organizationsByMember('0x1'),
+        orgs.organizationMembers('o', true),
+        orgs.orgInvites('o', 't'),
+        orgs.orgInviteLinks('o', 't'),
+        orgs.myOrgInvites('t'),
+        orgs.orgInviteLinkPreview('x'),
+        orgs.orgHandleAvailability('acme'),
+        orgs.myNotifications({ unreadOnly: true, after: null }, 't'),
+        orgs.myUnreadNotificationCount('t'),
+        orgs.markNotificationsRead({ all: true }, 't'),
+        orgs.fetchOrganizationStats('o'),
+        orgs.fetchOrganizationDidDocument('o'),
+      ]
+      await Promise.all(calls)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+    expect(sent).toHaveLength(14)
+    for (const query of sent) expect(validate(schema, parse(query)).map((e) => e.message), query).toEqual([])
+    for (const name of Object.keys(ORG_MUTATIONS) as OrgMutationName[]) {
+      expect(validate(schema, parse(mutationDocument(name))).map((e) => e.message), name).toEqual([])
+    }
   })
 })
