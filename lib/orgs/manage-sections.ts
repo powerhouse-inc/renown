@@ -16,6 +16,8 @@ export const MANAGE_SECTIONS: ManageSectionMeta[] = [
   { key: 'security', label: 'Security', minRole: 'ADMIN' },
   { key: 'domains', label: 'Domains', minRole: 'ADMIN' },
   { key: 'webhooks', label: 'Webhooks', minRole: 'ADMIN' },
+  { key: 'oidc', label: 'Sign-in clients', minRole: 'ADMIN' },
+  { key: 'audit', label: 'Audit log', minRole: 'ADMIN' },
   { key: 'settings', label: 'Settings', minRole: 'ADMIN' },
 ]
 

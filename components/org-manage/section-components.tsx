@@ -1,3 +1,5 @@
+import { AuditSection } from './audit-section'
+import { OidcSection } from './oidc-section'
 import { DomainsSection } from './domains-section'
 import { AppsSection } from './apps-section'
 import type { ComponentType } from 'react'
@@ -16,5 +18,7 @@ export const SECTION_COMPONENTS: Record<string, ComponentType<ManageSectionProps
   security: SecuritySection,
   domains: DomainsSection,
   webhooks: WebhooksSection,
+  oidc: OidcSection,
+  audit: AuditSection,
   settings: SettingsSection,
 }
