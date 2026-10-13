@@ -278,17 +278,24 @@ test.describe('/me organisations', () => {
     await page.goto('/me')
     const section = page.getByRole('region', { name: 'Organisations' })
     await expect(section).toBeVisible({ timeout: 30_000 })
-    await section.getByRole('button', { name: 'Join Acme Invite' }).click()
+    const row = section
+      .getByRole('list', { name: 'Your organisations' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Acme Home' })
+    // Both reads have landed before the first click: a click that races the
+    // initial load (cold route, slow machine) is not what this test is about.
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    const join = section.getByRole('button', { name: 'Join Acme Invite' })
+    await expect(join).toBeEnabled({ timeout: 30_000 })
+    await join.click()
     expect(await signedWrite(wallet, 'respondToOrgInvite', inviting.id)).toEqual({
       orgId: inviting.id,
       inviteId: 'inv-me',
       accept: true,
     })
-
-    const row = section
-      .getByRole('list', { name: 'Your organisations' })
-      .getByRole('listitem')
-      .filter({ hasText: 'Acme Home' })
+    // The success toast is the write's end (the buttons are busy until then and
+    // the lists re-read after it): each step starts from a settled page.
+    await expect(page.getByText('You joined Acme Invite.')).toBeVisible()
     await expect(row.getByRole('link', { name: 'Manage' })).toHaveAttribute(
       'href',
       '/org/acme-home/manage/members',
@@ -298,6 +305,7 @@ test.describe('/me organisations', () => {
       orgId: home.id,
       hidden: true,
     })
+    await expect(page.getByText('You are hidden from Acme Home’s public lists.')).toBeVisible()
     await row.getByRole('button', { name: 'Leave Acme Home' }).click()
     await row.getByRole('button', { name: 'Yes, leave Acme Home' }).click()
     expect(await signedWrite(wallet, 'leaveOrganization', home.id)).toEqual({ orgId: home.id })
