@@ -213,7 +213,7 @@ test.describe('orgsRequest server-side reads and 401', () => {
     await fixtureStub({ id: 'org-client-401', match: 'OrgClient401', variables: 'org-client-401', status: 401, response: { error: 'Verification failed' } })
     const probe = 'query OrgClient401($id: String) { organization(id: $id) { id } }'
     const failed = await orgsRequest(probe, { id: 'org-client-401' }, { endpoint: ORGS, bearer: 'stale' }).catch((e: unknown) => e)
-    expect(failed).toMatchObject({ code: 'FORBIDDEN', message: 'Sign in again' })
+    expect(failed).toMatchObject({ code: 'FORBIDDEN', message: 'Sign in again', unauthenticated: true })
   })
 })
 

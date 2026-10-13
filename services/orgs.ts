@@ -10,7 +10,14 @@ import type { OrgRole } from './org-signed-messages'
 
 export type { OrgRole }
 
-export type OrgMemberStatus = 'INVITED' | 'ACTIVE' | 'DECLINED' | 'LEFT' | 'REMOVED' | 'REVOKED' | 'EXPIRED'
+export type OrgMemberStatus =
+  | 'INVITED'
+  | 'ACTIVE'
+  | 'DECLINED'
+  | 'LEFT'
+  | 'REMOVED'
+  | 'REVOKED'
+  | 'EXPIRED'
 
 export interface OrgLink {
   id: string
@@ -83,7 +90,17 @@ export interface Organization extends OrgSummary {
 
 export type OrgCard = Pick<
   Organization,
-  'id' | 'did' | 'handle' | 'name' | 'bio' | 'avatar' | 'verifiedDomains' | 'memberCount' | 'archived' | 'takenDown' | 'notAffiliatedWith'
+  | 'id'
+  | 'did'
+  | 'handle'
+  | 'name'
+  | 'bio'
+  | 'avatar'
+  | 'verifiedDomains'
+  | 'memberCount'
+  | 'archived'
+  | 'takenDown'
+  | 'notAffiliatedWith'
 >
 
 export interface OrgAffiliation {
@@ -262,6 +279,8 @@ export class OrgApiError extends Error {
     readonly code: OrgFailureCode,
     message: string,
     readonly field: string | null = null,
+    /** True only when the server answered HTTP 401 (invalid or expired bearer). */
+    readonly unauthenticated = false,
   ) {
     super(message)
     this.name = 'OrgApiError'
@@ -273,13 +292,38 @@ export function toOrgApiError(error: unknown): OrgApiError {
   if (error instanceof OrgApiError) return error
   if (error instanceof ClientError) {
     const first = error.response.errors?.[0]
-    if (error.response.status === 401) return new OrgApiError('FORBIDDEN', 'Sign in again')
+    if (error.response.status === 401)
+      return new OrgApiError('FORBIDDEN', 'Sign in again', null, true)
     const extensions = (first?.extensions ?? {}) as { code?: unknown; field?: unknown }
     if (first && isOrgErrorCode(extensions.code)) {
-      return new OrgApiError(extensions.code, first.message, typeof extensions.field === 'string' ? extensions.field : null)
+      return new OrgApiError(
+        extensions.code,
+        first.message,
+        typeof extensions.field === 'string' ? extensions.field : null,
+      )
     }
   }
   return new OrgApiError('NETWORK', 'Renown did not answer')
+}
+
+/**
+ * Runs a bearer read; when it fails with an HTTP 401 it retries once with a
+ * fresh bearer (getBearer({ fresh: true })). Plain FORBIDDEN and every other
+ * error pass through, and there is never a second retry. Signed writes are
+ * never wrapped: the backend accepts each signature once, so a write is
+ * re-signed by the user, not retried here. A getBearer that takes no argument
+ * (useMeSession's) is fine: the retry then simply asks again.
+ */
+export async function withBearer<T>(
+  getBearer: (options?: { fresh?: boolean }) => Promise<string | null>,
+  read: (bearer: string | null) => Promise<T>,
+): Promise<T> {
+  try {
+    return await read(await getBearer())
+  } catch (error) {
+    if (!toOrgApiError(error).unauthenticated) throw error
+    return read(await getBearer({ fresh: true }))
+  }
 }
 
 export function orgsEndpoint(): string {
@@ -371,7 +415,10 @@ export const ORG_QUERY_MAX = 40
 /** The `q` parameter as searched: the first value, trimmed, at most 40 characters (code points). */
 export function parseOrgQuery(raw: string | string[] | undefined | null): string {
   const value = Array.isArray(raw) ? raw[0] : raw
-  return Array.from((value ?? '').trim()).slice(0, ORG_QUERY_MAX).join('').trim()
+  return Array.from((value ?? '').trim())
+    .slice(0, ORG_QUERY_MAX)
+    .join('')
+    .trim()
 }
 
 /** A blank query lists every listed organisation; otherwise 2 characters are needed. */
@@ -380,7 +427,10 @@ export function isOrgSearchable(query: string): boolean {
 }
 
 /** An organisation by id or handle; null when there is none. */
-export async function fetchOrganization(ref: { id: string } | { handle: string }, bearer?: string | null): Promise<Organization | null> {
+export async function fetchOrganization(
+  ref: { id: string } | { handle: string },
+  bearer?: string | null,
+): Promise<Organization | null> {
   const data = await orgsRequest<{ organization: Organization | null }>(
     `query OrgByRef($id: String, $handle: String) { organization(id: $id, handle: $handle) { ${ORG_FIELDS} } }`,
     ref,
@@ -390,7 +440,10 @@ export async function fetchOrganization(ref: { id: string } | { handle: string }
 }
 
 /** One page of listed organisations; a blank query lists them all. */
-export async function searchOrganizations(query: string, after: string | null = null): Promise<OrgSearchPage> {
+export async function searchOrganizations(
+  query: string,
+  after: string | null = null,
+): Promise<OrgSearchPage> {
   const data = await orgsRequest<{ organizationSearch: OrgSearchPage }>(
     `query OrgSearch($query: String, $limit: Int, $after: String) { organizationSearch(query: $query, limit: $limit, after: $after) { items { ${ORG_CARD_FIELDS} } next } }`,
     { query, limit: ORGS_PAGE_SIZE, after },
@@ -399,7 +452,10 @@ export async function searchOrganizations(query: string, after: string | null = 
 }
 
 /** Public memberships of `address`; with that address's bearer, all its ACTIVE ones (hidden included). */
-export async function organizationsByMember(address: string, bearer?: string | null): Promise<OrgAffiliation[]> {
+export async function organizationsByMember(
+  address: string,
+  bearer?: string | null,
+): Promise<OrgAffiliation[]> {
   const data = await orgsRequest<{ organizationsByMember: OrgAffiliation[] }>(
     `query OrgsByMember($address: String!) { organizationsByMember(address: $address) { role hidden org { ${ORG_SUMMARY_FIELDS} archived } } }`,
     { address: address.toLowerCase() },
@@ -409,7 +465,11 @@ export async function organizationsByMember(address: string, bearer?: string | n
 }
 
 /** The public member list, or (for members, with their bearer) every active member. */
-export async function organizationMembers(orgId: string, includeInactive: boolean, bearer?: string | null): Promise<OrgMember[]> {
+export async function organizationMembers(
+  orgId: string,
+  includeInactive: boolean,
+  bearer?: string | null,
+): Promise<OrgMember[]> {
   const data = await orgsRequest<{ organizationMembers: OrgMember[] }>(
     `query OrgMembers($orgId: String!, $includeInactive: Boolean) { organizationMembers(orgId: $orgId, includeInactive: $includeInactive) { ${MEMBER_FIELDS} } }`,
     includeInactive ? { orgId, includeInactive } : { orgId },
@@ -427,7 +487,10 @@ export async function orgInvites(orgId: string, bearer: string | null): Promise<
   return data.orgInvites
 }
 
-export async function orgInviteLinks(orgId: string, bearer: string | null): Promise<OrgInviteLink[]> {
+export async function orgInviteLinks(
+  orgId: string,
+  bearer: string | null,
+): Promise<OrgInviteLink[]> {
   const data = await orgsRequest<{ orgInviteLinks: OrgInviteLink[] }>(
     `query OrgInviteLinks($orgId: String!) { orgInviteLinks(orgId: $orgId) { ${LINK_FIELDS} } }`,
     { orgId },
@@ -437,7 +500,11 @@ export async function orgInviteLinks(orgId: string, bearer: string | null): Prom
 }
 
 export async function myOrgInvites(bearer: string | null): Promise<OrgInvite[]> {
-  const data = await orgsRequest<{ myOrgInvites: OrgInvite[] }>(`query MyOrgInvites { myOrgInvites { ${INVITE_FIELDS} } }`, {}, { bearer })
+  const data = await orgsRequest<{ myOrgInvites: OrgInvite[] }>(
+    `query MyOrgInvites { myOrgInvites { ${INVITE_FIELDS} } }`,
+    {},
+    { bearer },
+  )
   return data.myOrgInvites
 }
 
@@ -480,7 +547,10 @@ export async function myUnreadNotificationCount(bearer: string | null): Promise<
 }
 
 /** Marks the caller's own notifications read (bearer write; Rulings 3). Returns how many changed. */
-export async function markNotificationsRead(target: { ids: string[] } | { all: true }, bearer: string | null): Promise<number> {
+export async function markNotificationsRead(
+  target: { ids: string[] } | { all: true },
+  bearer: string | null,
+): Promise<number> {
   const data = await orgsRequest<{ markNotificationsRead: number }>(
     'mutation MarkNotificationsRead($ids: [String!], $all: Boolean) { markNotificationsRead(ids: $ids, all: $all) }',
     target,

@@ -46,7 +46,10 @@ export async function signedOrgWrite<T>(
     // not idempotent, so a create flow re-reads before it offers a retry.
     return failure('NETWORK', null, null, true)
   }
-  const body = (await response.json().catch(() => ({}))) as { data?: T; code?: unknown; field?: unknown; error?: unknown }
+  const parsed: unknown = await response.json().catch(() => null)
+  // An unparsable answer says nothing about whether the write was applied.
+  if (typeof parsed !== 'object' || parsed === null) return failure('NETWORK', null, null, true)
+  const body = parsed as { data?: T; code?: unknown; field?: unknown; error?: unknown }
   if (!response.ok) {
     const code = isOrgErrorCode(body.code) ? body.code : 'NETWORK'
     return failure(code, typeof body.field === 'string' ? body.field : null, typeof body.error === 'string' ? body.error : null, code === 'NETWORK')
