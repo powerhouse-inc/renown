@@ -311,8 +311,7 @@ export function toOrgApiError(error: unknown): OrgApiError {
  * fresh bearer (getBearer({ fresh: true })). Plain FORBIDDEN and every other
  * error pass through, and there is never a second retry. Signed writes are
  * never wrapped: the backend accepts each signature once, so a write is
- * re-signed by the user, not retried here. A getBearer that takes no argument
- * (useMeSession's) is fine: the retry then simply asks again.
+ * re-signed by the user, not retried here.
  */
 export async function withBearer<T>(
   getBearer: (options?: { fresh?: boolean }) => Promise<string | null>,

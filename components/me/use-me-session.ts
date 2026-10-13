@@ -10,7 +10,7 @@ export type MeSession =
       state: 'signed-in'
       address: string
       /** The Renown bearer for `address`; null when it cannot be had. */
-      getBearer: () => Promise<string | null>
+      getBearer: (options?: { fresh?: boolean }) => Promise<string | null>
       /** personal_sign by the connected wallet when it is `address`; null otherwise. */
       signMessage: ((message: string) => Promise<string>) | null
     }
@@ -31,11 +31,11 @@ export function useMeSession(): MeSession {
   const wallet = useSession()
   const walletInitializing = useAuthInitializing()
 
-  const getBearer = useCallback(async (): Promise<string | null> => {
+  const getBearer = useCallback(async (options?: { fresh?: boolean }): Promise<string | null> => {
     if (E2E_AUTH) return e2eBearer()
     if (!renown?.user) return null
     try {
-      return await renown.getBearerToken({ expiresIn: 600 })
+      return await renown.getBearerToken({ expiresIn: 600 }, options?.fresh === true)
     } catch (error) {
       // Only the name: the error can carry token material.
       console.warn('Renown bearer unavailable:', error instanceof Error ? error.name : 'error')
