@@ -1,5 +1,10 @@
 import Link from 'next/link'
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useRemote } from '../../hooks/use-remote'
+import { readActiveOrg, writeActiveOrg } from '../../lib/orgs/active-org'
+import { organizationsByMember, withBearer } from '../../services/orgs'
+import { AccountOrgs } from './account-orgs'
+import { useRenownBearer } from './use-renown-bearer'
 import { ProfileAvatar } from '../profile/profile-avatar'
 import type { RenownProfile } from '../../services/switchboard'
 import { accountLinks, shortAddress } from './account-links'
@@ -21,6 +26,12 @@ export function AccountMenu({ address, displayName, avatarUrl, profile, onSignOu
   const menuRef = useRef<HTMLDivElement>(null)
   const menuId = useId()
   const name = displayName || profile?.displayName || shortAddress(address)
+  const getBearer = useRenownBearer()
+  // The memberships are read the first time the menu opens, with the bearer (hidden ones included).
+  const [wanted, setWanted] = useState(false)
+  const [active, setActive] = useState<string | null>(null)
+  const loadOrgs = useCallback(() => withBearer(getBearer, (bearer) => organizationsByMember(address, bearer)), [address, getBearer])
+  const orgs = useRemote(wanted ? `menu-orgs:${address.toLowerCase()}` : null, loadOrgs)
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +77,11 @@ export function AccountMenu({ address, displayName, avatarUrl, profile, onSignOu
         aria-expanded={open}
         aria-controls={menuId}
         aria-label={`Account menu for ${name}`}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setOpen((value) => !value)
+          setWanted(true)
+          setActive(readActiveOrg())
+        }}
         className="border-hairline-strong hover:border-primary/50 flex h-10 items-center gap-2 rounded-full border py-1 pr-3 pl-1 transition-colors"
       >
         <ProfileAvatar
@@ -100,6 +115,16 @@ export function AccountMenu({ address, displayName, avatarUrl, profile, onSignOu
               {link.label}
             </Link>
           ))}
+          <AccountOrgs
+            state={orgs.state}
+            active={active}
+            itemClass={itemClass}
+            onClose={() => setOpen(false)}
+            onPick={(orgId) => {
+              writeActiveOrg(orgId)
+              setOpen(false)
+            }}
+          />
           <button
             type="button"
             role="menuitem"

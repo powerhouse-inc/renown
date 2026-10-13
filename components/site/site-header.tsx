@@ -5,6 +5,7 @@ import RenownLogo from '../ui/renown-logo'
 import ThemeToggle from '../ui/theme-toggle'
 import { AccountSwitchPrompt } from './account-switch-prompt'
 import { AuthSlot } from './auth-slot'
+import { NotificationsBell } from './notifications-bell'
 import { MobileNav } from './mobile-nav'
 import { isActivePath, SITE_NAV } from './nav'
 import { Container } from './primitives'
@@ -42,6 +43,7 @@ export function SiteHeader() {
           </ul>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          {auth.state === 'signed-in' && <NotificationsBell address={auth.address} />}
           <ThemeToggle />
           <div className="hidden md:block">
             <AuthSlot auth={auth} />
