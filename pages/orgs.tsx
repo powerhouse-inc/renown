@@ -6,7 +6,13 @@ import { useOrgDirectory } from '../components/orgs/use-org-directory'
 import { PageMeta } from '../components/site/page-meta'
 import { ButtonLink, buttonClasses, Container, Heading, Lead } from '../components/site/primitives'
 import { SiteLayout } from '../components/site/site-layout'
-import { isOrgRateLimited, isOrgSearchable, ORG_QUERY_MAX, parseOrgQuery, searchOrganizations, type OrgSearchPage } from '../services/orgs'
+import {
+  isOrgSearchable,
+  ORG_QUERY_MAX,
+  parseOrgQuery,
+  searchOrganizations,
+  type OrgSearchPage,
+} from '../services/orgs'
 import { peopleCacheControl } from '../utils/cache-control'
 import { cx } from '../utils/cx'
 import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../utils/with-timeout'
@@ -29,9 +35,20 @@ function countText(count: number, more: boolean): string {
   return `${count}${more ? '+' : ''} organisations`
 }
 
-function Notice({ title, children, alert = false }: { title: string; children: ReactNode; alert?: boolean }) {
+function Notice({
+  title,
+  children,
+  alert = false,
+}: {
+  title: string
+  children: ReactNode
+  alert?: boolean
+}) {
   return (
-    <div role={alert ? 'alert' : undefined} className="border-hairline-strong rounded-panel flex flex-col items-center border border-dashed px-6 py-16 text-center">
+    <div
+      role={alert ? 'alert' : undefined}
+      className="border-hairline-strong rounded-panel flex flex-col items-center border border-dashed px-6 py-16 text-center"
+    >
       <h2 className="text-ink text-h3">{title}</h2>
       <div className="text-ink-muted mt-3 max-w-[46ch]">{children}</div>
     </div>
@@ -44,7 +61,10 @@ function DirectoryList({ query, page }: { query: string; page: OrgSearchPage | n
     return (
       <Notice title="The organisation directory is unavailable" alert>
         <p>Renown did not answer. Nothing is wrong with your search; try again in a moment.</p>
-        <a href={query ? `/orgs?q=${encodeURIComponent(query)}` : '/orgs'} className={buttonClasses('primary', 'md', 'mt-6')}>
+        <a
+          href={query ? `/orgs?q=${encodeURIComponent(query)}` : '/orgs'}
+          className={buttonClasses('primary', 'md', 'mt-6')}
+        >
           Try again
         </a>
       </Notice>
@@ -64,7 +84,10 @@ function DirectoryList({ query, page }: { query: string; page: OrgSearchPage | n
         {directory.items.length === 0 ? (
           query ? (
             <Notice title={`No organisation matches “${query}”`}>
-              <p>Search looks at the start of handles and names, and finds only organisations that chose to be listed.</p>
+              <p>
+                Search looks at the start of handles and names, and finds only organisations that
+                chose to be listed.
+              </p>
               <Link href="/orgs" className={buttonClasses('secondary', 'md', 'mt-6')}>
                 Show all organisations
               </Link>
@@ -75,7 +98,10 @@ function DirectoryList({ query, page }: { query: string; page: OrgSearchPage | n
             </Notice>
           )
         ) : (
-          <ul aria-label="Organisations" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <ul
+            aria-label="Organisations"
+            className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {directory.items.map((org) => (
               <li key={org.id}>
                 <OrgCardView org={org} />
@@ -86,7 +112,12 @@ function DirectoryList({ query, page }: { query: string; page: OrgSearchPage | n
       </div>
       {directory.next && (
         <div className="mt-12 flex flex-col items-center gap-3">
-          <button type="button" aria-disabled={directory.more === 'loading'} onClick={directory.loadMore} className={buttonClasses('secondary', 'lg')}>
+          <button
+            type="button"
+            aria-disabled={directory.more === 'loading'}
+            onClick={directory.loadMore}
+            className={buttonClasses('secondary', 'lg')}
+          >
             {directory.more === 'loading' ? 'Loading…' : 'Load more organisations'}
           </button>
           {directory.more === 'error' && (
@@ -135,7 +166,9 @@ const OrgsPage: NextPage<OrgsPageProps> = ({ query, tooShort, page }) => (
             Search
           </button>
         </form>
-        <p className="text-ink-muted mt-2 min-h-5 text-sm">{tooShort ? 'Type at least 2 characters.' : ''}</p>
+        <p className="text-ink-muted mt-2 min-h-5 text-sm">
+          {tooShort ? 'Type at least 2 characters.' : ''}
+        </p>
       </Container>
     </section>
     <Container className="pb-24 md:pb-32">
@@ -144,18 +177,25 @@ const OrgsPage: NextPage<OrgsPageProps> = ({ query, tooShort, page }) => (
   </SiteLayout>
 )
 
-export const getServerSideProps: GetServerSideProps<OrgsPageProps> = async ({ query, req, res }) => {
+export const getServerSideProps: GetServerSideProps<OrgsPageProps> = async ({
+  query,
+  req,
+  res,
+}) => {
   const raw = parseOrgQuery(query['q'])
   const tooShort = !isOrgSearchable(raw)
   const q = tooShort ? '' : raw
-  let rateLimited = false
-  const page = await withTimeout(searchOrganizations(q, null, req), SSR_DATA_TIMEOUT_MS).catch((error: unknown) => {
-    console.error('Organisation directory unavailable:', error instanceof Error ? error.message : error)
-    rateLimited = isOrgRateLimited(error)
-    return null
-  })
-  if (rateLimited) {
-    // RATE_LIMITED is an outage, never an empty cacheable listing (D23).
+  const page = await withTimeout(searchOrganizations(q, null, req), SSR_DATA_TIMEOUT_MS).catch(
+    (error: unknown) => {
+      console.error(
+        'Organisation directory unavailable:',
+        error instanceof Error ? error.message : error,
+      )
+      return null
+    },
+  )
+  if (page === null) {
+    // Any read outage (timeout, RATE_LIMITED, unavailable) is a 503, never a cacheable or indexable empty listing (D23).
     res.statusCode = 503
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('Retry-After', '30')

@@ -24,7 +24,10 @@ export function useOrgDirectory(query: string, initial: OrgSearchPage) {
         setMore('idle')
       },
       (error: unknown) => {
-        console.warn('Organisation directory: next page unavailable:', error instanceof Error ? error.name : 'error')
+        console.warn(
+          'Organisation directory: next page unavailable:',
+          error instanceof Error ? error.name : 'error',
+        )
         setMore('error')
       },
     )
