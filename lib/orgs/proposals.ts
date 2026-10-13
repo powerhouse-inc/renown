@@ -68,6 +68,9 @@ export function proposalStage(p: OrgProposal, now: Date, owners: string[]): Prop
   if (p.status !== 'PENDING') return { stage: 'closed' }
   const t = now.getTime()
   const expires = Date.parse(p.expiresAt)
+  if (t >= expires) return { stage: 'expired' }
+  // Recovery has threshold 0: it never collects approvals, it only waits out its delay. Without a delay there is nothing to show.
+  if (p.kind === 'RECOVER' && p.executableAt === null) return { stage: 'closed' }
   if (p.executableAt === null) {
     if (t >= expires) return { stage: 'expired' }
     const current = new Set(owners.map(lower))
@@ -77,7 +80,7 @@ export function proposalStage(p: OrgProposal, now: Date, owners: string[]): Prop
   }
   const at = Date.parse(p.executableAt)
   // Matured after its expiry: it can never run (A2 ruling 1).
-  if (at > expires) return { stage: 'expired' }
+  if (at >= expires) return { stage: 'expired' }
   return at > t ? { stage: 'waiting', until: p.executableAt } : { stage: 'ready' }
 }
 
@@ -114,8 +117,8 @@ export function stageText(stage: ProposalStage, now: Date): string {
 }
 
 /** Owners approve proposals that still need approvals and that they have not approved. */
-export function canApprove(p: OrgProposal, viewer: string, role: OrgRole): boolean {
-  return role === 'OWNER' && p.status === 'PENDING' && p.kind !== 'RECOVER' && p.executableAt === null && !p.approvals.map(lower).includes(lower(viewer))
+export function canApprove(p: OrgProposal, viewer: string, role: OrgRole, now: Date): boolean {
+  return role === 'OWNER' && p.status === 'PENDING' && p.kind !== 'RECOVER' && p.executableAt === null && now.getTime() < Date.parse(p.expiresAt) && !p.approvals.map(lower).includes(lower(viewer))
 }
 
 /** Any owner cancels; the proposer may always withdraw their own. */

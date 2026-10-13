@@ -45,13 +45,26 @@ test.describe('proposals', () => {
 
   test('who may approve, cancel and execute', () => {
     const p = orgProposal({ orgId: 'o', proposer: OWNER, approvals: [OWNER], threshold: 2, expiresAt: '2026-10-26T00:00:00.000Z' })
-    expect(canApprove(p, OWNER, 'OWNER')).toBe(false)
-    expect(canApprove(p, OTHER, 'OWNER')).toBe(true)
-    expect(canApprove(p, OTHER, 'ADMIN')).toBe(false)
+    expect(canApprove(p, OWNER, 'OWNER', now)).toBe(false)
+    expect(canApprove(p, OTHER, 'OWNER', now)).toBe(true)
+    expect(canApprove(p, OTHER, 'ADMIN', now)).toBe(false)
     expect(canCancel(p, OTHER, 'ADMIN')).toBe(false)
     expect(canCancel(p, OWNER, 'ADMIN')).toBe(true)
     expect(canExecute(p, OWNER, 'OWNER', now)).toBe(false)
     expect(canExecute({ ...p, executableAt: '2026-10-12T11:00:00.000Z' }, OTHER, 'OWNER', now)).toBe(true)
+  })
+
+  test('expiry boundary, recovery and expired proposals', () => {
+    const base = orgProposal({ orgId: 'o', threshold: 2, approvals: [OWNER], expiresAt: '2026-10-26T00:00:00.000Z' })
+    expect(proposalStage({ ...base, executableAt: '2026-10-26T00:00:00.000Z' }, now, OWNERS)).toEqual({ stage: 'expired' })
+    const recover = orgProposal({ orgId: 'o', kind: 'RECOVER', threshold: 0, approvals: [], proposer: OTHER, executableAt: '2026-10-14T00:00:00.000Z', expiresAt: '2026-10-26T00:00:00.000Z' })
+    expect(proposalStage(recover, now, OWNERS)).toEqual({ stage: 'waiting', until: '2026-10-14T00:00:00.000Z' })
+    expect(proposalStage({ ...recover, executableAt: null }, now, OWNERS)).toEqual({ stage: 'closed' })
+    expect(canApprove(recover, OWNER, 'OWNER', now)).toBe(false)
+    expect(canCancel(recover, OWNER, 'OWNER')).toBe(true)
+    const lapsed = { ...base, expiresAt: '2026-10-12T11:00:00.000Z' }
+    expect(canApprove(lapsed, OTHER, 'OWNER', now)).toBe(false)
+    expect(canExecute({ ...base, executableAt: '2026-10-12T11:00:00.000Z', expiresAt: '2026-10-12T11:30:00.000Z' }, OWNER, 'OWNER', now)).toBe(false)
   })
 
   test('summaries name the change', () => {
