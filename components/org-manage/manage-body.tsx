@@ -194,6 +194,7 @@ function ManageOrg({
     getBearer,
     run,
     reloadOrg,
+    orgReading: remote.pending,
     notify: show,
   }
   const meta = manageSection(section)

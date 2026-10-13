@@ -10,6 +10,7 @@ import type {
   OrgMember,
   OrgMembership,
   OrgRole,
+  OrgProposal,
   OrgSummary,
 } from '../../services/orgs'
 import { fixtureStub, STUB_SWITCHBOARD_URL } from './stub-switchboard-client'
@@ -157,4 +158,22 @@ export async function installDirectoryFixture(): Promise<void> {
     variables: '"query":"",',
     response: { data: { organizationSearch: { items: DIRECTORY_ORGS, next: null } } },
   })
+}
+
+export function orgProposal(over: Partial<OrgProposal> & { orgId: string }): OrgProposal {
+  return {
+    id: 'proposal-1',
+    kind: 'CHANGE_HANDLE',
+    payload: { address: null, demoteToAdmin: null, appDid: null, toKind: null, toId: null, handle: null, domain: null },
+    proposer: '0x0a000000000000000000000000000000000000a1',
+    approvals: ['0x0a000000000000000000000000000000000000a1'],
+    threshold: 2,
+    status: 'PENDING',
+    createdAt: AT,
+    executableAt: null,
+    expiresAt: '2026-10-15T10:00:00.000Z',
+    executedAt: null,
+    reason: null,
+    ...over,
+  }
 }

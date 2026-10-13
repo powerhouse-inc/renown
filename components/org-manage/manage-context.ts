@@ -33,6 +33,8 @@ export interface ManageContext {
   ) => Promise<T | null>
   /** Re-reads the organisation (its teams, apps, settings and the viewer's role). */
   reloadOrg: () => void
+  /** True while the organisation is being (re-)read: creating waits for it, so a lost answer is checked before a retry. */
+  orgReading: boolean
   notify: (tone: 'success' | 'error', text: string) => void
 }
 
