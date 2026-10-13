@@ -359,15 +359,25 @@ function firstValue(raw: string | string[] | undefined): string | undefined {
 }
 
 /**
- * The visitor's address, from sources the visitor cannot set: x-vercel-forwarded-for
- * (Vercel sets it; first value), x-real-ip (set by the proxy), the LAST hop of
- * x-forwarded-for (the proxy appends the real peer; earlier hops are client-controlled),
- * then the socket's address. null when none is an IP literal.
+ * The visitor's address, from sources the visitor cannot set:
+ * - x-vercel-forwarded-for (first value), ONLY when the server env
+ *   RENOWN_TRUST_VERCEL_HEADERS is "1": on Vercel the platform sets it; behind our own
+ *   ingress a visitor could send it and pick any address;
+ * - x-real-ip (overwritten by the ingress);
+ * - the LAST hop of x-forwarded-for (the proxy appends the real peer; earlier hops are
+ *   client-controlled);
+ * - the socket's address.
+ * null when none is an IP literal.
  */
-export function visitorIp(request: OrgServerRequest): string | null {
+export function visitorIp(
+  request: OrgServerRequest,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
   const forwarded = firstValue(request.headers['x-forwarded-for'])?.split(',')
   const candidates = [
-    firstValue(request.headers['x-vercel-forwarded-for'])?.split(',')[0],
+    env.RENOWN_TRUST_VERCEL_HEADERS === '1'
+      ? firstValue(request.headers['x-vercel-forwarded-for'])?.split(',')[0]
+      : undefined,
     firstValue(request.headers['x-real-ip']),
     forwarded?.[forwarded.length - 1],
     request.socket?.remoteAddress,
@@ -391,7 +401,7 @@ export function serverReadHeaders(
   const headers: Record<string, string> = {}
   const token = env.RENOWN_TRUSTED_READ_TOKEN
   if (token) headers['X-Renown-Read-Token'] = token
-  const ip = visitorIp(request)
+  const ip = visitorIp(request, env)
   if (ip) headers['X-Renown-Client-IP'] = ip
   return headers
 }

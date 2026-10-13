@@ -171,8 +171,15 @@ test.describe('orgsRequest server-side reads and 401', () => {
       'X-Renown-Client-IP': '203.0.113.7',
     })
     expect(serverReadHeaders({ headers: {} }, env)).toEqual({ 'X-Renown-Read-Token': 'secret' })
-    // order: x-vercel-forwarded-for, x-real-ip, last x-forwarded-for hop, socket
-    expect(ip({ 'x-vercel-forwarded-for': '203.0.113.1, 10.0.0.1', 'x-real-ip': '203.0.113.2', 'x-forwarded-for': '9.9.9.9, 203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.1')
+    // x-vercel-forwarded-for counts only when RENOWN_TRUST_VERCEL_HEADERS=1 (on Vercel the platform sets it)
+    const vercel = { 'x-vercel-forwarded-for': '203.0.113.1, 10.0.0.1', 'x-real-ip': '203.0.113.2', 'x-forwarded-for': '9.9.9.9, 203.0.113.3' }
+    const onVercel = { RENOWN_TRUST_VERCEL_HEADERS: '1' }
+    expect(serverReadHeaders({ headers: vercel, socket: { remoteAddress: '10.0.0.9' } }, onVercel)['X-Renown-Client-IP']).toBe('203.0.113.1')
+    // by default a visitor-set x-vercel-forwarded-for is ignored (self-hosted ingress passes it through)
+    expect(ip(vercel, '10.0.0.9')).toBe('203.0.113.2')
+    expect(ip({ 'x-vercel-forwarded-for': '203.0.113.1' }, '10.0.0.9')).toBe('10.0.0.9')
+    expect(serverReadHeaders({ headers: { 'x-vercel-forwarded-for': '203.0.113.1' } }, { RENOWN_TRUST_VERCEL_HEADERS: 'true' })).toEqual({})
+    // otherwise: x-real-ip, last x-forwarded-for hop, socket
     expect(ip({ 'x-real-ip': '203.0.113.2', 'x-forwarded-for': '203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.2')
     // a spoofed first hop is ignored: the proxy-appended last hop counts
     expect(ip({ 'x-forwarded-for': '1.2.3.4, 203.0.113.3' }, '10.0.0.9')).toBe('203.0.113.3')

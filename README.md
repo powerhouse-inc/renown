@@ -33,6 +33,18 @@ You can start editing the page by modifying `pages/index.tsx`. The page auto-upd
 Copy `.env.example` to `.env.local` and fill in the values for the features you need (wallet
 connect, Privy, analytics, etc.).
 
+## Server-side organisation reads
+
+Server-only variables (never prefixed `NEXT_PUBLIC_`):
+
+- `RENOWN_TRUSTED_READ_TOKEN`: sent as `X-Renown-Read-Token` with SSR reads to renown-orgs,
+  together with the visitor's address as `X-Renown-Client-IP`, so the switchboard rate-limits
+  per visitor rather than per renown.id server.
+- `RENOWN_TRUST_VERCEL_HEADERS`: set to `1` only on Vercel (www.renown.id), where the platform
+  sets `x-vercel-forwarded-for`. Leave it unset on the self-hosted (k8s) images: there a visitor
+  could send that header. Without it the visitor address comes from `x-real-ip` (the ingress
+  overwrites it), then the last `x-forwarded-for` hop, then the socket.
+
 ## Analytics
 
 Renown uses [OpenPanel](https://openpanel.dev) (`@openpanel/nextjs`) for product analytics. The
