@@ -9,6 +9,7 @@ import { ToastRegion, useToasts } from '../site/toast'
 import { CompletenessChecklist } from './completeness-checklist'
 import { ConnectionSection } from './connection-list'
 import { IdentityCard } from './identity-card'
+import { AppTransfers } from './app-transfers'
 import { OrgMemberships } from './org-memberships'
 import { RevokeDialog, type RevokeTarget } from './revoke-dialog'
 import { useConnections } from './use-connections'
@@ -139,6 +140,7 @@ export function MeDashboard({ session }: { session: SignedIn }) {
             </>
           )}
           <OrgMemberships session={session} onToast={show} />
+          <AppTransfers session={session} onToast={show} />
         </div>
       </div>
 

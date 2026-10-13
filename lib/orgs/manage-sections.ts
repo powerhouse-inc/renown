@@ -12,6 +12,7 @@ export interface ManageSectionMeta {
 export const MANAGE_SECTIONS: ManageSectionMeta[] = [
   { key: 'members', label: 'Members', minRole: 'MEMBER' },
   { key: 'teams', label: 'Teams', minRole: 'MEMBER' },
+  { key: 'apps', label: 'Apps', minRole: 'MEMBER' },
   { key: 'settings', label: 'Settings', minRole: 'ADMIN' },
 ]
 
