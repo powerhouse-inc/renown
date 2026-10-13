@@ -215,7 +215,7 @@ test.describe('manage: apps, lost answers and links', () => {
     const ledger = apps.getByRole('listitem').filter({ hasText: 'Acme Ledger' })
     await expect(ledger.getByRole('link', { name: 'Proposal pending' })).toHaveAttribute(
       'href',
-      '/@acme-manage/manage/security',
+      '/@acme-manage/manage/security#proposal-proposal-1',
     )
     await expect(ledger.getByRole('button', { name: 'Propose freezing Acme Ledger' })).toBeDisabled()
     await expect(ledger.getByRole('button', { name: 'Transfer Acme Ledger out' })).toHaveCount(0)

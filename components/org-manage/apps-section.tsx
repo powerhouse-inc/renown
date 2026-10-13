@@ -6,6 +6,7 @@ import { useRemote, type Remote } from '../../hooks/use-remote'
 import { orgPath, shortDid } from '../../lib/orgs/format'
 import { normalizeOrgHandle } from '../../lib/orgs/handles'
 import { expiryText } from '../../lib/orgs/members'
+import { proposalAnchor } from '../../lib/orgs/proposals'
 import { partyText, transferDirection } from '../../lib/orgs/transfers'
 import { getAppProfilesByPublisher, listAppProfiles } from '../../services/app-profiles'
 import { appTransfers, orgProposals, type AppTransfer } from '../../services/org-security'
@@ -209,7 +210,7 @@ function OrgAppsPanel({
                     {app.frozen && <Badge>Frozen</Badge>}
                     {pendingProposal && (
                       <Link
-                        href={`${orgPath(ctx.org.handle)}/manage/security`}
+                        href={`${orgPath(ctx.org.handle)}/manage/security#${proposalAnchor(pendingProposal.id)}`}
                         className="text-ink-muted text-sm underline-offset-4 hover:underline"
                       >
                         Proposal pending

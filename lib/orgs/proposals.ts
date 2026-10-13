@@ -53,6 +53,11 @@ export function proposalSummary(p: OrgProposal, appName: (did: string) => string
 
 const lower = (value: string) => value.toLowerCase()
 
+/** The element id of one proposal on the security page; the apps section links "Proposal pending" to it. */
+export function proposalAnchor(id: string): string {
+  return `proposal-${id}`
+}
+
 export type ProposalStage =
   | { stage: 'approvals'; missing: number; have: number; need: number }
   | { stage: 'waiting'; until: string }

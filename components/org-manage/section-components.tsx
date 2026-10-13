@@ -2,6 +2,7 @@ import { AppsSection } from './apps-section'
 import type { ComponentType } from 'react'
 import type { ManageSectionProps } from './manage-context'
 import { MembersSection } from './members-section'
+import { SecuritySection } from './security-section'
 import { SettingsSection } from './settings-section'
 import { TeamsSection } from './teams-section'
 
@@ -10,5 +11,6 @@ export const SECTION_COMPONENTS: Record<string, ComponentType<ManageSectionProps
   members: MembersSection,
   apps: AppsSection,
   teams: TeamsSection,
+  security: SecuritySection,
   settings: SettingsSection,
 }
