@@ -10,7 +10,7 @@ import type { AppPartyProfile, Lookup, PartyProfile, StoredCredential, StoredCre
 const STATUS_FIELDS = 'credentialId issuerEthereumAddress credentialSubjectId credentialSubjectApp issuanceDate expirationDate revoked revokedAt revocationReason'
 const FULL_FIELDS = `${STATUS_FIELDS} context type issuerId credentialSchemaId credentialSchemaType proofValue proofEthereumAddress proofEip712Domain`
 
-async function graphql<T>(endpoint: string, query: string, variables: Record<string, unknown>): Promise<Lookup<T>> {
+export async function graphql<T>(endpoint: string, query: string, variables: Record<string, unknown>): Promise<Lookup<T>> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), CLIENT_DATA_TIMEOUT_MS)
   try {

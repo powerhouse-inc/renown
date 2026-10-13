@@ -6,6 +6,7 @@
 // @powerhousedao/shared is loaded only when an operation is checked.
 import { appName, formatDay, formatInstant, sentence, shortAddress, signerName } from './format'
 import { hexToBytes, verifyP256 } from './p256'
+import { orgRulesCheck, withOrgRules } from './org-rules'
 import { appParty, checkDelegation, signerParty, type Delegation } from './parties'
 import { SKIPPED_DETAIL, type Check, type Report, type Verdict, type VerifyDeps } from './types'
 
@@ -249,7 +250,7 @@ export async function verifyOperation(
   const [signer, app] = await Promise.all([
     signerParty(deps.lookups, user, action.signer.user.chainId || null),
     // signer.app.name is not covered by any signature: only the authorising credential names the app.
-    appParty(deps.lookups, key, delegation.credential?.credentialSubjectApp || null),
+    appParty(deps.lookups, key, delegation.credential?.credentialSubjectApp || null, false, deps.orgs),
   ])
   const verdict = verdictOf(checks, delegation.outcome)
   const who = signerName(signer)
@@ -283,7 +284,7 @@ export async function verifyOperation(
         : 'The signature holds, but Renown could not be reached to confirm who authorised its key. Try again in a moment.',
     identity: '',
   }
-  return {
+  const report: Report = {
     kind: 'operation',
     verdict,
     summary: sentence(summary[verdict]),
@@ -297,4 +298,6 @@ export async function verifyOperation(
         : []),
     ],
   }
+  if (delegation.outcome !== 'authorised' || !delegation.credential) return report
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, user, app.publisherOrg?.name ?? null))
 }

@@ -2,7 +2,7 @@
 // the delegation check tokens and operations share. Pure apart from the
 // injected lookups.
 import { formatDay } from './format'
-import type { AppParty, Check, Report, SignerParty, StoredCredential, VerifyLookups } from './types'
+import type { AppParty, Check, OrgLookups, Report, SignerParty, StoredCredential, VerifyLookups } from './types'
 
 /** Clock skew tolerated between a signer's clock and a credential's issuance time. */
 export const SKEW_MS = 5 * 60 * 1000
@@ -17,12 +17,22 @@ export async function appParty(
   did: string,
   claimedName: string | null,
   session = false,
+  orgs?: OrgLookups,
 ): Promise<AppParty> {
   if (session || !did.startsWith('did:key:')) {
     return { did, claimedName, profile: null, looked: true, session: true }
   }
-  const found = await lookups.appProfile(did)
-  return { did, claimedName, profile: found.ok ? found.value : null, looked: found.ok, session: false }
+  const [found, publisher] = await Promise.all([lookups.appProfile(did), orgs ? orgs.appPublisherOrg(did) : Promise.resolve(null)])
+  return {
+    did,
+    claimedName,
+    profile: found.ok ? found.value : null,
+    looked: found.ok,
+    session: false,
+    // Only with organisation reads, so reports made without them keep their exact shape;
+    // a failed read leaves it undefined (not known) rather than null (no organisation).
+    ...(orgs && publisher && publisher.ok ? { publisherOrg: publisher.value } : {}),
+  }
 }
 
 function isoOrNull(value: string | null): number | null {

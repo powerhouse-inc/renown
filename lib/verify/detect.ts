@@ -1,4 +1,5 @@
 // What a /verify paste is, decided from its shape alone. Pure.
+import { isAttestationShape } from './attestation'
 import type { InputKind } from './types'
 
 /** Pastes longer than this are refused before parsing (a credential is ~2 KB, an operation rarely 20 KB). */
@@ -11,6 +12,7 @@ export type Detected =
   | { kind: 'token'; jwt: string }
   | { kind: 'credential'; credential: Record<string, unknown> }
   | { kind: 'operation'; action: Record<string, unknown> }
+  | { kind: 'release-attestation'; attestation: Record<string, unknown> }
   | { kind: null; problem: DetectProblem }
 
 export type DetectProblem = 'empty' | 'too-long' | 'unrecognised' | 'json-unrecognised' | 'json-invalid'
@@ -28,6 +30,7 @@ export const KIND_NAMES: Record<InputKind, string> = {
   token: 'a bearer token',
   'credential-id': 'a credential id',
   operation: 'a signed operation',
+  'release-attestation': 'a release attestation',
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -89,6 +92,7 @@ export function detectInput(raw: string): Detected {
     if (isCredential(parsed)) return { kind: 'credential', credential: parsed }
     const action = signedAction(parsed)
     if (action) return { kind: 'operation', action }
+    if (isAttestationShape(parsed)) return { kind: 'release-attestation', attestation: parsed }
     return { kind: null, problem: 'json-unrecognised' }
   }
   return { kind: null, problem: 'unrecognised' }
@@ -102,5 +106,5 @@ export const PROBLEM_TEXT: Record<DetectProblem, string> = {
     'This is not a DID, a credential id, a bearer token or JSON. Check that nothing was cut off when you copied it.',
   'json-invalid': 'This looks like JSON but does not parse. Check that nothing was cut off when you copied it.',
   'json-unrecognised':
-    'This JSON is not a Renown credential or a signed operation. A credential has a proof with eip712; an operation has context.signer.signatures.',
+    'This JSON is not a Renown credential, a signed operation or a release attestation. A credential has a proof with eip712; an operation has context.signer.signatures; an attestation has appDid, version, artifactDigest, signer and signature.',
 }

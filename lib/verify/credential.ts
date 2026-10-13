@@ -2,6 +2,7 @@
 // urn:uuid id): is its EIP-712 proof the issuer's, is it in date, and has the
 // issuer revoked it? Pure apart from the injected deps.
 import { appName, formatDay, formatInstant, sentence, shortAddress, signerName } from './format'
+import { orgRulesCheck, withOrgRules } from './org-rules'
 import { appParty, signerParty, SKEW_MS } from './parties'
 import type {
   Check,
@@ -274,7 +275,7 @@ export async function verifyCredential(
   const session = credential.credentialSubject.id === credential.issuer.id || !credential.credentialSubject.id.startsWith('did:key:')
   const [signer, app] = await Promise.all([
     signerParty(deps.lookups, issuer, chainId),
-    appParty(deps.lookups, credential.credentialSubject.id, credential.credentialSubject.app || null, session),
+    appParty(deps.lookups, credential.credentialSubject.id, credential.credentialSubject.app || null, session, deps.orgs),
   ])
   checks.push(
     session
@@ -330,7 +331,10 @@ export async function verifyCredential(
     { label: 'Expires', iso: credential.expirationDate },
     ...(revokedAt ? [{ label: 'Revoked', iso: revokedAt }] : []),
   ]
-  return { kind: 'credential', verdict, summary: sentence(summary[verdict]), checks, signer, app, times }
+  const report: Report = { kind: 'credential', verdict, summary: sentence(summary[verdict]), checks, signer, app, times }
+  // A forged credential proves nothing to check rules for; a session is not an app.
+  if (forged || session) return report
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, credential.id, issuer, app.publisherOrg?.name ?? null))
 }
 
 /** /verify for a credential id: the stored copy, re-checked like a pasted credential. */

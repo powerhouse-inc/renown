@@ -1,11 +1,13 @@
 // One entry point for /verify: a detected paste in, a report out. The real
 // dependencies (the Renown SDK, viem, the switchboard) are loaded on demand,
 // so the page itself ships none of them.
+import { verifyAttestation } from './attestation'
 import { verifyCredential, verifyCredentialId } from './credential'
 import type { Detected } from './detect'
 import { verifyAppDid, verifyWalletDid } from './did'
 import { switchboardLookups } from './lookups'
 import { verifyOperation } from './operation'
+import { switchboardOrgLookups } from './org-lookups'
 import { contractSignatureOnChain } from './smart-wallet'
 import { verifyToken } from './token'
 import type { Report, VerifyDeps } from './types'
@@ -35,6 +37,7 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
 export function liveDeps(fixedNow?: Date): VerifyDeps {
   return {
     lookups: switchboardLookups(),
+    orgs: switchboardOrgLookups(),
     async eoaSignature(credential) {
       const { verifyCredentialSignature } = await import('@renown/sdk')
       return verifyCredentialSignature(credential as unknown as Parameters<typeof verifyCredentialSignature>[0])
@@ -66,5 +69,7 @@ export async function runVerify(input: CheckableInput, target: OperationTarget, 
       return verifyToken(input.jwt, deps)
     case 'operation':
       return verifyOperation(input.action, target, deps)
+    case 'release-attestation':
+      return verifyAttestation(input.attestation, deps)
   }
 }

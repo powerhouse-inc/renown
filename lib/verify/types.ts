@@ -1,7 +1,7 @@
 // The shapes /verify passes around: what was pasted, each check made, and the
 // report the page renders. Pure types.
 
-export type InputKind = 'did-pkh' | 'did-key' | 'credential' | 'token' | 'credential-id' | 'operation'
+export type InputKind = 'did-pkh' | 'did-key' | 'credential' | 'token' | 'credential-id' | 'operation' | 'release-attestation'
 
 /** pass/fail: checked; neutral: does not apply or says nothing either way; unknown: a lookup failed. */
 export type CheckStatus = 'pass' | 'fail' | 'neutral' | 'unknown'
@@ -49,6 +49,8 @@ export interface AppParty {
   looked: boolean
   /** A CLI or other session: the credential's subject is the user's own DID, not an app key. */
   session: boolean
+  /** The organisation that publishes the app, when one does (looked up only with organisation reads). */
+  publisherOrg?: AppPublisherOrgRef | null
 }
 
 export interface AppPartyProfile {
@@ -152,5 +154,50 @@ export interface VerifyDeps {
   bearerToken(jwt: string, audience: string | undefined): Promise<boolean>
   /** Smart-wallet fallback after the offline EOA check failed. */
   contractSignature(args: ContractSignatureArgs): Promise<ContractSignature>
+  /** Organisation reads (rules, publisher, attestations); without them those checks are left out. */
+  orgs?: OrgLookups
   now: Date
+}
+
+export interface AppPublisherOrgRef {
+  id: string
+  did: string
+  handle: string
+  name: string
+  verifiedDomains: string[]
+}
+
+export type OrgCredentialReason = 'ISSUER_NOT_MEMBER' | 'ISSUER_NOT_PUBLISHER' | 'SUSPENDED' | 'APP_FROZEN'
+
+/** orgCredentialStatus: whether an organisation's rules let a delegation count (null for person-owned apps). */
+export interface OrgCredentialVerdict {
+  appDid: string | null
+  orgId: string | null
+  counts: boolean
+  reason: OrgCredentialReason | null
+}
+
+/** A release attestation as renown-orgs stores it (issuedAt exactly as signed). */
+export interface StoredAttestation {
+  id: string
+  appDid: string
+  version: string
+  artifactDigest: string
+  orgId: string
+  signer: string
+  signerRole: string | null
+  signerStillMember: boolean
+  issuedAt: string
+  signature: string
+  createdAt: string
+}
+
+/** The organisation reads /verify makes: by credential id, app DID and attestation id only. */
+export interface OrgLookups {
+  credentialStatus(credentialId: string): Promise<Lookup<OrgCredentialVerdict | null>>
+  appPublisherOrg(appDid: string): Promise<Lookup<AppPublisherOrgRef | null>>
+  /** One attestation by the id the paste carries (null when unknown). */
+  releaseAttestation(id: string): Promise<Lookup<StoredAttestation | null>>
+  /** The newest 50 attestations of the app. */
+  releaseAttestations(appDid: string): Promise<Lookup<StoredAttestation[]>>
 }

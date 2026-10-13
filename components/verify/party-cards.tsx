@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { orgPath } from '../../lib/orgs/format'
 import { formatInstant } from '../../lib/verify/format'
 import type { AppParty, ReportTime, SignerParty } from '../../lib/verify/types'
 import { identityAccent } from '../../lib/identity-art'
@@ -76,6 +77,15 @@ export function AppCard({ app }: { app: AppParty }) {
           <p className="text-ink-muted text-sm">
             {app.profile ? 'Public app profile' : app.looked ? 'No public app profile' : 'App profile not checked'}
           </p>
+          {app.publisherOrg && (
+            <p className="text-ink-muted text-sm">
+              Published by{' '}
+              <Link href={orgPath(app.publisherOrg.handle)} className="text-ink font-semibold hover:underline">
+                {app.publisherOrg.name}
+              </Link>
+              {app.publisherOrg.verifiedDomains[0] ? `, verified as ${app.publisherOrg.verifiedDomains[0]}` : ''}
+            </p>
+          )}
         </div>
       </div>
       <p className={`${caption} mt-4`}>App key</p>

@@ -2,6 +2,7 @@ import { test, expect, type Page, type Route } from '@playwright/test'
 import { dirname, join } from 'node:path'
 import { SCRUB_SHARE_FRAGMENTS } from '../components/analytics/scrub-share-fragments'
 import { EXAMPLE_DATA } from '../lib/verify/examples'
+import { RELEASE_DOMAIN, RELEASE_TYPES } from '../lib/verify/attestation'
 import { shareFragment, type SharedInput } from '../lib/verify/share'
 import type { StoredCredentialFull } from '../lib/verify/types'
 import { attachScreenshots, expectNoSeriousA11yViolations, layoutShift, useTheme, type Theme } from './support/site'
@@ -143,7 +144,7 @@ test.describe('/verify', () => {
     await input(page).fill(EXAMPLE_DATA.token)
     await expect(hint).toHaveText('Looks like a bearer token.')
     await input(page).fill('{"hello": "world"}')
-    await expect(hint).toContainText('This JSON is not a Renown credential or a signed operation.')
+    await expect(hint).toContainText('This JSON is not a Renown credential, a signed operation or a release attestation.')
     await expect(page.getByRole('button', { name: 'Check', exact: true })).toBeDisabled()
   })
 
@@ -219,6 +220,52 @@ test.describe('/verify', () => {
     await expect(verdict(page)).toHaveText('Genuine', { timeout: 30_000 })
     await expect(check(page, 'delegation')).toHaveAttribute('data-status', 'pass')
     await expect(page.getByRole('region', { name: 'Signed by', exact: true })).toBeVisible()
+  })
+
+  test('a release attestation: recorded by id, published by its organisation, only ids leave the browser', async ({ page }) => {
+    const wallet = makeWallet()
+    const appDid = (await makeAppKey()).did
+    const message = { appDid, version: '2.0.0', artifactDigest: `sha256:${'c'.repeat(64)}`, orgId: 'org-page-1', issuedAt: new Date(Date.now() - 60_000).toISOString() }
+    const signature = await wallet.signTypedData({ domain: RELEASE_DOMAIN, types: RELEASE_TYPES, primaryType: 'ReleaseAttestation', message })
+    const record = {
+      id: 'att-page-1',
+      ...message,
+      signer: wallet.address.toLowerCase(),
+      signerRole: 'PUBLISHER',
+      signerStillMember: true,
+      signature,
+      createdAt: new Date().toISOString(),
+    }
+    const org = { id: 'org-page-1', did: 'did:web:www.renown.id:org:org-page-1', handle: 'acme', name: 'Acme', verifiedDomains: ['acme.example'] }
+    const sent: string[] = []
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql/renown-orgs`, async (route) => {
+      const body = route.request().postDataJSON() as { query: string; variables: Record<string, string> }
+      sent.push(JSON.stringify(body))
+      if (body.query.includes('VerifyReleaseAttestations')) return route.fulfill({ json: { data: { releaseAttestations: { items: [], next: null } } } })
+      if (body.query.includes('VerifyReleaseAttestation')) {
+        return route.fulfill({ json: { data: { releaseAttestation: body.variables.id === record.id ? record : null } } })
+      }
+      return route.continue()
+    })
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql/renown-stats`, async (route) => {
+      const body = route.request().postDataJSON() as { query: string }
+      sent.push(JSON.stringify(body))
+      if (body.query.includes('VerifyAppPublisherOrg')) return route.fulfill({ json: { data: { appProfile: { publisherOrg: org } } } })
+      if (body.query.includes('VerifyProfile')) return route.fulfill({ json: { data: { renownUsers: [] } } })
+      if (body.query.includes('VerifyApp')) return route.fulfill({ json: { data: { appProfile: null } } })
+      return route.continue()
+    })
+    await openVerify(page)
+
+    await input(page).fill(JSON.stringify({ id: record.id, ...message, signer: wallet.address, signature }))
+    await expect(page.locator('#verify-hint')).toHaveText('Looks like a release attestation.')
+    await page.getByRole('button', { name: 'Check', exact: true }).click()
+    await expect(verdict(page)).toHaveText('Genuine', { timeout: 30_000 })
+    await expect(check(page, 'record')).toHaveAttribute('data-status', 'pass')
+    await expect(check(page, 'publisher')).toHaveAttribute('data-status', 'pass')
+    await expect(page.getByRole('link', { name: 'Acme', exact: true })).toHaveAttribute('href', /acme/)
+    expect(sent.some((body) => body.includes('VerifyReleaseAttestation(') || body.includes('VerifyReleaseAttestation '))).toBe(true)
+    expect(sent.some((body) => body.includes(signature.slice(2, 40)))).toBe(false)
   })
 
   test('a signed operation needs its document id and holds only for that document', async ({ page }) => {

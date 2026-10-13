@@ -3,6 +3,7 @@
 // credential of that user authorise the key right now? Pure apart from deps.
 import { appName, formatInstant, sentence, shortAddress, signerName } from './format'
 import { base64UrlToBytes, isP256DidKey, verifyP256 } from './p256'
+import { orgRulesCheck, withOrgRules } from './org-rules'
 import { appParty, checkDelegation, signerParty, SKEW_MS, type Delegation } from './parties'
 import { SKIPPED_DETAIL, type Check, type Report, type Verdict, type VerifyDeps } from './types'
 
@@ -158,7 +159,7 @@ export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report
   const [signer, app] = await Promise.all([
     signerParty(deps.lookups, claims.address, claims.chainId),
     // A token carries no app name; the credential that authorised its key does.
-    appParty(deps.lookups, claims.iss, delegation.credential?.credentialSubjectApp || null),
+    appParty(deps.lookups, claims.iss, delegation.credential?.credentialSubjectApp || null, false, deps.orgs),
   ])
   const { verdict, reason } = decide(checks, expired, notYet, delegation.outcome)
   const who = signerName(signer)
@@ -181,5 +182,7 @@ export async function verifyToken(jwt: string, deps: VerifyDeps): Promise<Report
     ...(claims.iat ?? claims.nbf ? [{ label: 'Issued', iso: new Date((claims.iat ?? claims.nbf ?? 0) * 1000).toISOString() }] : []),
     ...(claims.exp ? [{ label: 'Expires', iso: new Date(claims.exp * 1000).toISOString() }] : []),
   ]
-  return { kind: 'token', verdict, summary: sentence(sentences[reason]), checks, signer, app, times }
+  const report: Report = { kind: 'token', verdict, summary: sentence(sentences[reason]), checks, signer, app, times }
+  if (delegation.outcome !== 'authorised' || !delegation.credential) return report
+  return withOrgRules(report, await orgRulesCheck(deps.orgs, delegation.credential.credentialId, claims.address, app.publisherOrg?.name ?? null))
 }
