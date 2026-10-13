@@ -10,6 +10,7 @@ export const VERDICT_TONE: Record<Verdict, Tone> = {
   'not-yet-valid': 'caution',
   'not-valid': 'caution',
   unchecked: 'neutral',
+  unrecorded: 'caution',
   identity: 'info',
 }
 
@@ -58,6 +59,9 @@ function Glyph({ verdict }: { verdict: Verdict }) {
       )
     case 'unchecked':
       return <path d="M42.5 43a6.5 6.5 0 1 1 9 6c-1.8.8-2.5 2-2.5 3.8V55M49 61.5v.5" />
+    case 'unrecorded':
+      // a mark of caution: a valid signature, but no record behind it
+      return <path d="M49 39v13M49 59.5v.5" />
     case 'identity':
       return (
         <>

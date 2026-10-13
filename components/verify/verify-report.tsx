@@ -15,6 +15,7 @@ const TITLE: Record<Exclude<Verdict, 'identity'>, string> = {
   'not-yet-valid': 'Not valid yet',
   'not-valid': 'Not valid',
   unchecked: 'Could not check',
+  unrecorded: 'Signature valid, but this release is not recorded by Renown',
 }
 
 const BAND: Record<Tone, string> = {

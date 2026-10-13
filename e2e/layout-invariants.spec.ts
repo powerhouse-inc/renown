@@ -458,7 +458,7 @@ const STATES: LayoutState[] = [
     inline: true,
     page: 'verify',
     widths: [390, 1280],
-    open: (page) => checkText(attestationJson, 'Genuine')(page),
+    open: (page) => checkText(attestationJson, 'Signature valid, but this release is not recorded by Renown')(page),
   },
   { name: 'invite link created', inline: true, page: 'org-manage', widths: [390, 1280], open: createInviteLink },
   { name: 'account menu with organisations', page: 'trust', widths: [1280], prepare: standInMenuSession, open: openAccountMenu },

@@ -226,14 +226,18 @@ export async function verifyAttestation(raw: Record<string, unknown>, deps: Veri
     checks.push({ id: 'publisher', label: publisherLabel, status: 'unknown', detail: 'Renown could not be reached to look up the organisation that publishes this app.' })
   } else checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: 'It names an organisation that does not publish this app now.' })
 
-  const verdict: Verdict = forged ? 'not-genuine' : checks.some((c) => c.status === 'unknown') ? 'unchecked' : 'genuine'
+  // Genuine needs Renown's matching record: a signature alone only proves some wallet signed
+  // these fields, not that it may release the app (renown-orgs checks that at attestRelease).
+  const verdict: Verdict = forged ? 'not-genuine' : checks.some((c) => c.status === 'unknown') ? 'unchecked' : record ? 'genuine' : 'unrecorded'
   const who = signerName(party)
   const what = appName(app)
   const publishedBy = a.orgId !== '' && org && org.id === a.orgId ? `published by ${org.name}, ` : ''
   const summary =
     verdict === 'genuine'
-      ? `Release ${a.version} of ${what} — ${publishedBy}signed off by ${who}.${record ? '' : ' Renown has no record of it.'}`
-      : verdict === 'not-genuine'
+      ? `Release ${a.version} of ${what} — ${publishedBy}signed off by ${who}.`
+      : verdict === 'unrecorded'
+        ? `${who} signed release ${a.version} of ${what}, but Renown has no record of it, so it says nothing about who may release ${what}.`
+        : verdict === 'not-genuine'
         ? `This attestation was not signed by the wallet it names, so it proves nothing about release ${a.version}.`
         : outcome === 'unavailable'
           ? `It is not from a plain wallet, and chain 1 could not be asked whether a smart wallet at ${shortAddress(signer)} made it.`

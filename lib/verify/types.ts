@@ -22,7 +22,8 @@ export interface Check {
  * 'not-yet-valid': genuinely signed, but its validity starts in the future.
  * 'not-valid': genuinely signed, but its dates cannot be read.
  */
-export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'not-yet-valid' | 'not-valid' | 'unchecked' | 'identity'
+/** 'unrecorded': a release attestation with a valid signature that Renown has no matching record of. */
+export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'not-yet-valid' | 'not-valid' | 'unchecked' | 'unrecorded' | 'identity'
 
 export interface SignerParty {
   address: string

@@ -323,6 +323,8 @@ export async function verifyCredential(
       : stored
         ? 'Renown has this credential, but its signature could not be re-checked from the stored copy. Paste the full credential to check it.'
         : `${signedBy}: it is not from a plain wallet, and chain ${chainId} could not be asked whether a smart wallet at ${shortAddress(issuer)} made it.`,
+    // only release attestations are 'unrecorded'
+    unrecorded: '',
     identity: '',
   }
   const revokedAt = rows?.find((r) => r.revoked && r.revokedAt && r.issuerEthereumAddress.toLowerCase() === issuer)?.revokedAt

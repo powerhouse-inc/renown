@@ -146,9 +146,10 @@ test.describe('release attestations', () => {
     const changed = await verifyAttestation({ ...json, version: '1.4.1' }, deps({}))
     expect(changed.verdict).toBe('not-genuine')
     expect(status(changed)).toEqual({ signature: 'fail', record: 'neutral', 'issued-at': 'neutral', publisher: 'neutral' })
+    // A valid signature without Renown's record says nothing about who may release the app (I6).
     const unrecorded = await verifyAttestation(json, deps({}))
-    expect(unrecorded.verdict).toBe('genuine')
-    expect(unrecorded.summary).toMatch(/Renown has no record of it\.$/)
+    expect(unrecorded.verdict).toBe('unrecorded')
+    expect(unrecorded.summary).toBe(`${short(json.signer)} signed release 1.4.0 of Acme Ledger, but Renown has no record of it, so it says nothing about who may release Acme Ledger.`)
     expect((await verifyAttestation(json, deps({ orgDown: true }))).verdict).toBe('unchecked')
     const broken = await verifyAttestation({ ...json, artifactDigest: 'sha256:xyz' }, deps({}))
     expect(broken).toMatchObject({ verdict: 'not-genuine', summary: 'This is not a complete release attestation: artifactDigest is missing or malformed.' })
@@ -182,9 +183,9 @@ test.describe('release attestations', () => {
     const { json } = await signedAttestation()
     const other = stored(json, { version: '1.5.0' })
     const report = await verifyAttestation({ id: 'att-1', ...json }, deps({ attestations: [other] }))
-    expect(report.verdict).toBe('genuine')
+    expect(report.verdict).toBe('unrecorded')
     expect(status(report).record).toBe('neutral')
-    expect(report.summary).toMatch(/Renown has no record of it\.$/)
+    expect(report.summary).toMatch(/Renown has no record of it, so it says nothing about who may release Acme Ledger\.$/)
     expect(report.times.map((t) => t.label)).toEqual(['Signed off'])
   })
 
@@ -212,7 +213,7 @@ test.describe('release attestations', () => {
     // Unrecorded and too old to be recorded now: informative, not a verdict change.
     const old = await signedAttestation({}, { issuedAt: '2026-08-01T10:00:00.000Z' })
     const stale = await verifyAttestation(old.json, deps({}))
-    expect(stale.verdict).toBe('genuine')
+    expect(stale.verdict).toBe('unrecorded')
     expect(status(stale)['issued-at']).toBe('neutral')
 
     // An offset zone is kept verbatim: the signature only holds over the exact string.
