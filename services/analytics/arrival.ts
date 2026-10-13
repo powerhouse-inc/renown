@@ -8,6 +8,9 @@ const ARRIVALS = {
   joined: { invite: ANALYTICS_EVENTS.orgInviteAccepted },
 } as const satisfies Record<string, Record<string, AnalyticsEvent>>
 
+/** The query parameters that carry arrival flags. */
+export const ARRIVAL_PARAMS: readonly string[] = Object.keys(ARRIVALS)
+
 type ArrivalFlag = { [K in keyof typeof ARRIVALS]: [K, keyof (typeof ARRIVALS)[K]] }[keyof typeof ARRIVALS]
 
 /** `href` with a one-shot arrival flag, e.g. withArrival('/org/acme/manage/members', 'joined', 'invite'). */

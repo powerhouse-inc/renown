@@ -8,4 +8,4 @@ export {
 } from './profile-hint'
 export { useOpenPanelAnalytics } from './use-open-panel-analytics'
 export type { Analytics, AnalyticsIdentity } from './use-open-panel-analytics'
-export { takeArrival, withArrival } from './arrival'
+export { ARRIVAL_PARAMS, takeArrival, withArrival } from './arrival'

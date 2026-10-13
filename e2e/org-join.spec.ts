@@ -85,6 +85,27 @@ test.describe('create form rules', () => {
       __referrer: 'http://localhost:3000/invite/redacted',
       other: 'https://renown.id/orgs',
     })
+    // Encoded once or twice, in any case: the token goes too.
+    const encoded = {
+      type: 'track',
+      payload: {
+        name: 'link_out',
+        properties: {
+          a: `https://x.example/?next=%2Finvite%2F${TOKEN}%3Fx%3D1`,
+          b: `https://x.example/?next=%2finvite%2f${TOKEN}`,
+          c: `https://x.example/?r=https%253A%252F%252Frenown.id%252FInvite%252F${TOKEN}`,
+          d: `https://renown.id/INVITE/${TOKEN}`,
+        },
+      },
+    }
+    expect(filter(encoded)).toBe(true)
+    expect(encoded.payload.properties).toEqual({
+      a: 'https://x.example/?next=%2Finvite%2Fredacted%3Fx%3D1',
+      b: 'https://x.example/?next=%2finvite%2fredacted',
+      c: 'https://x.example/?r=https%253A%252F%252Frenown.id%252Finvite%252Fredacted',
+      d: 'https://renown.id/invite/redacted',
+    })
+    expect(JSON.stringify(encoded)).not.toContain(TOKEN)
     expect(withArrival('/org/acme/manage/members', 'joined', 'invite')).toBe('/org/acme/manage/members?joined=invite')
     expect(takeArrival('/org/acme/manage/members?joined=invite#x')).toEqual({ event: 'org.invite.accepted', rest: '/org/acme/manage/members#x' })
     expect(takeArrival('/org/acme/manage/members?tab=1&joined=nope')).toEqual({ event: null, rest: '/org/acme/manage/members?tab=1' })
@@ -134,6 +155,23 @@ test.describe('/invite/[token]', () => {
     await page.waitForTimeout(1000)
     expect(events.filter((e) => e.includes('org.invite.accepted'))).toHaveLength(1)
     expect(events.join('\n')).not.toContain(TOKEN)
+  })
+
+  test('the join is recorded even when OpenPanel is ready only after the flag has left the address bar', async ({ page }) => {
+    await page.addInitScript(() => {
+      ;(window as { __renownE2eHoldAnalytics?: boolean }).__renownE2eHoldAnalytics = true
+    })
+    await signInTestWallet(page, { bearer: 'e2e-join-bearer' })
+    const events = await recordAnalytics(page)
+    await page.goto(`/invite/${TOKEN}`)
+    await page.getByRole('button', { name: 'Join Acme Join Works' }).click()
+    await expect(page).toHaveURL(/\/org\/acme-join\/manage\/members$/, { timeout: 30_000 })
+    await page.waitForTimeout(1500)
+    expect(events.filter((e) => e.includes('org.invite.accepted'))).toHaveLength(0)
+    await page.evaluate(() => {
+      ;(window as { __renownE2eHoldAnalytics?: boolean }).__renownE2eHoldAnalytics = false
+    })
+    await expect.poll(() => events.filter((e) => e.includes('org.invite.accepted')).length, { timeout: 15_000 }).toBe(1)
   })
 
   test('a lost answer re-reads the membership instead of signing again (D21)', async ({ page }) => {
