@@ -13,7 +13,7 @@ import { join } from 'node:path'
 
 const NEXT_DIR = process.argv[2] ?? '.next'
 
-const MARKETING_PAGES = ['/', '/apps', '/people', '/orgs', '/org/[id]', '/verify', '/developers', '/trust', '/ecosystem', '/app/[did]', '/profile/[id]', '/404', '/500']
+const MARKETING_PAGES = ['/', '/apps', '/people', '/orgs', '/org/[id]', '/invite/[token]', '/verify', '/developers', '/trust', '/ecosystem', '/app/[did]', '/profile/[id]', '/404', '/500']
 
 /** Library → strings found in its bundled code and in no Renown code. */
 const WALLET_MARKERS = {

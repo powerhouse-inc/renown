@@ -23,6 +23,9 @@ export const ANALYTICS_EVENTS = {
   consoleCompleted: 'console.authorization.completed',
   consoleFailed: 'console.authorization.failed',
   returnToApp: 'app.return.clicked',
+  orgCreated: 'org.created',
+  orgInviteSent: 'org.invite.sent',
+  orgInviteAccepted: 'org.invite.accepted',
   signOut: 'auth.sign.out',
 } as const
 

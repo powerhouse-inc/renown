@@ -20,9 +20,13 @@ function openPanelClientId(): string | undefined {
   return E2E_AUTH ? (window as { __renownE2eOpenPanel?: string }).__renownE2eOpenPanel : undefined
 }
 
-/** A /verify share link: its fragment carries what someone pasted and must never be recorded. */
+/**
+ * A URL that carries a secret and must never be recorded: a /verify share
+ * link (its fragment holds what someone pasted) or an invite link (its path
+ * holds the token).
+ */
 function hasPrivateFragment(): boolean {
-  return window.location.hash.startsWith('#v=')
+  return window.location.hash.startsWith('#v=') || window.location.pathname.startsWith('/invite/')
 }
 
 // Re-read after each route or hash change: /verify drops its share fragment
@@ -36,7 +40,7 @@ function subscribe(onChange: () => void): () => void {
   }
 }
 
-/** The cookies, or null while the URL holds a private fragment (OpenPanel records the full URL). */
+/** The cookies, or null while the URL holds a secret (OpenPanel records the full URL). */
 function clientSnapshot(): string | null {
   return hasPrivateFragment() ? null : document.cookie
 }
@@ -57,7 +61,7 @@ function clientSnapshot(): string | null {
  */
 export function Analytics() {
   // null on the server and during hydration; the browser's cookies afterwards.
-  // Also null while a /verify share fragment is in the URL: mounting waits until it is gone.
+  // Also null while the URL holds a secret (a /verify share fragment, an invite token): mounting waits until it is gone.
   const cookies = useSyncExternalStore(subscribe, clientSnapshot, () => null)
 
   if (cookies === null) return null
