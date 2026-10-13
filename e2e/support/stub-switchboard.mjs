@@ -154,6 +154,20 @@ const DEFAULT_DATA = {
   renownNetworkStats: null,
   appStats: null,
   userStats: [],
+  // renown-orgs (/graphql/renown-orgs): no organisations, nobody belongs to one.
+  organization: null,
+  organizationSearch: { items: [], next: null },
+  organizationsByMember: [],
+  organizationMembers: [],
+  orgInvites: [],
+  orgInviteLinks: [],
+  myOrgInvites: [],
+  orgInviteLink: null,
+  orgHandleAvailability: { handle: '', available: true, reason: null },
+  myNotifications: { items: [], next: null },
+  myUnreadNotificationCount: 0,
+  organizationStats: null,
+  organizationDidDocument: null,
 }
 
 function send(res, status, body) {
