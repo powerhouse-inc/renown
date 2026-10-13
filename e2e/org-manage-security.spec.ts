@@ -1,7 +1,22 @@
 import { test, expect } from '@playwright/test'
-import { APP_DID_A, orgCredential, orgProposal, orgWorkload } from './support/org-fixtures'
-import { BOB, CAROL, OWNER, openManagePage, signedWrite } from './support/org-manage'
-import { fixtureStub } from './support/stub-switchboard-client'
+import { shortDid } from '../lib/orgs/format'
+import {
+  APP_DID_A,
+  orgCredential,
+  orgMember,
+  orgProposal,
+  orgWorkload,
+} from './support/org-fixtures'
+import {
+  BOB,
+  CAROL,
+  DAVE,
+  OWNER,
+  defaultMembers,
+  openManagePage,
+  signedWrite,
+} from './support/org-manage'
+import { fixtureStub, stubRequests } from './support/stub-switchboard-client'
 
 const blank = {
   address: null,
@@ -30,9 +45,10 @@ function proposals(orgId: string) {
       id: 'p-approve',
       kind: 'ADD_OWNER',
       payload: { ...blank, address: CAROL },
+      // Proposed by an owner who has since left: their approval no longer counts.
       proposer: OWNER,
       approvals: [OWNER],
-      threshold: 2,
+      threshold: 1,
       createdAt: iso(-DAY),
       expiresAt: iso(13 * DAY),
     }),
@@ -76,6 +92,12 @@ test.describe('manage: security', () => {
       role: 'OWNER',
       section: 'security',
       org: { securityWarnings: ['SINGLE_OWNER'], ownerCount: 1 },
+      // A single-owner organisation: the viewer is its only owner.
+      members: (orgId, me) => [
+        orgMember({ orgId, address: me, role: 'OWNER', displayName: 'You Tester' }),
+        orgMember({ orgId, address: BOB, role: 'PUBLISHER', displayName: 'Bob Builder' }),
+        orgMember({ orgId, address: CAROL, role: 'MEMBER', displayName: 'Carol Member' }),
+      ],
       answers: { OrgProposals: (v) => ({ orgProposals: proposals(String(v.orgId)) }) },
     })
     for (const name of [
@@ -86,6 +108,8 @@ test.describe('manage: security', () => {
     ])
       await answer(setup.orgId, name, { id: 'p' })
     await expect(page.getByRole('note')).toContainText('Only one owner')
+    await expect(page.getByRole('note')).toContainText('Propose a second owner below.')
+    await expect(page.getByRole('list', { name: 'Owners' }).getByRole('listitem')).toHaveCount(1)
 
     await page.getByLabel('New owner').selectOption(BOB)
     await page.getByRole('button', { name: 'Propose a new owner' }).click()
@@ -98,7 +122,7 @@ test.describe('manage: security', () => {
     const list = page.getByRole('list', { name: 'Proposals' })
     const approve = list.getByRole('listitem').filter({ hasText: 'Make 0x0c00…00c3 an owner' })
     await expect(approve).toContainText('Needs 1 more owner approval')
-    await expect(approve).toContainText('1 of 2 owner approvals')
+    await expect(approve).toContainText('0 of 1 owner approvals')
     await approve.getByRole('button', { name: /^Approve/ }).click()
     expect(await signedWrite(setup.wallet, 'approveOrgProposal', setup.orgId)).toEqual({
       orgId: setup.orgId,
@@ -113,6 +137,10 @@ test.describe('manage: security', () => {
     await expect(ready).toContainText('Ready to run')
     await expect(ready).toContainText('Renown runs it shortly if no owner does')
     await ready.getByRole('button', { name: /^Run now/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText(`Freeze ${shortDid(APP_DID_A)} now?`)
+    await dialog.getByRole('button', { name: /^Yes, freeze/ }).click()
+    await expect(dialog).toBeHidden()
     expect(await signedWrite(setup.wallet, 'executeOrgProposal', setup.orgId)).toEqual({
       orgId: setup.orgId,
       proposalId: 'p-ready',
@@ -139,6 +167,7 @@ test.describe('manage: security', () => {
     const setup = await openManagePage(page, {
       role: 'ADMIN',
       section: 'security',
+      org: { securityWarnings: ['SINGLE_OWNER'], ownerCount: 1 },
       answers: {
         OrgProposals: (v) => ({ orgProposals: proposals(String(v.orgId)) }),
         OrgCredentials: () => ({
@@ -164,6 +193,9 @@ test.describe('manage: security', () => {
     await answer(setup.orgId, 'SetOrgWorkloadDisabled', orgWorkload({ disabled: true }))
     await expect(page.getByRole('button', { name: /^Approve/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Propose a new owner' })).toHaveCount(0)
+    // Admins have no propose control: the note asks them to turn to the owner.
+    await expect(page.getByRole('note')).toContainText('Ask the owner to propose a second owner.')
+    await expect(page.getByRole('note')).not.toContainText('below')
 
     const delegations = page.getByRole('list', { name: 'Delegations' })
     await expect(delegations).toContainText('Suspended by the organisation')
@@ -184,7 +216,21 @@ test.describe('manage: security', () => {
       credentialId: 'urn:uuid:00000000-0000-4000-8000-0000000000d2',
     })
     // P4: the per-issuer buttons render below the list, not inside it.
-    await page.getByRole('button', { name: 'Suspend every delegation from 0x0b00…00b2' }).click()
+    const suspendAll = page.getByRole('button', {
+      name: 'Suspend every delegation from 0x0b00…00b2',
+    })
+    // Cancelling the confirmation sends nothing.
+    await suspendAll.click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toContainText('Suspend every delegation from 0x0b00…00b2?')
+    await expect(dialog).toContainText('Acme Manage')
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    const sent = await stubRequests('mutation SuspendOrgCredentials(')
+    expect(
+      sent.filter((r) => r.variables.orgId === setup.orgId && r.variables.memberAddress),
+    ).toEqual([])
+    await suspendAll.click()
     await page
       .getByRole('button', { name: 'Yes, suspend every delegation from 0x0b00…00b2' })
       .click()
@@ -271,5 +317,160 @@ test.describe('manage: security', () => {
       orgId: setup.orgId,
       proposalId: 'p-recover',
     })
+  })
+
+  test('high-impact approvals, runs and owner removals ask first, naming what they act on; cancel sends nothing', async ({
+    page,
+  }) => {
+    let viewer = ''
+    const setup = await openManagePage(page, {
+      role: 'OWNER',
+      section: 'security',
+      members: (orgId, me) => {
+        viewer = me
+        return defaultMembers(orgId, me, 'OWNER')
+      },
+      answers: {
+        OrgProposals: (v) => {
+          const orgId = String(v.orgId)
+          const waiting = {
+            approvals: [OWNER],
+            threshold: 2,
+            createdAt: iso(-DAY),
+            expiresAt: iso(13 * DAY),
+          }
+          const ready = { ...waiting, threshold: 1, executableAt: iso(-60_000) }
+          return {
+            orgProposals: [
+              orgProposal({ orgId, id: 'p-delete', kind: 'DELETE_ORG', ...waiting }),
+              orgProposal({
+                orgId,
+                id: 'p-transfer',
+                kind: 'TRANSFER_APP_OUT',
+                payload: { ...blank, appDid: APP_DID_A, toKind: 'PERSON', toId: CAROL },
+                ...waiting,
+              }),
+              orgProposal({
+                orgId,
+                id: 'p-handle',
+                kind: 'CHANGE_HANDLE',
+                payload: { ...blank, handle: 'acme-two' },
+                ...waiting,
+              }),
+              orgProposal({
+                orgId,
+                id: 'p-freeze',
+                kind: 'FREEZE_APP',
+                payload: { ...blank, appDid: APP_DID_A },
+                ...ready,
+              }),
+              orgProposal({
+                orgId,
+                id: 'p-remove-me',
+                kind: 'REMOVE_OWNER',
+                payload: { ...blank, address: viewer, demoteToAdmin: false },
+                ...ready,
+              }),
+              orgProposal({
+                orgId,
+                id: 'p-recover',
+                kind: 'RECOVER',
+                payload: { ...blank, address: DAVE, domain: 'acme.example' },
+                proposer: DAVE,
+                approvals: [],
+                threshold: 0,
+                createdAt: iso(-8 * DAY),
+                executableAt: iso(-60_000),
+                expiresAt: iso(13 * DAY),
+              }),
+            ],
+          }
+        },
+      },
+    })
+    const app = shortDid(APP_DID_A)
+    const cases: { item: string; button: RegExp; texts: string[] }[] = [
+      {
+        item: '#proposal-p-delete',
+        button: /^Approve/,
+        texts: ['Approve: delete Acme Manage?', 'cannot be undone'],
+      },
+      {
+        item: '#proposal-p-transfer',
+        button: /^Approve/,
+        texts: [`transfer ${app} out of Acme Manage`, 'Carol Member'],
+      },
+      { item: '#proposal-p-handle', button: /^Approve/, texts: ['Acme Manage moves to @acme-two'] },
+      {
+        item: '#proposal-p-freeze',
+        button: /^Run now/,
+        texts: [`Freeze ${app} now?`, 'no tokens'],
+      },
+      {
+        item: '#proposal-p-remove-me',
+        button: /^Run now/,
+        texts: ['Remove You Tester', 'This ends your own ownership of Acme Manage.'],
+      },
+      {
+        item: '#proposal-p-recover',
+        button: /^Run now/,
+        texts: [
+          'Recover Acme Manage for 0x0d00…00d4 now?',
+          'acme.example',
+          'hands it to someone else',
+        ],
+      },
+    ]
+    const dialog = page.getByRole('dialog')
+    for (const c of cases) {
+      await page.locator(c.item).getByRole('button', { name: c.button }).click()
+      await expect(dialog).toBeVisible()
+      for (const text of c.texts) await expect(dialog).toContainText(text)
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await expect(dialog).toBeHidden()
+    }
+    await page.getByRole('button', { name: 'Propose removing Olga Owner' }).click()
+    await expect(dialog).toContainText('Propose removing Olga Owner?')
+    await expect(dialog).toContainText(
+      'Olga Owner stops being an owner of Acme Manage and becomes an admin',
+    )
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dialog).toBeHidden()
+
+    for (const name of ['ApproveOrgProposal', 'ExecuteOrgProposal', 'ProposeOrgChange']) {
+      const sent = await stubRequests(`mutation ${name}(`)
+      expect(sent.filter((r) => r.variables.orgId === setup.orgId)).toEqual([])
+    }
+  })
+
+  test('a countdown turns into Ready to run, with Run now, without a reload', async ({ page }) => {
+    await page.clock.install({ time: new Date() })
+    await openManagePage(page, {
+      role: 'OWNER',
+      section: 'security',
+      answers: {
+        OrgProposals: (v) => ({
+          orgProposals: [
+            orgProposal({
+              orgId: String(v.orgId),
+              id: 'p-soon',
+              kind: 'UNFREEZE_APP',
+              payload: { ...blank, appDid: APP_DID_A },
+              proposer: OWNER,
+              approvals: [OWNER],
+              threshold: 1,
+              executableAt: iso(90_000),
+              expiresAt: iso(13 * DAY),
+            }),
+          ],
+        }),
+      },
+    })
+    const item = page.locator('#proposal-p-soon')
+    await expect(item).toContainText(/Can run in (1 minute|less than a minute)/)
+    await expect(item.getByRole('button', { name: /^Run now/ })).toHaveCount(0)
+    await page.clock.fastForward('02:30')
+    await expect(item).toContainText('Ready to run')
+    await expect(item.getByRole('button', { name: /^Run now/ })).toBeVisible()
   })
 })

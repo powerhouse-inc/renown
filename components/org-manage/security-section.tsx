@@ -40,7 +40,10 @@ export function SecuritySection({ ctx }: ManageSectionProps) {
           className="border-caution-ink/35 bg-caution-ink/[0.07] text-ink rounded-card border px-4 py-3 text-sm leading-6"
         >
           Only one owner. If that wallet is lost, the organisation can only be recovered through a
-          domain verified for it, after a waiting period. Propose a second owner below.
+          domain verified for it, after a waiting period.{' '}
+          {ctx.role === 'OWNER'
+            ? 'Propose a second owner below.'
+            : 'Ask the owner to propose a second owner.'}
         </p>
       )}
       <OwnersPanel

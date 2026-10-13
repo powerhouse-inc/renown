@@ -11,7 +11,8 @@ import {
 import { withBearer } from '../../services/orgs'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageContext } from './manage-context'
-import { ConfirmButton, Panel, RemoteView } from './manage-ui'
+import { useConfirm } from './confirm-dialog'
+import { Panel, RemoteView } from './manage-ui'
 
 const live = (c: OrgCredential) => c.status.counts && !c.revoked
 
@@ -30,6 +31,7 @@ export function DelegationsPanel({
   )
   const credentials = useRemote(`credentials:${org.id}`, load)
   const [busy, setBusy] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
 
   async function act(
     key: string,
@@ -131,24 +133,39 @@ export function DelegationsPanel({
               )}
               {issuers.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {issuers.map((address) => (
-                    <ConfirmButton
-                      key={address}
-                      label={`Suspend every delegation from ${shortAddress(address)}`}
-                      confirm={`Yes, suspend every delegation from ${shortAddress(address)}`}
-                      busy={busy === address}
-                      onConfirm={() =>
-                        void act(
-                          address,
-                          'suspendOrgCredentials',
-                          { memberAddress: address },
-                          `Every delegation from ${shortAddress(address)} is suspended.`,
-                        )
-                      }
-                    />
-                  ))}
+                  {issuers.map((address) => {
+                    const who = shortAddress(address)
+                    const count = list.filter(
+                      (c) => live(c) && c.issuer.toLowerCase() === address,
+                    ).length
+                    return (
+                      <button
+                        key={address}
+                        type="button"
+                        disabled={busy === address}
+                        onClick={() =>
+                          ask({
+                            title: `Suspend every delegation from ${who}?`,
+                            body: `The ${count === 1 ? 'delegation' : `${count} delegations`} ${who} issued for ${org.name}’s apps stop counting at once, so those app keys can no longer act for the organisation. You can lift each suspension here later; lifting one keeps the others suspended.`,
+                            confirm: `Yes, suspend every delegation from ${who}`,
+                            onConfirm: () =>
+                              void act(
+                                address,
+                                'suspendOrgCredentials',
+                                { memberAddress: address },
+                                `Every delegation from ${who} is suspended.`,
+                              ),
+                          })
+                        }
+                        className={buttonClasses('ghost', 'md', 'text-danger-ink')}
+                      >
+                        Suspend every delegation from {who}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
+              {dialog}
             </>
           )
         }}

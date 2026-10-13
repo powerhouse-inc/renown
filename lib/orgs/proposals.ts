@@ -27,7 +27,10 @@ export const PROPOSAL_STATUS_LABELS: Record<OrgProposalStatus, string> = {
 }
 
 /** One line on what the proposal would do. `appName` names an app DID when the caller knows it. */
-export function proposalSummary(p: OrgProposal, appName: (did: string) => string = shortDid): string {
+export function proposalSummary(
+  p: OrgProposal,
+  appName: (did: string) => string = shortDid,
+): string {
   const q = p.payload
   const who = q.address ? shortAddress(q.address) : null
   const app = q.appDid ? appName(q.appDid) : 'an app'
@@ -35,7 +38,9 @@ export function proposalSummary(p: OrgProposal, appName: (did: string) => string
     case 'ADD_OWNER':
       return `Make ${who ?? 'a member'} an owner`
     case 'REMOVE_OWNER':
-      return q.demoteToAdmin ? `Demote ${who ?? 'an owner'} to admin` : `Remove ${who ?? 'an owner'} from the organisation`
+      return q.demoteToAdmin
+        ? `Demote ${who ?? 'an owner'} to admin`
+        : `Remove ${who ?? 'an owner'} from the organisation`
     case 'TRANSFER_APP_OUT':
       return `Transfer ${app} to ${q.toKind === 'ORG' ? 'another organisation' : q.toId ? shortAddress(q.toId) : 'someone else'}`
     case 'CHANGE_HANDLE':
@@ -102,7 +107,8 @@ export function countdown(untilIso: string, now: Date): string {
   const hours = Math.floor((ms % DAY) / HOUR)
   const minutes = Math.floor((ms % HOUR) / MINUTE)
   if (days > 0) return hours > 0 ? `${unit(days, 'day')} ${unit(hours, 'hour')}` : unit(days, 'day')
-  if (hours > 0) return minutes > 0 ? `${unit(hours, 'hour')} ${unit(minutes, 'minute')}` : unit(hours, 'hour')
+  if (hours > 0)
+    return minutes > 0 ? `${unit(hours, 'hour')} ${unit(minutes, 'minute')}` : unit(hours, 'hour')
   return unit(minutes, 'minute')
 }
 
@@ -123,7 +129,14 @@ export function stageText(stage: ProposalStage, now: Date): string {
 
 /** Owners approve proposals that still need approvals and that they have not approved. */
 export function canApprove(p: OrgProposal, viewer: string, role: OrgRole, now: Date): boolean {
-  return role === 'OWNER' && p.status === 'PENDING' && p.kind !== 'RECOVER' && p.executableAt === null && now.getTime() < Date.parse(p.expiresAt) && !p.approvals.map(lower).includes(lower(viewer))
+  return (
+    role === 'OWNER' &&
+    p.status === 'PENDING' &&
+    p.kind !== 'RECOVER' &&
+    p.executableAt === null &&
+    now.getTime() < Date.parse(p.expiresAt) &&
+    !p.approvals.map(lower).includes(lower(viewer))
+  )
 }
 
 /** Any owner cancels; the proposer may always withdraw their own. */
@@ -134,4 +147,116 @@ export function canCancel(p: OrgProposal, viewer: string, role: OrgRole): boolea
 export function canExecute(p: OrgProposal, viewer: string, role: OrgRole, now: Date): boolean {
   // Past approvals, the stage does not depend on the owner list.
   return canCancel(p, viewer, role) && proposalStage(p, now, []).stage === 'ready'
+}
+
+/** Kinds whose Approve and Run now ask first: they remove, delete, move, freeze or rename something. */
+export const CONFIRMED_KINDS: readonly OrgProposalKind[] = [
+  'DELETE_ORG',
+  'REMOVE_OWNER',
+  'TRANSFER_APP_OUT',
+  'FREEZE_APP',
+  'CHANGE_HANDLE',
+  'RECOVER',
+]
+
+/** How a confirmation names the organisation, apps and people, and who is looking. */
+export interface ConfirmNames {
+  org: string
+  app: (did: string) => string
+  person: (address: string) => string
+  /** The viewer's address. */
+  viewer: string
+}
+
+export interface ProposalConfirmation {
+  title: string
+  body: string
+  /** A sharper warning when the action touches the viewer's own ownership or hands the organisation to someone. */
+  warning: string | null
+  confirm: string
+}
+
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** What a proposal does once it runs, as [short verb phrase, consequence]. */
+function proposalEffect(p: OrgProposal, n: ConfirmNames): [string, string] {
+  const q = p.payload
+  const person = q.address ? n.person(q.address) : 'an owner'
+  const app = q.appDid ? n.app(q.appDid) : 'the app'
+  switch (p.kind) {
+    case 'DELETE_ORG':
+      return [
+        `delete ${n.org}`,
+        `${n.org} is archived for good: every member is removed, its invite links and pending proposals end, and nothing about it can be changed again. This cannot be undone.`,
+      ]
+    case 'REMOVE_OWNER':
+      return q.demoteToAdmin
+        ? [
+            `demote ${person} to admin`,
+            `${person} stops being an owner of ${n.org} and becomes an admin.`,
+          ]
+        : [
+            `remove ${person} from ${n.org}`,
+            `${person} leaves ${n.org}, and their delegations for its apps are suspended.`,
+          ]
+    case 'TRANSFER_APP_OUT': {
+      const to =
+        q.toKind === 'ORG' ? 'another organisation' : q.toId ? n.person(q.toId) : 'the recipient'
+      return [
+        `transfer ${app} out of ${n.org}`,
+        `${app} is offered to ${to}. Once they accept, ${n.org} no longer publishes it.`,
+      ]
+    }
+    case 'FREEZE_APP':
+      return [
+        `freeze ${app}`,
+        `${app}’s delegations stop counting and it gets no tokens until it is unfrozen.`,
+      ]
+    case 'CHANGE_HANDLE':
+      return [
+        `change the handle of ${n.org} to @${q.handle ?? '…'}`,
+        `${n.org} moves to @${q.handle ?? '…'}. Links that use its current handle may stop working.`,
+      ]
+    case 'RECOVER':
+      return [
+        `recover ${n.org} for ${person}`,
+        `${person} becomes an owner of ${n.org} through ${q.domain ?? 'a verified domain'}, with an owner’s say over every high-risk change.`,
+      ]
+    default:
+      return [lower(proposalSummary(p)), '']
+  }
+}
+
+/** The confirmation an Approve or Run now asks for, or null when the kind runs on one click. */
+export function proposalConfirmation(
+  p: OrgProposal,
+  action: 'approve' | 'execute',
+  n: ConfirmNames,
+): ProposalConfirmation | null {
+  if (!CONFIRMED_KINDS.includes(p.kind)) return null
+  const [short, effect] = proposalEffect(p, n)
+  const q = p.payload
+  const self = q.address !== null && lower(q.address) === lower(n.viewer)
+  let warning: string | null = null
+  if (p.kind === 'REMOVE_OWNER' && self) warning = `This ends your own ownership of ${n.org}.`
+  if (p.kind === 'RECOVER' && !self)
+    warning = `You are an owner of ${n.org}, and this hands it to someone else. Run it only if you expected this recovery; if you did not, cancel it instead.`
+  if (action === 'execute') {
+    return {
+      title: `${capitalise(short)} now?`,
+      body: `It runs now. ${effect}`,
+      warning,
+      confirm: `Yes, ${short} now`,
+    }
+  }
+  const after =
+    p.kind === 'FREEZE_APP'
+      ? 'If yours is the last approval needed, it can run straight away, and Renown runs it shortly if no owner does.'
+      : 'If yours is the last approval needed, it runs when its waiting period ends: an owner runs it, or Renown does shortly after.'
+  return {
+    title: `Approve: ${short}?`,
+    body: `${effect} ${after}`,
+    warning,
+    confirm: `Yes, approve: ${short}`,
+  }
 }

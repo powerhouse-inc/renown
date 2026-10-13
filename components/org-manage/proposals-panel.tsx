@@ -8,6 +8,7 @@ import {
   canExecute,
   PROPOSAL_STATUS_LABELS,
   proposalAnchor,
+  proposalConfirmation,
   proposalStage,
   proposalSummary,
   stageText,
@@ -18,6 +19,7 @@ import { cx } from '../../utils/cx'
 import { Field, inputClass } from '../profile-edit/field'
 import { Badge, buttonClasses } from '../site/primitives'
 import type { ManageContext } from './manage-context'
+import { useConfirm } from './confirm-dialog'
 import { ConfirmButton, Panel, RemoteView } from './manage-ui'
 
 /** A read with its reload (useRemote's state and reload). */
@@ -48,6 +50,7 @@ export function OwnersPanel({
   const [candidate, setCandidate] = useState('')
   const [removal, setRemoval] = useState<Record<string, 'demote' | 'remove'>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
   // Writes are not idempotent: proposing waits for the proposals, and a pending one for the same address blocks a duplicate.
   const reading = proposals.state.status !== 'ready'
   const pending =
@@ -143,12 +146,26 @@ export function OwnersPanel({
                             type="button"
                             disabled={busy === member.address || reading}
                             onClick={() =>
-                              void propose(
-                                member.address,
-                                { address: member.address, demoteToAdmin: mode === 'demote' },
-                                'REMOVE_OWNER',
-                                `Removing ${label} as an owner was proposed.`,
-                              )
+                              ask({
+                                title: `Propose removing ${label}?`,
+                                body: `${
+                                  mode === 'demote'
+                                    ? `Once it runs, ${label} stops being an owner of ${ctx.org.name} and becomes an admin.`
+                                    : `Once it runs, ${label} leaves ${ctx.org.name}, and their delegations for its apps are suspended.`
+                                } Other owners approve it first, and it runs after a waiting period unless an owner cancels it.`,
+                                warning:
+                                  lower(member.address) === ctx.address
+                                    ? `This proposes ending your own ownership of ${ctx.org.name}.`
+                                    : null,
+                                confirm: `Yes, propose removing ${label}`,
+                                onConfirm: () =>
+                                  void propose(
+                                    member.address,
+                                    { address: member.address, demoteToAdmin: mode === 'demote' },
+                                    'REMOVE_OWNER',
+                                    `Removing ${label} as an owner was proposed.`,
+                                  ),
+                              })
                             }
                             className={buttonClasses('ghost', 'md')}
                           >
@@ -211,6 +228,21 @@ export function OwnersPanel({
                   </button>
                 </form>
               )}
+              {owner && proposals.state.status === 'error' && (
+                <div role="status" className="mt-3 text-sm">
+                  <p className="text-ink-muted">
+                    Proposing waits for the list of proposals, which did not load.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={proposals.reload}
+                    className={buttonClasses('secondary', 'md', 'mt-2')}
+                  >
+                    Load the proposals again
+                  </button>
+                </div>
+              )}
+              {dialog}
             </>
           )
         }}
@@ -246,6 +278,7 @@ export function ProposalsPanel({
 }) {
   const now = useNow(30_000)
   const [busy, setBusy] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
   useAnchorScroll(proposals.state.status === 'ready' && members.state.status === 'ready')
 
   async function act(
@@ -270,6 +303,26 @@ export function ProposalsPanel({
     }
   }
 
+  /** Approve or run; high-impact kinds ask first, naming what they act on and the consequence. */
+  function confirmThen(
+    p: OrgProposal,
+    action: 'approve' | 'execute',
+    person: (address: string) => string,
+  ) {
+    const run = () =>
+      action === 'approve'
+        ? void act(p, 'approveOrgProposal', 'Approved.')
+        : void act(p, 'executeOrgProposal', 'Carried out.')
+    const confirmation = proposalConfirmation(p, action, {
+      org: ctx.org.name,
+      app: appName,
+      person,
+      viewer: ctx.address,
+    })
+    if (!confirmation) run()
+    else ask({ ...confirmation, onConfirm: run })
+  }
+
   return (
     <Panel
       id="proposals-title"
@@ -279,93 +332,110 @@ export function ProposalsPanel({
       <RemoteView remote={proposals.state} what="proposals" onRetry={proposals.reload}>
         {(list) => {
           if (list.length === 0) return <p className="text-ink-muted text-sm">No proposals yet.</p>
+          // Approvals count only from current owners, so the stages need the owner list. Its
+          // failure (with a retry) shows once, in the Owners panel above.
+          if (members.state.status === 'loading')
+            return (
+              <p role="status" className="text-ink-muted text-sm">
+                Loading owners…
+              </p>
+            )
+          if (members.state.status === 'error')
+            return (
+              <p className="text-ink-muted text-sm">
+                Proposals show once the owners load (see Owners above).
+              </p>
+            )
+          const memberList = members.state.value
+          const person = (address: string) => {
+            const member = memberList.find((m) => lower(m.address) === lower(address))
+            return member
+              ? `${memberLabel(member)} (${shortAddress(lower(address))})`
+              : shortAddress(lower(address))
+          }
+          const owners = ownerAddresses(memberList)
+          const sorted = [
+            ...list.filter((p) => p.status === 'PENDING'),
+            ...list.filter((p) => p.status !== 'PENDING').slice(0, 20),
+          ]
           return (
-            // Approvals count only from current owners, so the stages need the owner list.
-            <RemoteView remote={members.state} what="owners" onRetry={members.reload}>
-              {(memberList) => {
-                const owners = ownerAddresses(memberList)
-                const sorted = [
-                  ...list.filter((p) => p.status === 'PENDING'),
-                  ...list.filter((p) => p.status !== 'PENDING').slice(0, 20),
-                ]
-                return (
-                  <ul aria-label="Proposals" className="divide-hairline divide-y">
-                    {sorted.map((p) => {
-                      const summary = proposalSummary(p, appName)
-                      const stage = proposalStage(p, now, owners)
-                      const pending = p.status === 'PENDING'
-                      return (
-                        <li
-                          key={p.id}
-                          id={proposalAnchor(p.id)}
-                          tabIndex={-1}
-                          className="scroll-mt-24 py-4 outline-none target:ring-2"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-ink font-semibold break-words">{summary}</p>
-                              <p className="text-ink-muted mt-1 text-xs">
-                                {p.kind === 'RECOVER'
-                                  ? `Started by ${shortAddress(p.proposer)} through a verified domain. Owners were notified and any of them can cancel it.`
-                                  : `Proposed by ${shortAddress(p.proposer)}`}
-                                {pending &&
-                                  stage.stage === 'approvals' &&
-                                  `, ${stage.have} of ${stage.need} owner approvals`}
-                                {pending &&
-                                  stage.stage === 'ready' &&
-                                  '. Renown runs it shortly if no owner does'}
-                                {p.reason ? `. ${p.reason}` : ''}
-                              </p>
-                            </div>
-                            {pending && stage.stage !== 'closed' ? (
-                              <Badge tone={stage.stage === 'ready' ? 'signal' : 'neutral'}>
-                                {stageText(stage, now)}
-                              </Badge>
-                            ) : (
-                              <Badge>{PROPOSAL_STATUS_LABELS[p.status]}</Badge>
-                            )}
-                          </div>
-                          {pending && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {canApprove(p, ctx.address, ctx.role, now) && (
-                                <button
-                                  type="button"
-                                  disabled={busy === p.id}
-                                  onClick={() => void act(p, 'approveOrgProposal', 'Approved.')}
-                                  aria-label={`Approve: ${summary}`}
-                                  className={buttonClasses('primary', 'md')}
-                                >
-                                  Approve
-                                </button>
-                              )}
-                              {canExecute(p, ctx.address, ctx.role, now) && (
-                                <button
-                                  type="button"
-                                  disabled={busy === p.id}
-                                  onClick={() => void act(p, 'executeOrgProposal', 'Carried out.')}
-                                  aria-label={`Run now: ${summary}`}
-                                  className={buttonClasses('primary', 'md')}
-                                >
-                                  Run now
-                                </button>
-                              )}
-                              {canCancel(p, ctx.address, ctx.role) && (
-                                <ConfirmButton
-                                  label={`Cancel: ${summary}`}
-                                  confirm={`Yes, cancel: ${summary}`}
-                                  busy={busy === p.id}
-                                  onConfirm={() => void act(p, 'cancelOrgProposal', 'Cancelled.')}
-                                />
-                              )}
-                            </div>
+            <>
+              <ul aria-label="Proposals" className="divide-hairline divide-y">
+                {sorted.map((p) => {
+                  const summary = proposalSummary(p, appName)
+                  const stage = proposalStage(p, now, owners)
+                  const pending = p.status === 'PENDING'
+                  return (
+                    <li
+                      key={p.id}
+                      id={proposalAnchor(p.id)}
+                      tabIndex={-1}
+                      className="scroll-mt-24 py-4 outline-none target:ring-2"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-ink font-semibold break-words">{summary}</p>
+                          <p className="text-ink-muted mt-1 text-xs">
+                            {p.kind === 'RECOVER'
+                              ? `Started by ${shortAddress(p.proposer)} through a verified domain. Owners were notified and any of them can cancel it.`
+                              : `Proposed by ${shortAddress(p.proposer)}`}
+                            {pending &&
+                              stage.stage === 'approvals' &&
+                              `, ${stage.have} of ${stage.need} owner approvals`}
+                            {pending &&
+                              stage.stage === 'ready' &&
+                              '. Renown runs it shortly if no owner does'}
+                            {p.reason ? `. ${p.reason}` : ''}
+                          </p>
+                        </div>
+                        {pending && stage.stage !== 'closed' ? (
+                          <Badge tone={stage.stage === 'ready' ? 'signal' : 'neutral'}>
+                            {stageText(stage, now)}
+                          </Badge>
+                        ) : (
+                          <Badge>{PROPOSAL_STATUS_LABELS[p.status]}</Badge>
+                        )}
+                      </div>
+                      {pending && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {canApprove(p, ctx.address, ctx.role, now) && (
+                            <button
+                              type="button"
+                              disabled={busy === p.id}
+                              onClick={() => confirmThen(p, 'approve', person)}
+                              aria-label={`Approve: ${summary}`}
+                              className={buttonClasses('primary', 'md')}
+                            >
+                              Approve
+                            </button>
                           )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )
-              }}
-            </RemoteView>
+                          {canExecute(p, ctx.address, ctx.role, now) && (
+                            <button
+                              type="button"
+                              disabled={busy === p.id}
+                              onClick={() => confirmThen(p, 'execute', person)}
+                              aria-label={`Run now: ${summary}`}
+                              className={buttonClasses('primary', 'md')}
+                            >
+                              Run now
+                            </button>
+                          )}
+                          {canCancel(p, ctx.address, ctx.role) && (
+                            <ConfirmButton
+                              label={`Cancel: ${summary}`}
+                              confirm={`Yes, cancel: ${summary}`}
+                              busy={busy === p.id}
+                              onConfirm={() => void act(p, 'cancelOrgProposal', 'Cancelled.')}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+              {dialog}
+            </>
           )
         }}
       </RemoteView>
