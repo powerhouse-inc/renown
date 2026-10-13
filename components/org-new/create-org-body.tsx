@@ -32,6 +32,10 @@ async function createdByViewer(session: SignedIn, handle: string): Promise<'mine
 }
 
 const UNCERTAIN = 'Renown did not answer, so it is not known whether the organisation was created. Check again in a moment.'
+/** One read found nothing, but a create still in flight can land later: read once more before signing again. */
+const NOT_CONFIRMED = 'We couldn’t confirm the organisation was created — check again.'
+/** orgHandleAvailability answered INVALID for a handle the local rule accepts. */
+const SERVER_INVALID = 'Renown does not accept this handle. Try another.'
 
 const HANDLE_HINT: Record<HandleState, string> = {
   idle: 'Your organisation’s address on Renown: renown.id/@handle.',
@@ -75,13 +79,20 @@ function CreateOrgForm({ session }: { session: SignedIn }) {
   const availability = useOrgHandleAvailability(handle)
   const problems = { ...createOrgProblems(form), ...serverErrors }
   const handleError =
-    problems.handle ?? (availability === 'taken' ? 'This handle is taken.' : availability === 'reserved' ? 'This handle is reserved.' : undefined)
+    problems.handle ??
+    (availability === 'taken'
+      ? 'This handle is taken.'
+      : availability === 'reserved'
+        ? 'This handle is reserved.'
+        : availability === 'invalid'
+          ? SERVER_INVALID
+          : undefined)
   const handleHint = availability === 'available' ? `renown.id/@${handle} is available.` : HANDLE_HINT[availability]
 
   function set<K extends keyof CreateOrgForm>(key: K, value: CreateOrgForm[K]) {
     setForm((current) => {
       const next = { ...current, [key]: value }
-      if (key === 'name' && !handleEdited) next.handle = handleFromName(String(value))
+      if (key === 'name' && !handleEdited && !uncertainHandle) next.handle = handleFromName(String(value))
       return next
     })
     if (isCreateOrgField(key)) {
@@ -98,21 +109,31 @@ function CreateOrgForm({ session }: { session: SignedIn }) {
     await router.push(manageHref(orgHandle))
   }
 
-  /** Reads whether the uncertain create went through; true when the form may sign a new create. */
-  async function settleUncertain(orgHandle: string): Promise<boolean> {
+  /**
+   * Reads whether an uncertain create went through; true when the form may sign
+   * a new create. `afterWrite`: the read right after the lost answer, where
+   * "not found" is not yet trusted (the create may still land), so the form
+   * asks for one more check. The handle stays locked while a create is uncertain.
+   */
+  async function settleUncertain(orgHandle: string, afterWrite: boolean): Promise<boolean> {
     try {
       const outcome = await createdByViewer(session, orgHandle)
-      setUncertainHandle(null)
       if (outcome === 'mine') {
+        setUncertainHandle(null)
         await opened(orgHandle)
         return false
       }
       if (outcome === 'taken') {
-        // Someone else's: the lost create did not go through. Only the current handle is in the way.
-        if (orgHandle !== handle) return true
+        setUncertainHandle(null)
         setServerErrors({ handle: 'This handle is taken.' })
         return false
       }
+      if (afterWrite) {
+        setUncertainHandle(orgHandle)
+        setFailure(NOT_CONFIRMED)
+        return false
+      }
+      setUncertainHandle(null)
       return true
     } catch {
       setUncertainHandle(orgHandle)
@@ -125,11 +146,17 @@ function CreateOrgForm({ session }: { session: SignedIn }) {
     event.preventDefault()
     setSubmitted(true)
     setFailure(null)
-    if (Object.values(createOrgProblems(form)).some(Boolean) || availability === 'taken' || availability === 'reserved') return
-    setSaving(true)
-    if (uncertainHandle && !(await settleUncertain(uncertainHandle))) {
-      setSaving(false)
-      return
+    const localProblem = Object.values(createOrgProblems(form)).some(Boolean)
+    if (uncertainHandle) {
+      // Read first: the availability answer may be this viewer's own new organisation.
+      setSaving(true)
+      if (!(await settleUncertain(uncertainHandle, false)) || localProblem) {
+        setSaving(false)
+        return
+      }
+    } else {
+      if (localProblem || availability === 'taken' || availability === 'reserved' || availability === 'invalid') return
+      setSaving(true)
     }
     const args = createOrgArgs(form)
     const result = await orgWriter(sessionSigner(session)).write<Organization>('createOrganization', args)
@@ -139,15 +166,15 @@ function CreateOrgForm({ session }: { session: SignedIn }) {
     }
     if (result.unconfirmed) {
       setLostHandles((list) => [...list, String(args.handle)])
-      const retry = await settleUncertain(String(args.handle))
+      await settleUncertain(String(args.handle), true)
       setSaving(false)
-      if (retry) setFailure('Renown did not answer and the organisation was not created. Try again.')
       return
     }
     if (result.code === 'HANDLE_TAKEN' && lostHandles.includes(String(args.handle))) {
-      const retry = await settleUncertain(String(args.handle))
+      // Possibly our own earlier create, landed late.
+      const absent = await settleUncertain(String(args.handle), false)
       setSaving(false)
-      if (retry) setServerErrors({ handle: result.message })
+      if (absent) setServerErrors({ handle: result.message })
       return
     }
     setSaving(false)
@@ -179,6 +206,8 @@ function CreateOrgForm({ session }: { session: SignedIn }) {
             setHandleEdited(true)
             set('handle', e.target.value)
           }}
+          readOnly={uncertainHandle !== null}
+          aria-readonly={uncertainHandle !== null}
           autoCapitalize="none"
           autoComplete="off"
           spellCheck={false}

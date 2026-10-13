@@ -4,9 +4,9 @@ import { useRouter } from 'next/router'
 import { useState } from 'react'
 import { manageHref, shortAddress } from '../../lib/orgs/format'
 import { INVITE_STATE_TEXT, inviteLinkState } from '../../lib/orgs/invites'
-import { ANALYTICS_EVENTS, useOpenPanelAnalytics } from '../../services/analytics'
+import { withArrival } from '../../services/analytics'
 import { orgWriter, sessionSigner } from '../../services/org-client-write'
-import { fetchOrganization, orgInviteLinkPreview, withBearer, type OrgRole, type OrgSummary } from '../../services/orgs'
+import { fetchOrganization, orgInviteLinkPreview, withBearer, type OrgSummary } from '../../services/orgs'
 import { useMeSession, type MeSession } from '../me/use-me-session'
 import { buttonClasses } from '../site/primitives'
 import { InviteAcceptLoading } from './invite-accept-loading'
@@ -30,10 +30,9 @@ async function checkJoined(session: SignedIn, token: string, org: OrgSummary): P
   return state === 'usable' ? 'usable' : { closed: INVITE_STATE_TEXT[state] }
 }
 
-export function InviteAccept({ token, org, role }: { token: string; org: OrgSummary; role: OrgRole }) {
+export function InviteAccept({ token, org }: { token: string; org: OrgSummary }) {
   const session = useMeSession()
   const router = useRouter()
-  const { track } = useOpenPanelAnalytics()
   const [state, setState] = useState<JoinState>({ status: 'idle' })
 
   if (session.state === 'loading') return <InviteAcceptLoading error={null} />
@@ -46,9 +45,10 @@ export function InviteAccept({ token, org, role }: { token: string; org: OrgSumm
   }
   const signedIn = session
 
+  // OpenPanel never runs on an invite page (its URL holds the token), so the
+  // organisation page records org.invite.accepted on arrival (ArrivalEvent).
   async function joined() {
-    track(ANALYTICS_EVENTS.orgInviteAccepted, { role })
-    await router.push(manageHref(org.handle))
+    await router.push(withArrival(manageHref(org.handle), 'joined', 'invite'))
   }
 
   async function recheck() {

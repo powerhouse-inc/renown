@@ -8,16 +8,9 @@ import { SiteLayout } from '../../components/site/site-layout'
 import { NotFoundPage } from '../../components/ui/not-found-page'
 import { withLazyWalletShell } from '../../components/wallet/lazy-wallet-shell'
 import { roleLabel } from '../../lib/orgs/format'
-import { INVITE_CACHE_CONTROL, INVITE_STATE_TEXT, INVITE_TOKEN_RE, inviteLinkState, ROLE_MEANING } from '../../lib/orgs/invites'
+import { loadInvitePage, type InvitePageProps } from '../../lib/orgs/invite-page-data'
+import { INVITE_STATE_TEXT, inviteLinkState, ROLE_MEANING } from '../../lib/orgs/invites'
 import { formatDay } from '../../lib/verify/format'
-import { orgInviteLinkPreview, type OrgInviteLinkPreview } from '../../services/orgs'
-import { SSR_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
-
-interface InvitePageProps {
-  preview: OrgInviteLinkPreview | null
-  token: string
-  unavailable: boolean
-}
 
 // Only the Join control loads the wallet stack; the preview is plain HTML.
 const InviteAccept = withLazyWalletShell(
@@ -54,7 +47,7 @@ const InvitePage: NextPage<InvitePageProps> = ({ preview, token, unavailable }) 
             <>
               <p className="text-ink-muted mt-2 text-sm">This link expires on {formatDay(preview.expiresAt)}.</p>
               <div className="mt-8">
-                <InviteAccept token={token} org={org} role={role} />
+                <InviteAccept token={token} org={org} />
               </div>
             </>
           ) : (
@@ -71,25 +64,6 @@ const InvitePage: NextPage<InvitePageProps> = ({ preview, token, unavailable }) 
   )
 }
 
-export const getServerSideProps: GetServerSideProps<InvitePageProps> = async ({ params, res }) => {
-  const token = String(params?.token ?? '')
-  // The URL carries a secret: never stored by a cache, never passed on as a Referer.
-  res.setHeader('Cache-Control', INVITE_CACHE_CONTROL)
-  res.setHeader('Referrer-Policy', 'no-referrer')
-  if (!INVITE_TOKEN_RE.test(token)) {
-    res.statusCode = 404
-    return { props: { preview: null, token: '', unavailable: false } }
-  }
-  try {
-    const preview = await withTimeout(orgInviteLinkPreview(token), SSR_DATA_TIMEOUT_MS)
-    if (!preview) res.statusCode = 404
-    return { props: { preview, token: preview ? token : '', unavailable: false } }
-  } catch (error) {
-    console.error('Invite preview unavailable:', error instanceof Error ? error.name : 'error')
-    res.statusCode = 503
-    res.setHeader('Retry-After', '30')
-    return { props: { preview: null, token: '', unavailable: true } }
-  }
-}
+export const getServerSideProps: GetServerSideProps<InvitePageProps> = ({ params, res }) => loadInvitePage(params?.token, res)
 
 export default InvitePage

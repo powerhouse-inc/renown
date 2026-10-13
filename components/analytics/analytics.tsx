@@ -5,6 +5,7 @@ import Router from 'next/router'
 import { useSyncExternalStore } from 'react'
 import { ANALYTICS_APP, readProfileHint } from '../../services/analytics'
 import { AnalyticsIdentity } from './analytics-identity'
+import { ArrivalEvent } from './arrival-event'
 import { SCRUB_SHARE_FRAGMENTS } from './scrub-share-fragments'
 
 // Playwright runs the dev server with NEXT_PUBLIC_E2E_AUTH=1: a test can then
@@ -64,7 +65,15 @@ export function Analytics() {
   // Also null while the URL holds a secret (a /verify share fragment, an invite token): mounting waits until it is gone.
   const cookies = useSyncExternalStore(subscribe, clientSnapshot, () => null)
 
-  if (cookies === null) return null
+  return (
+    <>
+      <ArrivalEvent />
+      {cookies !== null && <OpenPanel cookies={cookies} />}
+    </>
+  )
+}
+
+function OpenPanel({ cookies }: { cookies: string }) {
   const clientId = openPanelClientId()
   if (!clientId) return null
   const profileId = readProfileHint(cookies)

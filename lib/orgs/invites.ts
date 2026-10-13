@@ -7,6 +7,12 @@ export const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/
 /** The invite page's Cache-Control: its URL carries a secret, so no cache may store it. */
 export const INVITE_CACHE_CONTROL = 'private, no-store'
 
+/** Sets the invite page's headers on every answer (preview, 404, 503): never stored by a cache, never passed on as a Referer. */
+export function setInviteHeaders(res: { setHeader(name: string, value: string): unknown }): void {
+  res.setHeader('Cache-Control', INVITE_CACHE_CONTROL)
+  res.setHeader('Referrer-Policy', 'no-referrer')
+}
+
 export type InviteLinkState = 'usable' | 'expired' | 'revoked' | 'full'
 
 export function inviteLinkState(preview: { usable: boolean; expired: boolean; revoked: boolean; full: boolean }): InviteLinkState {
