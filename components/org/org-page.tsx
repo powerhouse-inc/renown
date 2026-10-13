@@ -4,6 +4,7 @@ import { IdentityArt } from '../identity/identity-art'
 import { LinkChips } from '../identity/link-chip'
 import { PageSection } from '../identity/page-section'
 import { ShareMenu } from '../identity/share-menu'
+import { ReportOrgButton } from './report-org-button'
 import { ProfileAvatar } from '../profile/profile-avatar'
 import { PageMeta } from '../site/page-meta'
 import { Badge, Container, Heading } from '../site/primitives'
@@ -132,6 +133,7 @@ export function OrgPage({ data }: { data: OrgPageData }) {
                 <OrgAvatar org={org} className="h-20 w-20" />
               </span>
               <div className="flex items-center gap-2 pb-1">
+                <ReportOrgButton org={org} />
                 <ShareMenu url={canonicalUrl} title={`${org.name} on Renown`} qr={qr} subject="this organisation" />
               </div>
             </div>
