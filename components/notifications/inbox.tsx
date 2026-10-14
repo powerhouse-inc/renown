@@ -31,6 +31,7 @@ function InboxList({ address }: { address: string }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [attempt, setAttempt] = useState(0)
   const [list, setList] = useState<ListState | null>(null)
+  const [markFailed, setMarkFailed] = useState(false)
   const key = `${address}:${filter}:${attempt}`
 
   useEffect(() => {
@@ -77,9 +78,12 @@ function InboxList({ address }: { address: string }) {
   }, [current, filter, getBearer, key])
 
   async function markRead(target: { ids: string[] } | { all: true }) {
+    setMarkFailed(false)
     try {
       await withBearer(getBearer, (bearer) => markNotificationsRead(target, bearer))
     } catch {
+      // Marking read is idempotent: say so, and the same button tries again.
+      setMarkFailed(true)
       return
     }
     const at = new Date().toISOString()
@@ -99,6 +103,9 @@ function InboxList({ address }: { address: string }) {
   }
 
   const unread = current?.items.filter((n) => !n.readAt).length ?? 0
+  // "Mark all" marks every unread notification on the server ({ all: true }), loaded or not:
+  // it stays available while more pages may hold unread ones.
+  const canMarkAll = current !== null && current.status === 'ready' && (unread > 0 || current.next !== null)
 
   return (
     <>
@@ -111,13 +118,18 @@ function InboxList({ address }: { address: string }) {
         </div>
         <button
           type="button"
-          disabled={!current || unread === 0}
+          disabled={!canMarkAll}
           onClick={() => void markRead({ all: true })}
           className={buttonClasses('secondary', 'md')}
         >
           Mark all as read
         </button>
       </div>
+      {markFailed && (
+        <p role="alert" className="text-danger-ink mt-4 text-sm">
+          Your notifications were not marked as read. Try again.
+        </p>
+      )}
       <div className="mt-6 flex gap-2">
         {(['all', 'unread'] as const).map((value) => (
           <button

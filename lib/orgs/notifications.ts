@@ -17,6 +17,8 @@ const PROPOSAL_TEXT: Record<OrgProposalKind, string> = {
   UNFREEZE_APP: 'unfreeze an app',
 }
 
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+
 function payloadOf(n: NotificationView): Record<string, unknown> {
   try {
     const value: unknown = JSON.parse(n.payload)
@@ -33,10 +35,13 @@ function text(value: unknown): string | null {
 }
 
 function who(value: unknown): string {
-  return typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value)
+  return typeof value === 'string' && ADDRESS_RE.test(value)
     ? shortAddress(value.toLowerCase())
     : 'Someone'
 }
+
+// The app DID shape (services/app-profiles APP_DID_RE), kept here so the inbox bundle stays free of the app reads.
+const APP_DID_RE = /^did:key:z[1-9A-HJ-NP-Za-km-z]{32,128}$/
 
 function proposalText(kind: unknown): string {
   return typeof kind === 'string' && Object.hasOwn(PROPOSAL_TEXT, kind)
@@ -75,7 +80,7 @@ export function notificationText(n: NotificationView): string {
         ? `The proposal to ${proposal} in ${org} expired.`
         : `The proposal to ${proposal} in ${org} was cancelled.`
     case 'RECOVERY_STARTED':
-      return `Someone started recovering ${org}${text(p.domain) ? ` through ${text(p.domain)}` : ''}. Any owner can cancel it within 7 days.`
+      return `Someone started recovering ${org}${text(p.domain) ? ` through ${text(p.domain)}` : ''}. Any owner can cancel it before it takes effect.`
     case 'APP_TRANSFER_REQUEST':
       return text(p.from) === n.orgId
         ? `${Org} wants to transfer an app to you.`
@@ -111,8 +116,15 @@ export function notificationHref(n: NotificationView): string {
     case 'RECOVERY_STARTED':
     case 'DELEGATION_ADDED':
       return manageHref(handle, 'security')
+    case 'APP_TRANSFER_DONE': {
+      // A person on either side is told too, and cannot open the manage pages: anyone can
+      // open the app's own page, which shows its publisher now.
+      const person = [p.from, p.to].some((party) => typeof party === 'string' && ADDRESS_RE.test(party))
+      if (!person) return manageHref(handle, 'apps')
+      const appDid = text(p.appDid)
+      return appDid && APP_DID_RE.test(appDid) ? `/app/${appDid}` : orgPath(handle)
+    }
     case 'APP_TRANSFER_REQUEST':
-    case 'APP_TRANSFER_DONE':
     case 'APP_FROZEN':
       return manageHref(handle, 'apps')
     case 'DOMAIN_LAPSED':

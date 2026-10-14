@@ -73,7 +73,17 @@ test.describe('notification wording', () => {
     expect(
       notificationText(note('RECOVERY_STARTED', { kind: 'RECOVER', domain: 'acme.example' })),
     ).toBe(
-      'Someone started recovering Acme Inbox through acme.example. Any owner can cancel it within 7 days.',
+      'Someone started recovering Acme Inbox through acme.example. Any owner can cancel it before it takes effect.',
+    )
+    // A transfer done with a person on one side: the person cannot open the manage pages, so
+    // the app's own page; an org-to-org transfer goes to the apps section.
+    const PERSON = '0x0b000000000000000000000000000000000000b2'
+    const APP = 'did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK'
+    expect(notificationHref(note('APP_TRANSFER_DONE', { appDid: APP, from: PERSON, to: INBOX_ORG.id }))).toBe(`/app/${APP}`)
+    expect(notificationHref(note('APP_TRANSFER_DONE', { appDid: APP, from: INBOX_ORG.id, to: PERSON }))).toBe(`/app/${APP}`)
+    expect(notificationHref(note('APP_TRANSFER_DONE', { appDid: '../x', from: INBOX_ORG.id, to: PERSON }))).toBe('/@acme-inbox')
+    expect(notificationHref(note('APP_TRANSFER_DONE', { appDid: APP, from: INBOX_ORG.id, to: 'org-other' }))).toBe(
+      '/org/acme-inbox/manage/apps',
     )
     expect(notificationHref(note('APP_TRANSFER_REQUEST', { from: INBOX_ORG.id }))).toBe(
       '/me#app-transfers',
@@ -224,6 +234,45 @@ test.describe('header and inbox', () => {
     ])
     await page.getByRole('button', { name: 'Unread', exact: true }).click()
     await expect.poll(() => unreadOnly.includes(true)).toBe(true)
+  })
+
+  test('mark all as read covers unread beyond the loaded page, and a failure is shown', async ({ page }) => {
+    await standInSession(page)
+    const marked: unknown[] = []
+    let fail = true
+    await page.route(`${STUB_SWITCHBOARD_URL}/graphql/renown-orgs**`, async (route: Route) => {
+      const body = route.request().postDataJSON() as { query: string; variables: Record<string, unknown> }
+      if (body.query.includes('query MyNotifications')) {
+        // The first page is all read, but more pages follow.
+        return route.fulfill({
+          json: {
+            data: {
+              myNotifications: {
+                items: [note('ROLE_CHANGED', { from: 'MEMBER', to: 'ADMIN' }, { readAt: '2026-10-12T11:00:00.000Z' })],
+                next: 'cursor-2',
+              },
+            },
+          },
+        })
+      }
+      if (body.query.includes('mutation MarkNotificationsRead')) {
+        marked.push(body.variables)
+        if (fail) return route.fulfill({ json: { data: null, errors: [{ message: 'down', extensions: { code: 'SERVICE_UNAVAILABLE' } }] } })
+        return route.fulfill({ json: { data: { markNotificationsRead: 3 } } })
+      }
+      return route.continue()
+    })
+    await page.goto('/notifications')
+    await expect(page.getByRole('list', { name: 'Notifications' })).toBeVisible({ timeout: 30_000 })
+    const markAll = page.getByRole('button', { name: 'Mark all as read' })
+    await expect(markAll).toBeEnabled()
+    await markAll.click()
+    const problem = page.getByText('Your notifications were not marked as read. Try again.')
+    await expect(problem).toBeVisible()
+    fail = false
+    await markAll.click()
+    await expect(problem).toHaveCount(0)
+    expect(marked).toEqual([{ all: true }, { all: true }])
   })
 
   test('the inbox asks visitors to sign in', async ({ page }) => {
