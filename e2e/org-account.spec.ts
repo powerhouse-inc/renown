@@ -324,7 +324,11 @@ test.describe('/me organisations', () => {
         response: { data: { [name.charAt(0).toLowerCase() + name.slice(1)]: value } },
       })
     }
-    await page.goto('/me')
+    // A client-side move from the sign-in page: the connected wallet and the loaded wallet
+    // bundle carry over, instead of a second full load that starts and reconnects them again
+    // (the slow part of this test under load, not the writes it is about).
+    await page.evaluate(() => (window as unknown as { next: { router: { push: (url: string) => Promise<boolean> } } }).next.router.push('/me'))
+    await expect(page).toHaveURL(/\/me$/)
     const section = page.getByRole('region', { name: 'Organisations' })
     await expect(section).toBeVisible({ timeout: 30_000 })
     const row = section
