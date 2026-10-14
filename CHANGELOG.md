@@ -1,3 +1,12 @@
+## <small>1.25.1 (2026-10-14)</small>
+
+* fix(orgs): manage polish: domain refusal reasons, confirm focus, rotated secret in its row, webhook  ([b2fc108](https://github.com/powerhouse-inc/renown/commit/b2fc108))
+* fix(orgs): never cache a failed membership read as none; start the app page's reads together (Minors ([4e257ae](https://github.com/powerhouse-inc/renown/commit/4e257ae))
+* fix(orgs): notification links and copy match the backend; the inbox reports failures and marks all u ([3ab5596](https://github.com/powerhouse-inc/renown/commit/3ab5596))
+* fix(verify): a recorded attestation for a non-publisher is a warning, not Genuine ([6f39480](https://github.com/powerhouse-inc/renown/commit/6f39480))
+* test(orgs): deflake the /me invite test by moving to /me client-side after sign-in (Minor 16) ([77c3f25](https://github.com/powerhouse-inc/renown/commit/77c3f25))
+* ci(e2e): run the org SDL conformance spec in CI (Minor 7) ([c0f246d](https://github.com/powerhouse-inc/renown/commit/c0f246d))
+
 ## 1.25.0 (2026-10-13)
 
 * fix(me): force a fresh Renown bearer when withBearer retries after a 401 ([4d23e78](https://github.com/powerhouse-inc/renown/commit/4d23e78))
