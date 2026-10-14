@@ -67,6 +67,7 @@ jobs:
           e2e/app-provenance.spec.ts
           e2e/verify-orgs.spec.ts
           e2e/org-reports.spec.ts
+          e2e/org-sdl-conformance.spec.ts
           --workers=2
 
       # Always uploaded: the layout cases attach a full-page screenshot each (the gallery).
