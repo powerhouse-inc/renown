@@ -73,7 +73,8 @@ export function DomainsSection({ ctx }: ManageSectionProps) {
   async function remove(domain: OrgDomain) {
     setBusy(domain.id)
     const done = await ctx.run<boolean>('removeOrgDomain', { orgId: org.id, domainId: domain.id }, `${domain.domain} was removed.`, {
-      errorText: { FORBIDDEN: OWNERS_ONLY },
+      // Only a verified domain is owners-only; any other denial keeps the general text.
+      ...(domain.status === 'VERIFIED' ? { errorText: { FORBIDDEN: OWNERS_ONLY } } : {}),
       recheck: domains.reload,
     })
     setBusy(null)

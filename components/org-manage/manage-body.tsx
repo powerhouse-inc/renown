@@ -182,7 +182,9 @@ function ManageOrg({
       }
       return null
     }
-    show('error', options.errorText?.[result.code] ?? result.message)
+    // A section's FORBIDDEN text explains a denial; a replayed or read-only refusal keeps its own.
+    const sectionText = result.code === 'FORBIDDEN' && result.reason !== 'denied' ? undefined : options.errorText?.[result.code]
+    show('error', sectionText ?? result.message)
     if (result.reason === 'replayed') {
       // The signed request was already applied once: re-read what it changed.
       options.recheck?.()

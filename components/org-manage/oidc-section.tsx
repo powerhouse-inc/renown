@@ -18,18 +18,18 @@ function ClientRow({
   ctx,
   client,
   onChange,
-  onSecret,
 }: {
   ctx: ManageContext
   client: OrgOidcClient
   onChange: () => void
-  onSecret: (c: OrgOidcClientCredentials) => void
 }) {
   // D6: an archived or taken-down organisation reads its clients DISABLED and refuses writes.
   const readonly = ctx.org.archived || ctx.org.takenDown
   const [uri, setUri] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // A rotated secret is shown once, in this client's own row.
+  const [rotated, setRotated] = useState<OrgOidcClientCredentials | null>(null)
   const { ask, dialog } = useConfirm()
 
   async function update(args: Record<string, unknown>, success: string) {
@@ -64,7 +64,7 @@ function ClientRow({
       { recheck: onChange },
     )
     setBusy(false)
-    if (done) onSecret(done)
+    if (done) setRotated(done)
   }
 
   return (
@@ -158,6 +158,7 @@ function ClientRow({
           </button>
         </div>
       )}
+      {rotated && <SecretOnce label={`New secret of ${client.name}`} value={rotated.clientSecret} />}
       {dialog}
     </li>
   )
@@ -283,7 +284,6 @@ export function OidcSection({ ctx }: ManageSectionProps) {
                     ctx={ctx}
                     client={client}
                     onChange={clients.reload}
-                    onSecret={setSecret}
                   />
                 ))}
               </ul>

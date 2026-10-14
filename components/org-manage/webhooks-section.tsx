@@ -111,6 +111,7 @@ export function WebhooksSection({ ctx }: ManageSectionProps) {
   }
 
   const count = hooks.state.status === 'ready' ? hooks.state.value.length : 0
+  const full = count >= MAX_WEBHOOKS
 
   return (
     <div className="mt-6 space-y-8">
@@ -142,9 +143,21 @@ export function WebhooksSection({ ctx }: ManageSectionProps) {
               ))}
             </ul>
           </fieldset>
-          <button type="submit" disabled={busy === 'create' || hooks.pending || count >= MAX_WEBHOOKS} className={buttonClasses('primary', 'md')}>
-            Add webhook
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={busy === 'create' || hooks.pending || full}
+              aria-describedby={full ? 'webhook-cap' : undefined}
+              className={buttonClasses('primary', 'md')}
+            >
+              Add webhook
+            </button>
+            {full && (
+              <p id="webhook-cap" className="text-ink-muted text-sm">
+                This organisation has {MAX_WEBHOOKS} webhooks, the most allowed. Delete one to add another.
+              </p>
+            )}
+          </div>
         </form>
         {secret && (
           <SecretOnce label="Webhook signing secret" value={secret}>

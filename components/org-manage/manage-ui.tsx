@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Remote } from '../../hooks/use-remote'
 import { orgErrorText } from '../../lib/orgs/errors'
 import { cx } from '../../utils/cx'
@@ -96,9 +96,29 @@ export function ConfirmButton({
   busy?: boolean
 }) {
   const [asking, setAsking] = useState(false)
+  // Keyboard focus follows the swap: to the confirm control when it appears, and back to the
+  // first button when the question goes away (once it is enabled again after a write).
+  const trigger = useRef<HTMLButtonElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
+  const returnFocus = useRef(false)
+  useEffect(() => {
+    if (asking) {
+      confirmRef.current?.focus()
+    } else if (returnFocus.current && trigger.current && !trigger.current.disabled) {
+      returnFocus.current = false
+      // Never pull focus away from where someone moved it during a write.
+      const focused = document.activeElement
+      if (!focused || focused === document.body) trigger.current.focus()
+    }
+  }, [asking, busy])
+  function stopAsking() {
+    returnFocus.current = true
+    setAsking(false)
+  }
   if (!asking) {
     return (
       <button
+        ref={trigger}
         type="button"
         disabled={busy}
         aria-label={ariaLabel}
@@ -110,23 +130,28 @@ export function ConfirmButton({
     )
   }
   return (
-    <span className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-2">
+    <span
+      className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-2"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          stopAsking()
+        }
+      }}
+    >
       <button
+        ref={confirmRef}
         type="button"
         disabled={busy}
         onClick={() => {
-          setAsking(false)
+          stopAsking()
           onConfirm()
         }}
         className={buttonClasses('secondary', 'md', cx('border-danger-ink/50 text-danger-ink', LONG_LABEL))}
       >
         {confirm}
       </button>
-      <button
-        type="button"
-        onClick={() => setAsking(false)}
-        className={buttonClasses('ghost', 'md')}
-      >
+      <button type="button" onClick={stopAsking} className={buttonClasses('ghost', 'md')}>
         Cancel
       </button>
     </span>

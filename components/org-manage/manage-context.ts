@@ -10,7 +10,7 @@ export interface RunOptions {
    * section shows the re-read state before anyone retries.
    */
   recheck?: () => void
-  /** Section-specific texts for some failure codes (e.g. a RATE_LIMITED limit). */
+  /** Section-specific texts for some failure codes (e.g. a RATE_LIMITED limit). FORBIDDEN applies only to a denial, not to a replayed or read-only refusal. */
   errorText?: Partial<Record<OrgFailureCode, string>>
 }
 

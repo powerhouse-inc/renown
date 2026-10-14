@@ -52,7 +52,9 @@ test.describe('manage: sign-in clients', () => {
     await client.getByRole('button', { name: 'Rotate the secret of Acme intranet' }).click()
     await page.getByRole('button', { name: 'Yes, rotate it' }).click()
     expect(await signedWrite(setup.wallet, 'rotateOrgOidcClientSecret', setup.orgId)).toEqual({ orgId: setup.orgId, clientId: 'client-1' })
-    await expect(page.getByRole('region', { name: 'Client secret' })).toContainText('secret-rotated-BBBBBBBB')
+    // The rotated secret shows in its client's row, named for it; the register panel keeps the new client's.
+    await expect(client.getByRole('region', { name: 'New secret of Acme intranet' })).toContainText('secret-rotated-BBBBBBBB')
+    await expect(page.getByRole('region', { name: 'Client secret' })).not.toContainText('secret-rotated-BBBBBBBB')
 
     await client.getByLabel('Add a redirect URI').fill('https://intranet.acme.example/other')
     await client.getByRole('button', { name: 'Add URI' }).click()

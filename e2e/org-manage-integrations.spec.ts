@@ -65,7 +65,86 @@ test.describe('manage: domains', () => {
   })
 })
 
+test.describe('manage: confirm buttons and focus', () => {
+  test('focus moves to the confirm control and back to the button on cancel', async ({ page }) => {
+    await openManagePage(page, {
+      role: 'OWNER',
+      section: 'domains',
+      answers: { OrgDomains: (v) => ({ orgDomains: [orgDomain({ orgId: String(v.orgId), id: 'd-focus', domain: 'focus.example' })] }) },
+    })
+    const remove = page.getByRole('button', { name: 'Remove focus.example' })
+    await remove.focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('button', { name: 'Yes, remove focus.example' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(remove).toBeFocused()
+    // Escape also steps back.
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('button', { name: 'Yes, remove focus.example' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(remove).toBeFocused()
+  })
+})
+
+test.describe('manage: domain removal refusals', () => {
+  test('says why a removal was refused: owners only, already sent, or read-only', async ({ page }) => {
+    const setup = await openManagePage(page, {
+      role: 'OWNER',
+      section: 'domains',
+      answers: {
+        OrgDomains: (v) => ({
+          orgDomains: [
+            orgDomain({ orgId: String(v.orgId), id: 'd-denied', domain: 'denied.example', status: 'VERIFIED', verifiedAt: '2026-10-01T10:00:00.000Z' }),
+            orgDomain({ orgId: String(v.orgId), id: 'd-replayed', domain: 'replayed.example' }),
+            orgDomain({ orgId: String(v.orgId), id: 'd-readonly', domain: 'readonly.example' }),
+            orgDomain({ orgId: String(v.orgId), id: 'd-pending-denied', domain: 'pending-denied.example' }),
+          ],
+        }),
+      },
+    })
+    const refuse = (domainId: string, message: string) =>
+      fixtureStub({ match: 'mutation RemoveOrgDomain', variables: domainId, response: { data: null, errors: [{ message, extensions: { code: 'FORBIDDEN' } }] } })
+    await refuse('d-denied', 'Not allowed')
+    await refuse('d-replayed', 'Signature already used')
+    await refuse('d-readonly', 'Organisation is archived or taken down')
+    await refuse('d-pending-denied', 'Not allowed')
+
+    const list = page.getByRole('list', { name: 'Domains' })
+    async function remove(domain: string) {
+      await list.getByRole('listitem').filter({ hasText: domain }).getByRole('button', { name: `Remove ${domain}` }).click()
+      await page.getByRole('button', { name: `Yes, remove ${domain}` }).click()
+    }
+    await remove('denied.example')
+    await expect(page.getByText('Only owners can remove a verified domain.')).toBeVisible()
+    await remove('replayed.example')
+    await expect(page.getByText('This request was already sent. Reload to see the result.')).toBeVisible()
+    await remove('readonly.example')
+    await expect(page.getByText('This organisation can no longer be changed.')).toBeVisible()
+    // A pending domain is not owners-only: a denial there keeps the general text.
+    await remove('pending-denied.example')
+    await expect(page.getByText('You are not allowed to do this', { exact: false })).toBeVisible()
+  })
+})
+
 test.describe('manage: webhooks', () => {
+  test('at the cap, the add button says why it is disabled', async ({ page }) => {
+    await openManagePage(page, {
+      role: 'ADMIN',
+      section: 'webhooks',
+      answers: {
+        OrgWebhooks: (v) => ({
+          orgWebhooks: Array.from({ length: 10 }, (_, i) => orgWebhook({ orgId: String(v.orgId), id: `hook-cap-${i}`, url: `https://hooks.acme.example/${i}` })),
+        }),
+      },
+    })
+    const add = page.getByRole('button', { name: 'Add webhook' })
+    await expect(add).toBeDisabled()
+    await expect(add).toHaveAccessibleDescription('This organisation has 10 webhooks, the most allowed. Delete one to add another.')
+    await expect(page.getByText('This organisation has 10 webhooks, the most allowed. Delete one to add another.')).toBeVisible()
+  })
+
   test('shows the webhook secret once, tests, disables and lists deliveries', async ({ page }) => {
     const setup = await openManagePage(page, {
       role: 'ADMIN',
