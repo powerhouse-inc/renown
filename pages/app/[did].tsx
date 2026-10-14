@@ -188,7 +188,13 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
     notAffiliatedWith: null,
   }
   let app: RenownAppProfile | null = null
+  // Reads keyed by the DID alone start with the profile read rather than after it, so a slow
+  // provenance or stats answer costs one SSR budget at most, not one more per step.
+  let provenanceRead: Promise<AppProvenance | null> = Promise.resolve(null)
+  let statsRead: Promise<AppStats | null> = Promise.resolve(null)
   if (APP_DID_RE.test(did)) {
+    provenanceRead = optional(fetchAppProvenance(did), null)
+    statsRead = optional(getAppStats(did), null)
     try {
       app = await fetchAppProfile(did)
     } catch (error) {
@@ -215,22 +221,34 @@ export const getServerSideProps: GetServerSideProps<AppPageProps> = async (conte
       return fallback
     })
   // Organisation provenance has its own query: a switchboard without it loses only this part.
-  const provenance = await optional(fetchAppProvenance(did), null)
-  const publisherOrg = provenance?.publisherOrg ?? null
-  const [publisher, stats, byPublisher, inCategory, org, latest] = await Promise.all([
+  // Reads that do not need it run beside it; the org reads start as soon as it answers, and the
+  // signer's profile as soon as the latest attestation does.
+  const orgReads = (async () => {
+    const provenance = await provenanceRead
+    const publisherOrg = provenance?.publisherOrg ?? null
+    if (!publisherOrg) return { provenance, publisherOrg, org: null, latest: null, signer: null, byOrg: [] }
+    const latestRead = orgOptional(releaseAttestations(did, 1, context.req).then((page) => page.items[0] ?? null), null)
+    const signerRead = latestRead.then((latest) => {
+      const address = latest?.signer.toLowerCase()
+      return address ? optional(getProfile({ driveId: `renown-${address}`, ethAddress: address }), null) : null
+    })
+    const [org, latest, signer, byOrg] = await Promise.all([
+      orgOptional(fetchOrganization({ id: publisherOrg.id }, null, context.req), null),
+      latestRead,
+      signerRead,
+      publisherAddress ? Promise.resolve([]) : optional(listAppProfiles({ limit: 5, orgId: publisherOrg.id }).then((page) => page.items), []),
+    ])
+    return { provenance, publisherOrg, org, latest, signer, byOrg }
+  })()
+  const [publisher, stats, byAddress, inCategory, { provenance, publisherOrg, org, latest, signer, byOrg }] = await Promise.all([
     publisherAddress ? optional(getProfile({ driveId: `renown-${publisherAddress}`, ethAddress: publisherAddress }), null) : Promise.resolve(null),
-    optional(getAppStats(did), null),
-    publisherAddress
-      ? optional(getAppProfilesByPublisher(publisherAddress), [])
-      : publisherOrg
-        ? optional(listAppProfiles({ limit: 5, orgId: publisherOrg.id }).then((page) => page.items), [])
-        : Promise.resolve([]),
+    statsRead,
+    publisherAddress ? optional(getAppProfilesByPublisher(publisherAddress), []) : Promise.resolve([]),
     app.category ? optional(listAppProfiles({ limit: 4, category: app.category }).then((page) => page.items), []) : Promise.resolve([]),
-    publisherOrg ? orgOptional(fetchOrganization({ id: publisherOrg.id }, null, context.req), null) : Promise.resolve(null),
-    publisherOrg ? orgOptional(releaseAttestations(did, 1, context.req).then((page) => page.items[0] ?? null), null) : Promise.resolve(null),
+    orgReads,
   ])
+  const byPublisher = publisherAddress ? byAddress : byOrg
   const signerAddress = latest?.signer.toLowerCase() ?? null
-  const signer = signerAddress ? await optional(getProfile({ driveId: `renown-${signerAddress}`, ethAddress: signerAddress }), null) : null
   const orgPublisher: OrgSummary | null = org
     ? { id: org.id, did: org.did, handle: org.handle, name: org.name, avatar: org.avatar, verifiedDomains: org.verifiedDomains }
     : publisherOrg

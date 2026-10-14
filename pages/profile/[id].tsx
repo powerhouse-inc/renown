@@ -45,8 +45,8 @@ interface ProfilePageProps {
   qr: QrCode | null
   /** Set when /@handle belongs to an organisation: the page renders OrgPage instead. */
   org: OrgPageData | null
-  /** The person's public organisation memberships. */
-  memberOf: OrgAffiliation[]
+  /** The person's public organisation memberships; null when they could not be read. */
+  memberOf: OrgAffiliation[] | null
   error?: string
 }
 
@@ -76,7 +76,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ profile, ensVerified, art, ap
   ]
   // Only http(s) links are ever shown; the rest count as no links at all.
   const links = (profile.links ?? []).filter((link) => linkTarget(link.url))
-  const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0 || memberOf.length > 0
+  const hasContent = Boolean(profile.bio?.trim()) || links.length > 0 || apps.length > 0 || groups.length > 0 || memberOf === null || memberOf.length > 0
   const path = profilePath(profile)
   const url = canonicalUrl ?? path
   const image = profile.avatar && canonicalUrl ? mediaUrl(profile.documentId, 'avatar', new URL(canonicalUrl).origin, profile.avatar) : null
@@ -198,14 +198,16 @@ export const getServerSideProps: GetServerSideProps<ProfilePageProps> = async (c
   const address = profile.ethAddress ?? ''
   const wallet = ADDRESS_RE.test(address)
   const ogImage = wallet ? ogImageUrl({ variant: 'profile', address }, origin) : ogImageUrl({ variant: 'default' }, origin)
-  context.res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120')
   // Secondary sections: each drops out on failure or timeout; the profile always renders.
+  // Memberships are the exception: a failed read (an outage or RATE_LIMITED) is shown as not
+  // loaded, never as "no organisations", and the page is not cached.
   const [ensVerified, apps, stats, memberOf] = await Promise.all([
     isEnsVerified(profile.username, profile.ethAddress),
     wallet ? optional(getAppProfilesByPublisher(address.toLowerCase()), []) : Promise.resolve([]),
     wallet ? optional(getUserStats(address), []) : Promise.resolve([]),
-    wallet ? optional(organizationsByMember(address.toLowerCase(), null, context.req), []) : Promise.resolve([]),
+    wallet ? optional<OrgAffiliation[] | null>(organizationsByMember(address.toLowerCase(), null, context.req), null) : Promise.resolve([]),
   ])
+  context.res.setHeader('Cache-Control', orgPageCacheControl(memberOf === null))
   // The same URL as <link rel=canonical> (PageMeta), so share, QR and JSON-LD agree with it.
   const canonicalUrl = siteCanonicalUrl(profilePath(profile))
   return {

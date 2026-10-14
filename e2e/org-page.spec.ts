@@ -57,6 +57,15 @@ const PERSON = {
   updatedAt: '2026-10-09T10:00:00.000Z',
 }
 
+// A person whose memberships cannot be read (RATE_LIMITED).
+const BUSY_PERSON = {
+  ...PERSON,
+  documentId: 'doc-org-member-busy',
+  ethAddress: '0x0a00000000000000000000000000000000000b33',
+  displayName: 'Rita Busy',
+  handle: 'rita-busy',
+}
+
 test.beforeAll(async () => {
   const org = (value: unknown) => ({ data: { organization: value } })
   await fixtureStub({ match: 'query OrgByRef', variables: '"acme-page"', response: org(ORG) })
@@ -108,6 +117,8 @@ test.beforeAll(async () => {
   })
   await fixtureStub({ match: 'query OrgDidDocument', variables: ORG_ID, response: { data: { organizationDidDocument: JSON.stringify(DID_DOC) } } })
   await fixtureStub({ match: 'renownUsers', variables: '"lena-member"', response: { data: { renownUsers: [PERSON] } } })
+  await fixtureStub({ match: 'renownUsers', variables: '"rita-busy"', response: { data: { renownUsers: [BUSY_PERSON] } } })
+  await fixtureStub({ match: 'query OrgsByMember', variables: BUSY_PERSON.ethAddress, response: graphqlError('Too many requests', 'RATE_LIMITED') })
   await fixtureStub({
     match: 'query OrgsByMember',
     variables: PERSON.ethAddress,
@@ -227,5 +238,14 @@ test.describe('organisation page', () => {
     const chip = section.getByRole('link', { name: /Acme Page Works/ })
     await expect(chip).toHaveAttribute('href', '/@acme-page')
     await expect(chip).toContainText('Publisher')
+  })
+
+  // Not cached either: the page sends orgPageCacheControl(true), 'no-store' (not asserted on the response: next dev rewrites a page's Cache-Control).
+  test('a membership read that fails is shown as not loaded, not as no organisations', async ({ page }) => {
+    const res = await page.goto('/@rita-busy')
+    expect(res?.status()).toBe(200)
+    const section = page.getByRole('region', { name: 'Member of' })
+    await expect(section).toContainText('We couldn’t load this person’s organisations right now.')
+    await expect(section.getByRole('link')).toHaveCount(0)
   })
 })
