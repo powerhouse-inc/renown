@@ -218,17 +218,35 @@ export async function verifyAttestation(raw: Record<string, unknown>, deps: Veri
   // undefined: the publisher could not be looked up; null: no organisation publishes the app.
   const org = app.publisherOrg
   const publisherLabel = 'Published by'
+  // The attestation names a publisher other than the app's current one (only when that is known).
+  let otherPublisher = false
   if (forged) checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: SKIPPED_DETAIL })
-  else if (a.orgId === '') checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: 'It was signed for an app a person publishes.' })
-  else if (org && org.id === a.orgId) {
+  else if (a.orgId === '') {
+    if (org) {
+      otherPublisher = true
+      checks.push({ id: 'publisher', label: publisherLabel, status: 'fail', detail: `It was signed for an app a person published, but ${org.name} publishes this app now.` })
+    } else checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: 'It was signed for an app a person publishes.' })
+  } else if (org && org.id === a.orgId) {
     checks.push({ id: 'publisher', label: publisherLabel, status: 'pass', detail: `${org.name} publishes this app${org.verifiedDomains.length ? `, verified as ${org.verifiedDomains[0]}` : ''}.` })
   } else if (deps.orgs && org === undefined) {
     checks.push({ id: 'publisher', label: publisherLabel, status: 'unknown', detail: 'Renown could not be reached to look up the organisation that publishes this app.' })
-  } else checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: 'It names an organisation that does not publish this app now.' })
+  } else if (deps.orgs) {
+    otherPublisher = true
+    checks.push({ id: 'publisher', label: publisherLabel, status: 'fail', detail: 'It names an organisation that does not publish this app now.' })
+  } else checks.push({ id: 'publisher', label: publisherLabel, status: 'neutral', detail: 'Renown’s organisations were not consulted.' })
 
   // Genuine needs Renown's matching record: a signature alone only proves some wallet signed
   // these fields, not that it may release the app (renown-orgs checks that at attestRelease).
-  const verdict: Verdict = forged ? 'not-genuine' : checks.some((c) => c.status === 'unknown') ? 'unchecked' : record ? 'genuine' : 'unrecorded'
+  // A record for a publisher that no longer (or never) publishes the app is a warning too (I6).
+  const verdict: Verdict = forged
+    ? 'not-genuine'
+    : checks.some((c) => c.status === 'unknown')
+      ? 'unchecked'
+      : !record
+        ? 'unrecorded'
+        : otherPublisher
+          ? 'other-publisher'
+          : 'genuine'
   const who = signerName(party)
   const what = appName(app)
   const publishedBy = a.orgId !== '' && org && org.id === a.orgId ? `published by ${org.name}, ` : ''
@@ -237,6 +255,8 @@ export async function verifyAttestation(raw: Record<string, unknown>, deps: Veri
       ? `Release ${a.version} of ${what} — ${publishedBy}signed off by ${who}.`
       : verdict === 'unrecorded'
         ? `${who} signed release ${a.version} of ${what}, but Renown has no record of it, so it says nothing about who may release ${what}.`
+        : verdict === 'other-publisher'
+        ? `${who} signed release ${a.version} of ${what} for ${a.orgId === '' ? 'a person' : 'an organisation'} that does not publish ${what} now, so it says nothing about who may release it today.`
         : verdict === 'not-genuine'
         ? `This attestation was not signed by the wallet it names, so it proves nothing about release ${a.version}.`
         : outcome === 'unavailable'

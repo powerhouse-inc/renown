@@ -22,8 +22,11 @@ export interface Check {
  * 'not-yet-valid': genuinely signed, but its validity starts in the future.
  * 'not-valid': genuinely signed, but its dates cannot be read.
  */
-/** 'unrecorded': a release attestation with a valid signature that Renown has no matching record of. */
-export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'not-yet-valid' | 'not-valid' | 'unchecked' | 'unrecorded' | 'identity'
+/**
+ * 'unrecorded': a release attestation with a valid signature that Renown has no matching record of.
+ * 'other-publisher': a recorded release attestation naming a publisher that does not publish the app now.
+ */
+export type Verdict = 'genuine' | 'not-genuine' | 'revoked' | 'expired' | 'not-yet-valid' | 'not-valid' | 'unchecked' | 'unrecorded' | 'other-publisher' | 'identity'
 
 export interface SignerParty {
   address: string

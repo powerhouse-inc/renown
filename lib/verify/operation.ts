@@ -282,8 +282,9 @@ export async function verifyOperation(
           ? 'The signature holds, but it covers a legacy hash of a kind that cannot be recomputed, so it does not show what was signed.'
           : 'The signature holds. Enter the document id to check that it belongs to that document.'
         : 'The signature holds, but Renown could not be reached to confirm who authorised its key. Try again in a moment.',
-    // only release attestations are 'unrecorded'
+    // only release attestations are 'unrecorded' or 'other-publisher'
     unrecorded: '',
+    'other-publisher': '',
     identity: '',
   }
   const report: Report = {

@@ -155,6 +155,26 @@ test.describe('release attestations', () => {
     expect(broken).toMatchObject({ verdict: 'not-genuine', summary: 'This is not a complete release attestation: artifactDigest is missing or malformed.' })
   })
 
+  test('a recorded sign-off naming an organisation that does not publish the app now is a warning, not genuine', async () => {
+    // Signed and recorded for another organisation (the app moved since, or it never published it).
+    const other = 'org-verify-other'
+    const { json } = await signedAttestation({}, { orgId: other })
+    const report = await verifyAttestation(json, deps({ attestations: [stored(json, { orgId: other })] }))
+    expect(report.verdict).toBe('other-publisher')
+    expect(status(report)).toEqual({ signature: 'pass', record: 'pass', 'issued-at': 'pass', publisher: 'fail' })
+    expect(report.summary).toBe(
+      `${short(json.signer)} signed release 1.4.0 of Acme Ledger for an organisation that does not publish Acme Ledger now, so it says nothing about who may release it today.`,
+    )
+    // Signed for a person's app, and an organisation publishes it now: the same warning.
+    const personal = await signedAttestation({}, { orgId: '' })
+    const moved = await verifyAttestation(personal.json, deps({ attestations: [stored(personal.json, { orgId: '' })] }))
+    expect(moved.verdict).toBe('other-publisher')
+    expect(moved.checks.find((c) => c.id === 'publisher')?.detail).toBe('It was signed for an app a person published, but Acme publishes this app now.')
+    // Signed for a person's app that a person still publishes: genuine.
+    const still = await verifyAttestation(personal.json, deps({ personalApp: true, attestations: [stored(personal.json, { orgId: '' })] }))
+    expect(still.verdict).toBe('genuine')
+  })
+
   test('a pasted id is cross-checked with releaseAttestation(id) before the 50-item page (D16)', async () => {
     const { json } = await signedAttestation()
     const calls: string[] = []
