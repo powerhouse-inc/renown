@@ -78,6 +78,8 @@ test.beforeAll(async () => {
         id: 'a0c0ffee-0000-4000-8000-00000000a002',
         handle: 'acme-page-copy',
         name: 'Acme Page Works',
+        // Points at the verified org's domain without having verified it.
+        website: 'https://acme-page.example',
         membersPublic: false,
         notAffiliatedWith: orgSummary({ id: ORG_ID, handle: 'acme-page', name: 'Acme Page Works', verifiedDomains: ['acme-page.example'] }),
       }),
@@ -164,6 +166,14 @@ test.describe('organisation page', () => {
     await expect(note).toContainText('Not affiliated with the verified Acme Page Works')
     await expect(note.getByRole('link', { name: 'Acme Page Works' })).toHaveAttribute('href', '/@acme-page')
     await expect(page.getByRole('list', { name: 'Members' })).toHaveCount(0)
+  })
+
+  test('the website link is followed only when the organisation verified that domain', async ({ page }) => {
+    await page.goto('/@acme-page')
+    await expect(page.getByRole('link', { name: 'acme-page.example' })).toHaveAttribute('rel', 'noopener noreferrer')
+    // Same URL, but this organisation has not proven it owns the domain.
+    await page.goto('/@acme-page-copy')
+    await expect(page.getByRole('link', { name: 'acme-page.example' })).toHaveAttribute('rel', 'nofollow noopener noreferrer')
   })
 
   test('an archived organisation is labelled and not indexed', async ({ page }) => {

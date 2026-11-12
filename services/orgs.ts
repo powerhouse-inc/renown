@@ -474,6 +474,17 @@ export async function searchOrganizations(
   return data.organizationSearch
 }
 
+export type OrgHandlePage = { items: Pick<Organization, 'handle' | 'archived' | 'takenDown'>[]; next: string | null }
+
+/** One page of listed organisations for the sitemap: just what it needs to pick URLs. */
+export async function listOrgHandles({ limit, after }: { limit: number; after?: string | null }): Promise<OrgHandlePage> {
+  const data = await orgsRequest<{ organizationSearch: OrgHandlePage }>(
+    `query SitemapOrgs($query: String, $limit: Int, $after: String) { organizationSearch(query: $query, limit: $limit, after: $after) { items { handle archived takenDown } next } }`,
+    { query: '', limit, after: after ?? null },
+  )
+  return data.organizationSearch
+}
+
 /** Public memberships of `address`; with that address's bearer, all its ACTIVE ones (hidden included). */
 export async function organizationsByMember(
   address: string,

@@ -10,6 +10,7 @@ import { PageMeta } from '../site/page-meta'
 import { Badge, Container, Heading } from '../site/primitives'
 import { SiteLayout } from '../site/site-layout'
 import { organizationJsonLd } from '../../lib/json-ld'
+import { isVerifiedWebsite } from '../../lib/orgs/domains'
 import { memberLabel, memberHref, orgPath, plural, roleLabel } from '../../lib/orgs/format'
 import type { OrgPageData } from '../../lib/orgs/org-page-data'
 import { memberSince } from '../../lib/profile-identity'
@@ -113,6 +114,8 @@ export function OrgPage({ data }: { data: OrgPageData }) {
   // Only http(s) links are ever shown.
   const links = org.links.filter((link) => linkTarget(link.url))
   const website = org.website ? linkTarget(org.website) : null
+  // A domain the organisation proved it owns is not a third-party link, so it is followed.
+  const websiteRel = !org.archived && org.website && isVerifiedWebsite(org.website, org.verifiedDomains) ? 'noopener noreferrer' : 'nofollow noopener noreferrer'
 
   return (
     <SiteLayout>
@@ -151,7 +154,7 @@ export function OrgPage({ data }: { data: OrgPageData }) {
             )}
             {org.bio && <p className="text-ink mt-5 max-w-[68ch] leading-7 break-words whitespace-pre-line">{org.bio}</p>}
             {website && org.website && (
-              <a href={org.website} target="_blank" rel="nofollow noopener noreferrer" className="text-primary-ink mt-3 inline-block text-sm font-semibold break-all underline-offset-4 hover:underline">
+              <a href={org.website} target="_blank" rel={websiteRel} className="text-primary-ink mt-3 inline-block text-sm font-semibold break-all underline-offset-4 hover:underline">
                 {website.host}
               </a>
             )}

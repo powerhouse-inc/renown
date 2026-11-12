@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { fixtureStub, removeFixture } from './support/stub-switchboard-client'
-import { renderSitemap } from '../lib/sitemap'
+import { collectOrgHandles, renderSitemap } from '../lib/sitemap'
 
 // The sitemap's appProfiles walk uses limit 50; nothing else reads that page size.
 const APP_DID = 'did:key:z6MkCrawlAppxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx1'
@@ -12,10 +12,28 @@ test.beforeAll(async () => {
     variables: '"limit":50',
     response: { data: { appProfiles: { items: [{ appDid: APP_DID }], next: null } } },
   })
+  // Only the sitemap sends `query SitemapOrgs`, so this cannot answer the /orgs directory.
+  await fixtureStub({
+    id: 'crawl-sitemap-orgs',
+    match: 'query SitemapOrgs',
+    response: {
+      data: {
+        organizationSearch: {
+          items: [
+            { handle: 'crawl-org', archived: false, takenDown: false },
+            { handle: 'crawl-archived', archived: true, takenDown: false },
+            { handle: 'crawl-takendown', archived: false, takenDown: true },
+          ],
+          next: null,
+        },
+      },
+    },
+  })
 })
 
 test.afterAll(async () => {
   await removeFixture('crawl-sitemap')
+  await removeFixture('crawl-sitemap-orgs')
 })
 
 test.describe('crawling', () => {
@@ -36,8 +54,30 @@ test.describe('crawling', () => {
     expect(xml).toContain(`/app/${APP_DID}</loc>`)
   })
 
+  test('sitemap.xml lists listed organisations, but not archived or taken-down ones', async ({ request }) => {
+    const xml = await (await request.get('/sitemap.xml')).text()
+    expect(xml).toContain('/@crawl-org</loc>')
+    expect(xml).not.toContain('crawl-archived')
+    expect(xml).not.toContain('crawl-takendown')
+  })
+
   test('renderSitemap escapes XML', () => {
     expect(renderSitemap('https://x.test', ['did:key:a&b'])).toContain('<loc>https://x.test/app/did:key:a&amp;b</loc>')
+    expect(renderSitemap('https://x.test', [], ['a&b'])).toContain('<loc>https://x.test/@a%26b</loc>')
+  })
+
+  test('collectOrgHandles pages through, stops at the cap, and keeps what it has when a page fails', async () => {
+    const pages: Record<string, { items: { handle: string; archived: boolean; takenDown: boolean }[]; next: string | null }> = {
+      first: { items: [{ handle: 'a', archived: false, takenDown: false }, { handle: 'b', archived: true, takenDown: false }], next: 'p2' },
+      p2: { items: [{ handle: 'c', archived: false, takenDown: false }], next: 'p3' },
+    }
+    const fetchPage = async ({ after }: { limit: number; after?: string | null }) => {
+      const page = pages[after ?? 'first']
+      if (!page) throw new Error('down')
+      return page
+    }
+    expect(await collectOrgHandles(fetchPage)).toEqual(['a', 'c'])
+    expect(await collectOrgHandles(fetchPage, 1)).toEqual(['a'])
   })
 })
 

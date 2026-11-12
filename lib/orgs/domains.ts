@@ -16,6 +16,22 @@ export function normalizeDomain(raw: string): string {
     .replace(/\.$/, '')
 }
 
+/**
+ * True when `website` is on one of the organisation's own verified domains or a
+ * subdomain of one. Proven ownership is what lets the link drop `nofollow`.
+ */
+export function isVerifiedWebsite(website: string, verifiedDomains: string[]): boolean {
+  let host: string
+  try {
+    const url = new URL(website)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
+    host = normalizeDomain(url.hostname)
+  } catch {
+    return false
+  }
+  return verifiedDomains.map(normalizeDomain).some((domain) => domain !== '' && (host === domain || host.endsWith(`.${domain}`)))
+}
+
 export function domainProblem(domain: string): string | null {
   return ORG_DOMAIN_RE.test(domain) ? null : 'Enter a domain such as acme.com.'
 }

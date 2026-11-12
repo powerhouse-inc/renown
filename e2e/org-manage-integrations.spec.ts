@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { domainProblem, normalizeDomain } from '../lib/orgs/domains'
+import { domainProblem, isVerifiedWebsite, normalizeDomain } from '../lib/orgs/domains'
 import { ORG_WEBHOOK_EVENTS, webhookUrlProblem } from '../lib/orgs/webhooks'
 import { orgDelivery, orgDomain, orgWebhook } from './support/org-fixtures'
 import { openManagePage, signedWrite } from './support/org-manage'
@@ -23,6 +23,19 @@ test.describe('domain and webhook rules', () => {
     expect(webhookUrlProblem('https://hooks.example:8443/x')).toBeNull()
     expect(webhookUrlProblem('https://hooks.example:443/x')).toBeNull()
     expect(webhookUrlProblem('https://hooks.example/renown')).toBeNull()
+  })
+
+  test('a website counts as verified only on a verified domain or its subdomains', () => {
+    const verified = ['acme.example']
+    expect(isVerifiedWebsite('https://acme.example', verified)).toBe(true)
+    expect(isVerifiedWebsite('https://WWW.Acme.Example/about', verified)).toBe(true)
+    expect(isVerifiedWebsite('http://docs.acme.example.', verified)).toBe(true)
+    expect(isVerifiedWebsite('https://evilacme.example', verified)).toBe(false)
+    expect(isVerifiedWebsite('https://acme.example.evil.test', verified)).toBe(false)
+    expect(isVerifiedWebsite('https://acme.example@evil.test', verified)).toBe(false)
+    expect(isVerifiedWebsite('javascript:alert(1)', verified)).toBe(false)
+    expect(isVerifiedWebsite('not a url', verified)).toBe(false)
+    expect(isVerifiedWebsite('https://acme.example', [])).toBe(false)
   })
 })
 
