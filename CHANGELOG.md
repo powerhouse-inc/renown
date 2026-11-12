@@ -1,3 +1,7 @@
+## 1.26.0 (2026-11-12)
+
+* feat(orgs): follow verified-domain website links and list organisations in the sitemap ([89d08d5](https://github.com/powerhouse-inc/renown/commit/89d08d5))
+
 ## <small>1.25.1 (2026-10-14)</small>
 
 * fix(orgs): manage polish: domain refusal reasons, confirm focus, rotated secret in its row, webhook  ([b2fc108](https://github.com/powerhouse-inc/renown/commit/b2fc108))
