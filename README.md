@@ -51,11 +51,21 @@ travel this way.
 | `PRIVY_APP_ID` | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy app (email and social sign-in) |
 | `PRIVY_CLIENT_ID` | `NEXT_PUBLIC_PRIVY_CLIENT_ID` | Privy app client |
 | `WALLET_CONNECT_PROJECT_ID` | `NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID` | WalletConnect project |
-| `INFURA_PROJECT_ID` | `NEXT_PUBLIC_VITE_INFURA_PROJECT_ID` | Infura project, for smart-wallet checks |
+| `INFURA_PROJECT_ID` | `NEXT_PUBLIC_VITE_INFURA_PROJECT_ID` | Infura project: the wallets' RPC and smart-wallet checks |
 | `OPENPANEL_CLIENT_ID` | `NEXT_PUBLIC_OPENPANEL_CLIENT_ID` | OpenPanel client (analytics) |
 | `OPENPANEL_API_URL` | `NEXT_PUBLIC_OPENPANEL_API_URL` | OpenPanel API |
 | `RENOWN_DRIVE_ID` | `NEXT_PUBLIC_RENOWN_DRIVE_ID` | The drive profiles live in (default `renown-profiles`) |
 | `RENOWN_ANALYTICS` | none | `off` loads neither OpenPanel nor Umami; anything else leaves them on |
+
+Two pairs resolve together: when `PRIVY_APP_ID` is given at start, `PRIVY_CLIENT_ID` comes from
+the start too (none when not given), never from the build, whose client belongs to another app.
+Likewise `OPENPANEL_API_URL` follows `OPENPANEL_CLIENT_ID`.
+
+Known limit: pages prerendered at build (404, 500, admin/reports, developers, ecosystem, me,
+notifications, org/new, trust, verify) carry the build's origin in their canonical and
+link-preview tags; the browser rewrites them after it loads, but crawlers and link unfurlers see
+the build's. Rendering those pages per request (`getServerSideProps`) would change that, at the
+cost of static rendering.
 
 Read a setting through `runtimeConfig()` from `lib/runtime-config.ts`, never as
 `process.env.NEXT_PUBLIC_*`: a direct read keeps the build's value whatever the deployment sets

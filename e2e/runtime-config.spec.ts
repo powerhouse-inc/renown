@@ -98,4 +98,24 @@ test.describe('runtime config', () => {
     await page.goto('/')
     expect(await page.evaluate(() => window.__RENOWN_CONFIG__?.renownUrl)).toBe('http://localhost:3000')
   })
+
+  test('a Privy app or OpenPanel client given at start takes its partner from the start too, never from the build', () => {
+    const baked = {
+      NEXT_PUBLIC_PRIVY_APP_ID: 'baked-app',
+      NEXT_PUBLIC_PRIVY_CLIENT_ID: 'baked-client',
+      NEXT_PUBLIC_OPENPANEL_CLIENT_ID: 'baked-op',
+      NEXT_PUBLIC_OPENPANEL_API_URL: 'https://openpanel.baked.example.com/api',
+    }
+    expect(serverConfig({ PRIVY_APP_ID: 'company-app' }, baked)).toMatchObject({ privyAppId: 'company-app', privyClientId: '' })
+    expect(serverConfig({ PRIVY_APP_ID: 'company-app', PRIVY_CLIENT_ID: 'company-client' }, baked)).toMatchObject({ privyClientId: 'company-client' })
+    expect(serverConfig({ OPENPANEL_CLIENT_ID: 'company-op' }, baked)).toMatchObject({ openPanelClientId: 'company-op', openPanelApiUrl: '' })
+    // A partner alone at start does not split the build's pair.
+    expect(serverConfig({ PRIVY_CLIENT_ID: 'stray-client' }, baked)).toMatchObject({ privyAppId: 'baked-app', privyClientId: 'baked-client' })
+    expect(serverConfig({}, baked)).toMatchObject({
+      privyAppId: 'baked-app',
+      privyClientId: 'baked-client',
+      openPanelClientId: 'baked-op',
+      openPanelApiUrl: 'https://openpanel.baked.example.com/api',
+    })
+  })
 })

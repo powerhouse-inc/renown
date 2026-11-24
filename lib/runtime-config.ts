@@ -4,7 +4,7 @@
 // Renown: www.renown.id, or a company's own at https://renown.<domain>.
 //
 // The server reads its environment; the browser gets the same values from
-// /runtime-config.js (pages/api/runtime-config.ts), which _document loads
+// /api/runtime-config (pages/api/runtime-config.ts), which _document loads
 // before the app starts. Only public values are here: never a token or key.
 
 export type PublicConfig = {
@@ -64,9 +64,19 @@ const NAMES = {
   driveId: ['RENOWN_DRIVE_ID', 'NEXT_PUBLIC_RENOWN_DRIVE_ID'],
 } as const satisfies Record<Exclude<keyof PublicConfig, 'analytics'>, readonly [string, string]>
 
-/** The settings from the environment at start, then the baked values, then today's defaults. An empty value counts as unset. */
+/**
+ * The settings from the environment at start, then the baked values, then
+ * today's defaults. An empty value counts as unset. A Privy app and its
+ * client, and an OpenPanel client and its API, are pairs: when the first is
+ * given at start, its partner comes from the start too (empty when not
+ * given), never from the build, which names another app's.
+ */
 export function serverConfig(env: Env = process.env, baked: Env = BAKED): PublicConfig {
   const pick = ([runtime, built]: readonly [string, string]): string => env[runtime] || baked[built] || ''
+  const pair = (first: readonly [string, string], partner: readonly [string, string]): [string, string] =>
+    env[first[0]] ? [env[first[0]]!, env[partner[0]] || ''] : [baked[first[1]] || '', baked[partner[1]] || '']
+  const [privyAppId, privyClientId] = pair(NAMES.privyAppId, NAMES.privyClientId)
+  const [openPanelClientId, openPanelApiUrl] = pair(NAMES.openPanelClientId, NAMES.openPanelApiUrl)
   return {
     renownUrl: pick(NAMES.renownUrl),
     // Only `next dev` falls back to a local switchboard: a production build
@@ -76,12 +86,12 @@ export function serverConfig(env: Env = process.env, baked: Env = BAKED): Public
       (env.NODE_ENV === 'development' ? 'http://localhost:4001/graphql' : 'https://switchboard.renown.vetra.io/graphql'),
     oidcIssuer: pick(NAMES.oidcIssuer),
     connectUrl: pick(NAMES.connectUrl),
-    privyAppId: pick(NAMES.privyAppId),
-    privyClientId: pick(NAMES.privyClientId),
+    privyAppId,
+    privyClientId,
     walletConnectProjectId: pick(NAMES.walletConnectProjectId),
     infuraProjectId: pick(NAMES.infuraProjectId),
-    openPanelClientId: pick(NAMES.openPanelClientId),
-    openPanelApiUrl: pick(NAMES.openPanelApiUrl),
+    openPanelClientId,
+    openPanelApiUrl,
     driveId: pick(NAMES.driveId) || 'renown-profiles',
     analytics: env.RENOWN_ANALYTICS !== 'off',
   }
@@ -93,7 +103,7 @@ declare global {
   }
 }
 
-/** In the browser: what /runtime-config.js set, else the baked values (the script did not load). */
+/** In the browser: what /api/runtime-config set, else the baked values (the script did not load). */
 export function publicConfig(): PublicConfig {
   return window.__RENOWN_CONFIG__ ?? serverConfig({ NODE_ENV: process.env.NODE_ENV }, BAKED)
 }
@@ -114,7 +124,7 @@ const UMAMI = {
 /** JSON as a script literal in which no value can end the script or start markup. */
 const scriptJson = (value: unknown): string => JSON.stringify(value).replace(/</g, '\\u003c')
 
-/** The body of /runtime-config.js: the settings for the browser, and Umami when analytics is on. */
+/** The body of /api/runtime-config: the settings for the browser, and Umami when analytics is on. */
 export function runtimeConfigScript(config: PublicConfig): string {
   let script = `window.__RENOWN_CONFIG__=${scriptJson(config)};`
   if (config.analytics) {
