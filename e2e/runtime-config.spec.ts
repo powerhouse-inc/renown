@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { serverConfig } from '../lib/runtime-config'
+import { runtimeConfigScript, serverConfig } from '../lib/runtime-config'
 
 // Runs in the Playwright worker (Node): the settings an install gives the app
 // when it starts, over what the image was built with.
@@ -73,5 +73,29 @@ test.describe('runtime config', () => {
   test('carries none of the server-only settings', () => {
     const config = serverConfig({ RENOWN_TRUSTED_READ_TOKEN: 'secret-read-token', ENS_RPC_URL: 'https://rpc.example.com/key' }, BUILT)
     expect(JSON.stringify(config)).not.toMatch(/secret-read-token|rpc\.example\.com/)
+  })
+
+  test('the script gives the browser its settings, and loads Umami only when analytics is on', () => {
+    const off = runtimeConfigScript(serverConfig({ RENOWN_URL: 'https://renown.labs.example.com', RENOWN_ANALYTICS: 'off' }, {}))
+    expect(off).toMatch(/^window\.__RENOWN_CONFIG__=/)
+    expect(off).toContain('"renownUrl":"https://renown.labs.example.com"')
+    expect(off).not.toMatch(/umami/)
+    expect(runtimeConfigScript(serverConfig({}, {}))).toContain('https://umami.monitoring.vetra.io/script.js')
+  })
+
+  test('a setting cannot end the script or start markup', () => {
+    const script = runtimeConfigScript(serverConfig({ RENOWN_URL: '</script><script>alert(1)</script>', RENOWN_ANALYTICS: 'off' }, {}))
+    expect(script).not.toContain('<')
+    expect(script).toContain('\\u003c/script')
+  })
+
+  test('every page has its settings before the app starts, and no Umami of its own', async ({ page, request }) => {
+    const script = await request.get('/api/runtime-config')
+    expect(script.headers()['content-type']).toContain('javascript')
+    const html = await (await request.get('/')).text()
+    expect(html).toContain('/api/runtime-config')
+    expect(html).not.toContain('umami.monitoring.vetra.io')
+    await page.goto('/')
+    expect(await page.evaluate(() => window.__RENOWN_CONFIG__?.renownUrl)).toBe('http://localhost:3000')
   })
 })

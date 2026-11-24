@@ -102,3 +102,27 @@ export function publicConfig(): PublicConfig {
 export function runtimeConfig(): PublicConfig {
   return typeof window === 'undefined' ? serverConfig() : publicConfig()
 }
+
+// Umami (self-hosted) counts renown.vetra.io and www.renown.id and nothing
+// else (previews, local development, other deployments).
+const UMAMI = {
+  src: 'https://umami.monitoring.vetra.io/script.js',
+  websiteId: 'c5102484-ab3d-4c46-9198-0fbe81f27789',
+  domains: 'renown.vetra.io,www.renown.id',
+}
+
+/** JSON as a script literal in which no value can end the script or start markup. */
+const scriptJson = (value: unknown): string => JSON.stringify(value).replace(/</g, '\\u003c')
+
+/** The body of /runtime-config.js: the settings for the browser, and Umami when analytics is on. */
+export function runtimeConfigScript(config: PublicConfig): string {
+  let script = `window.__RENOWN_CONFIG__=${scriptJson(config)};`
+  if (config.analytics) {
+    script +=
+      `(function(){var s=document.createElement('script');s.defer=true;s.src=${scriptJson(UMAMI.src)};` +
+      `s.setAttribute('data-website-id',${scriptJson(UMAMI.websiteId)});s.setAttribute('data-domains',${scriptJson(UMAMI.domains)});` +
+      `s.setAttribute('data-do-not-track','true');s.setAttribute('data-exclude-search','true');s.setAttribute('data-performance','true');` +
+      `document.head.appendChild(s)})();`
+  }
+  return script
+}
