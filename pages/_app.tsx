@@ -1,3 +1,4 @@
+import { runtimeConfig } from '../lib/runtime-config'
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { Inter } from 'next/font/google'
@@ -20,7 +21,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <QueryClientProvider client={queryClient}>
           <Renown
             appName="renown-app"
-            url={process.env.NEXT_PUBLIC_RENOWN_URL || 'https://www.renown.id'}
+            url={runtimeConfig().renownUrl || 'https://www.renown.id'}
             onError={(error) => {
               // useRenownInit rejects synchronously during SSR — suppress that noise.
               if (error instanceof Error && error.message === 'window is undefined') return

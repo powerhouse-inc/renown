@@ -1,4 +1,5 @@
 // Organisation-owned sign-in (OIDC) clients (renown-package A3 ruling 6). Pure.
+import { runtimeConfig } from '../runtime-config'
 import { DEFAULT_OIDC_ISSUER } from '../../utils/oidc-issuer'
 
 /** At most this many clients per organisation; disabled ones count (D4). */
@@ -32,5 +33,5 @@ export function parseRedirectUris(text: string): { uris: string[] } | { problem:
 
 /** The issuer apps configure (the deployment's, else Renown's default). */
 export function oidcIssuer(): string {
-  return process.env.NEXT_PUBLIC_RENOWN_OIDC_ISSUER || DEFAULT_OIDC_ISSUER
+  return runtimeConfig().oidcIssuer || DEFAULT_OIDC_ISSUER
 }

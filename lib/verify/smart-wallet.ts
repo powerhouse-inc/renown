@@ -3,6 +3,7 @@
 // read-only eth_call, like the switchboard does (renown-package
 // subgraphs/renown-auth/core/smart-wallet.ts). Only reached after the offline
 // check failed; viem's chain client is loaded only then.
+import { runtimeConfig } from '../runtime-config'
 import { CLIENT_DATA_TIMEOUT_MS, withTimeout } from '../../utils/with-timeout'
 import type { ContractSignature, ContractSignatureArgs } from './types'
 
@@ -28,7 +29,7 @@ const PUBLIC_MAINNET_RPC = 'https://ethereum-rpc.publicnode.com'
 const RPC_TIMEOUT_MS = 4000
 
 /** The RPC for `chainId`: Infura when configured (the wallet stack's own config), else a public node for mainnet. */
-export function rpcUrl(chainId: number, infuraProjectId = process.env.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID): string | null {
+export function rpcUrl(chainId: number, infuraProjectId = runtimeConfig().infuraProjectId || undefined): string | null {
   const subdomain = INFURA[chainId]
   if (subdomain && infuraProjectId) return `https://${subdomain}.infura.io/v3/${infuraProjectId}`
   return chainId === 1 ? PUBLIC_MAINNET_RPC : null

@@ -1,5 +1,6 @@
 "use client";
 
+import { runtimeConfig } from "../../lib/runtime-config"
 import { useAuthFlow, type AuthFlowView } from "../../hooks/use-auth-flow";
 import RenownCard from "../ui/renown-card";
 import { ProfileCard } from "./profile-card";
@@ -15,7 +16,7 @@ interface IProps {
     expiresInDays?: number;
 }
 
-const connectUrl = process.env.NEXT_PUBLIC_CONNECT_URL;
+const connectUrl = runtimeConfig().connectUrl || undefined;
 
 const showsProfileCard = (kind: AuthFlowView["kind"]): boolean =>
     kind === "needs-authorization" || kind === "authorized";

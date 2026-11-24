@@ -1,5 +1,6 @@
 'use client'
 
+import { runtimeConfig } from '../../lib/runtime-config'
 import { OpenPanelComponent } from '@openpanel/nextjs'
 import Router from 'next/router'
 import { useSyncExternalStore } from 'react'
@@ -16,7 +17,8 @@ const E2E_AUTH = process.env.NEXT_PUBLIC_E2E_AUTH === '1'
 
 /** The OpenPanel client id; read in the browser only. */
 function openPanelClientId(): string | undefined {
-  const configured = process.env.NEXT_PUBLIC_OPENPANEL_CLIENT_ID
+  const { analytics, openPanelClientId: configured } = runtimeConfig()
+  if (!analytics) return undefined
   if (configured) return configured
   return E2E_AUTH ? (window as { __renownE2eOpenPanel?: string }).__renownE2eOpenPanel : undefined
 }
@@ -49,7 +51,7 @@ function clientSnapshot(): string | null {
 /**
  * Mounts OpenPanel analytics for Renown.
  *
- * Env-gated: with `NEXT_PUBLIC_OPENPANEL_CLIENT_ID` unset this renders nothing
+ * Env-gated: with no OpenPanel client id set, or analytics off (lib/runtime-config.ts), this renders nothing
  * and the SDK script is never loaded — a complete no-op. When configured it
  * enables automatic pageview + outgoing-link tracking, stamps every event with
  * the `app: renown` global property, and wires up user identification.
@@ -82,7 +84,7 @@ function OpenPanel({ cookies }: { cookies: string }) {
     <>
       <OpenPanelComponent
         clientId={clientId}
-        apiUrl={process.env.NEXT_PUBLIC_OPENPANEL_API_URL || undefined}
+        apiUrl={runtimeConfig().openPanelApiUrl || undefined}
         {...(profileId ? { profileId } : {})}
         trackScreenViews
         trackOutgoingLinks

@@ -1,11 +1,11 @@
+import { runtimeConfig } from '../../../lib/runtime-config'
 import { NextApiRequest, NextApiResponse } from 'next/types'
 import { allowCors } from '../../../utils/allow-cors'
 import { GraphQLClient, gql } from 'graphql-request'
 import { DEFAULT_DRIVE_ID } from '../../../utils/constants'
 
 const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
+  runtimeConfig().switchboardEndpoint
 
 interface RenownCredential {
   documentId: string

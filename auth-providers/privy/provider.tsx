@@ -1,3 +1,4 @@
+import { runtimeConfig } from '../../lib/runtime-config'
 import { useMemo, type ReactElement, type ReactNode } from 'react'
 import { PrivyProvider } from '@privy-io/react-auth'
 import { useTheme } from 'next-themes'
@@ -6,8 +7,8 @@ import RenownLogo from '../../components/ui/renown-logo'
 import { PrivyAdapter } from './adapter'
 import { PrivyAdapterBridge } from './bridge'
 
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID || undefined
-const PRIVY_CLIENT_ID = process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID || undefined
+const PRIVY_APP_ID = runtimeConfig().privyAppId || undefined
+const PRIVY_CLIENT_ID = runtimeConfig().privyClientId || undefined
 
 // Privy requires the raw <svg> / <img> element — not a component. It inspects
 // `element.type` and bails on anything else. Built once at module scope to
