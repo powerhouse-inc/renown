@@ -24,9 +24,11 @@ COPY . .
 # ENV NEXT_TELEMETRY_DISABLED=1
 
 # These have to be here for next build
-# NEXT_PUBLIC_* values are inlined into the browser bundle at build time, so
-# every one the browser reads must be passed per environment (see
-# .github/workflows/semantic-release.yml).
+# NEXT_PUBLIC_* values are inlined into the bundles at build time: they are the
+# defaults of this image (see .github/workflows/semantic-release.yml). A
+# deployment overrides each at start with its runtime name (RENOWN_URL,
+# SWITCHBOARD_ENDPOINT, ...; README "Settings at start"), so one image serves
+# any Renown.
 ARG NEXT_PUBLIC_OPENPANEL_CLIENT_ID
 ARG NEXT_PUBLIC_OPENPANEL_API_URL
 ARG NEXT_PUBLIC_SWITCHBOARD_ENDPOINT

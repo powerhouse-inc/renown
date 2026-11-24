@@ -3,12 +3,13 @@
 // renown-auth subgraph). Used only as a fallback by services/renown-credential.ts;
 // delete once every Renown switchboard serves renown_issueCredential and
 // renown_revokeCredential.
+import { runtimeConfig } from '../lib/runtime-config'
 import { GraphQLClient, gql } from 'graphql-request'
 import { v4 as uuidv4 } from 'uuid'
 import type { CredentialInitInput } from './renown-credential'
 
 const SWITCHBOARD_URL =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || 'https://switchboard.renown.vetra.io/graphql'
+  runtimeConfig().switchboardEndpoint
 
 function makeAction(type: string, input: Record<string, unknown>) {
   return {

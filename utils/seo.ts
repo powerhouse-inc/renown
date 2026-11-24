@@ -1,6 +1,7 @@
-/** Canonical origin of the public site (NEXT_PUBLIC_RENOWN_URL, else www.renown.id), without a trailing slash. */
+import { runtimeConfig } from '../lib/runtime-config'
+/** Canonical origin of the public site (the deployment's Renown URL, else www.renown.id), without a trailing slash. */
 export function publicOrigin(): string {
-  return (process.env.NEXT_PUBLIC_RENOWN_URL || 'https://www.renown.id').replace(/\/+$/, '')
+  return (runtimeConfig().renownUrl || 'https://www.renown.id').replace(/\/+$/, '')
 }
 
 /** Absolute canonical URL of a site path ("/" or "/developers"). */

@@ -33,6 +33,44 @@ You can start editing the page by modifying `pages/index.tsx`. The page auto-upd
 Copy `.env.example` to `.env.local` and fill in the values for the features you need (wallet
 connect, Privy, analytics, etc.).
 
+## Settings at start
+
+One image serves any Renown deployment: the settings below, given to the server when it starts,
+win over the `NEXT_PUBLIC_*` values baked into the build. An unset or empty setting keeps the
+baked value, so a deployment that sets none (renown.id's) runs exactly as built. The server reads
+them from its environment; the browser gets the same values from `/api/runtime-config`, which
+`pages/_document.tsx` loads before the app starts (`lib/runtime-config.ts`). Only public values
+travel this way.
+
+| Setting at start | Overrides (baked) | What |
+|---|---|---|
+| `RENOWN_URL` | `NEXT_PUBLIC_RENOWN_URL` | This Renown's public origin |
+| `SWITCHBOARD_ENDPOINT` | `NEXT_PUBLIC_SWITCHBOARD_ENDPOINT` | The switchboard's GraphQL endpoint |
+| `RENOWN_OIDC_ISSUER` | `NEXT_PUBLIC_RENOWN_OIDC_ISSUER` | The OIDC issuer apps configure |
+| `CONNECT_URL` | `NEXT_PUBLIC_CONNECT_URL` | Where a sign-in with nowhere else to return to goes |
+| `PRIVY_APP_ID` | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy app (email and social sign-in) |
+| `PRIVY_CLIENT_ID` | `NEXT_PUBLIC_PRIVY_CLIENT_ID` | Privy app client |
+| `WALLET_CONNECT_PROJECT_ID` | `NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID` | WalletConnect project |
+| `INFURA_PROJECT_ID` | `NEXT_PUBLIC_VITE_INFURA_PROJECT_ID` | Infura project: the wallets' RPC and smart-wallet checks |
+| `OPENPANEL_CLIENT_ID` | `NEXT_PUBLIC_OPENPANEL_CLIENT_ID` | OpenPanel client (analytics) |
+| `OPENPANEL_API_URL` | `NEXT_PUBLIC_OPENPANEL_API_URL` | OpenPanel API |
+| `RENOWN_DRIVE_ID` | `NEXT_PUBLIC_RENOWN_DRIVE_ID` | The drive profiles live in (default `renown-profiles`) |
+| `RENOWN_ANALYTICS` | none | `off` loads neither OpenPanel nor Umami; anything else leaves them on |
+
+Two pairs resolve together: when `PRIVY_APP_ID` is given at start, `PRIVY_CLIENT_ID` comes from
+the start too (none when not given), never from the build, whose client belongs to another app.
+Likewise `OPENPANEL_API_URL` follows `OPENPANEL_CLIENT_ID`.
+
+Known limit: pages prerendered at build (404, 500, admin/reports, developers, ecosystem, me,
+notifications, org/new, trust, verify) carry the build's origin in their canonical and
+link-preview tags; the browser rewrites them after it loads, but crawlers and link unfurlers see
+the build's. Rendering those pages per request (`getServerSideProps`) would change that, at the
+cost of static rendering.
+
+Read a setting through `runtimeConfig()` from `lib/runtime-config.ts`, never as
+`process.env.NEXT_PUBLIC_*`: a direct read keeps the build's value whatever the deployment sets
+(`e2e/runtime-config-readers.spec.ts` fails on one).
+
 ## Server-side organisation reads
 
 Server-only variables (never prefixed `NEXT_PUBLIC_`):
@@ -48,8 +86,10 @@ Server-only variables (never prefixed `NEXT_PUBLIC_`):
 ## Analytics
 
 Renown uses [OpenPanel](https://openpanel.dev) (`@openpanel/nextjs`) for product analytics. The
-integration is **env-gated and a complete no-op when unconfigured** — if
-`NEXT_PUBLIC_OPENPANEL_CLIENT_ID` is empty the SDK script is never loaded and no events are sent.
+integration is **env-gated and a complete no-op when unconfigured** — with no OpenPanel client
+id (`OPENPANEL_CLIENT_ID` at start, else `NEXT_PUBLIC_OPENPANEL_CLIENT_ID`), or with
+`RENOWN_ANALYTICS=off`, the SDK script is never loaded and no events are sent. Umami, loaded by
+`/api/runtime-config`, follows `RENOWN_ANALYTICS` too.
 
 ### Configuration
 

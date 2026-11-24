@@ -1,0 +1,121 @@
+import { test, expect } from '@playwright/test'
+import { runtimeConfigScript, serverConfig } from '../lib/runtime-config'
+
+// Runs in the Playwright worker (Node): the settings an install gives the app
+// when it starts, over what the image was built with.
+const BUILT = {
+  NEXT_PUBLIC_RENOWN_URL: 'https://www.renown.id',
+  NEXT_PUBLIC_SWITCHBOARD_ENDPOINT: 'https://switchboard.renown.vetra.io/graphql',
+  NEXT_PUBLIC_PRIVY_APP_ID: 'baked-privy-app',
+}
+
+test.describe('runtime config', () => {
+  test('a setting given at start wins over the one baked into the build', () => {
+    const config = serverConfig({ RENOWN_URL: 'https://renown.labs.example.com' }, BUILT)
+    expect(config.renownUrl).toBe('https://renown.labs.example.com')
+    expect(config.switchboardEndpoint).toBe('https://switchboard.renown.vetra.io/graphql')
+  })
+
+  test('a setting given empty keeps the baked one', () => {
+    expect(serverConfig({ RENOWN_URL: '', PRIVY_APP_ID: '' }, BUILT)).toMatchObject({
+      renownUrl: 'https://www.renown.id',
+      privyAppId: 'baked-privy-app',
+    })
+  })
+
+  test('every setting has its name at start', () => {
+    const config = serverConfig(
+      {
+        RENOWN_URL: 'https://renown.labs.example.com',
+        SWITCHBOARD_ENDPOINT: 'https://renown-switchboard.labs.example.com/graphql',
+        RENOWN_OIDC_ISSUER: 'https://renown-switchboard.labs.example.com/api/@powerhousedao/renown-package/oidc',
+        CONNECT_URL: 'https://labs.example.com',
+        PRIVY_APP_ID: 'privy-app',
+        PRIVY_CLIENT_ID: 'privy-client',
+        WALLET_CONNECT_PROJECT_ID: 'wc',
+        INFURA_PROJECT_ID: 'infura',
+        OPENPANEL_CLIENT_ID: 'op-client',
+        OPENPANEL_API_URL: 'https://op.example.com',
+        RENOWN_DRIVE_ID: 'powerhouse',
+        RENOWN_ANALYTICS: 'on',
+      },
+      {},
+    )
+    expect(config).toEqual({
+      renownUrl: 'https://renown.labs.example.com',
+      switchboardEndpoint: 'https://renown-switchboard.labs.example.com/graphql',
+      oidcIssuer: 'https://renown-switchboard.labs.example.com/api/@powerhousedao/renown-package/oidc',
+      connectUrl: 'https://labs.example.com',
+      privyAppId: 'privy-app',
+      privyClientId: 'privy-client',
+      walletConnectProjectId: 'wc',
+      infuraProjectId: 'infura',
+      openPanelClientId: 'op-client',
+      openPanelApiUrl: 'https://op.example.com',
+      driveId: 'powerhouse',
+      analytics: true,
+    })
+  })
+
+  test('RENOWN_ANALYTICS=off turns analytics off; unset leaves it on', () => {
+    expect(serverConfig({ RENOWN_ANALYTICS: 'off' }, BUILT).analytics).toBe(false)
+    expect(serverConfig({}, BUILT).analytics).toBe(true)
+  })
+
+  test("with nothing set: today's defaults", () => {
+    const config = serverConfig({ NODE_ENV: 'production' }, {})
+    expect(config.driveId).toBe('renown-profiles')
+    expect(config.switchboardEndpoint).toBe('https://switchboard.renown.vetra.io/graphql')
+    expect(config.renownUrl).toBe('')
+    expect(serverConfig({ NODE_ENV: 'development' }, {}).switchboardEndpoint).toBe('http://localhost:4001/graphql')
+  })
+
+  test('carries none of the server-only settings', () => {
+    const config = serverConfig({ RENOWN_TRUSTED_READ_TOKEN: 'secret-read-token', ENS_RPC_URL: 'https://rpc.example.com/key' }, BUILT)
+    expect(JSON.stringify(config)).not.toMatch(/secret-read-token|rpc\.example\.com/)
+  })
+
+  test('the script gives the browser its settings, and loads Umami only when analytics is on', () => {
+    const off = runtimeConfigScript(serverConfig({ RENOWN_URL: 'https://renown.labs.example.com', RENOWN_ANALYTICS: 'off' }, {}))
+    expect(off).toMatch(/^window\.__RENOWN_CONFIG__=/)
+    expect(off).toContain('"renownUrl":"https://renown.labs.example.com"')
+    expect(off).not.toMatch(/umami/)
+    expect(runtimeConfigScript(serverConfig({}, {}))).toContain('https://umami.monitoring.vetra.io/script.js')
+  })
+
+  test('a setting cannot end the script or start markup', () => {
+    const script = runtimeConfigScript(serverConfig({ RENOWN_URL: '</script><script>alert(1)</script>', RENOWN_ANALYTICS: 'off' }, {}))
+    expect(script).not.toContain('<')
+    expect(script).toContain('\\u003c/script')
+  })
+
+  test('every page has its settings before the app starts, and no Umami of its own', async ({ page, request }) => {
+    const script = await request.get('/api/runtime-config')
+    expect(script.headers()['content-type']).toContain('javascript')
+    const html = await (await request.get('/')).text()
+    expect(html).toContain('/api/runtime-config')
+    expect(html).not.toContain('umami.monitoring.vetra.io')
+    await page.goto('/')
+    expect(await page.evaluate(() => window.__RENOWN_CONFIG__?.renownUrl)).toBe('http://localhost:3000')
+  })
+
+  test('a Privy app or OpenPanel client given at start takes its partner from the start too, never from the build', () => {
+    const baked = {
+      NEXT_PUBLIC_PRIVY_APP_ID: 'baked-app',
+      NEXT_PUBLIC_PRIVY_CLIENT_ID: 'baked-client',
+      NEXT_PUBLIC_OPENPANEL_CLIENT_ID: 'baked-op',
+      NEXT_PUBLIC_OPENPANEL_API_URL: 'https://openpanel.baked.example.com/api',
+    }
+    expect(serverConfig({ PRIVY_APP_ID: 'company-app' }, baked)).toMatchObject({ privyAppId: 'company-app', privyClientId: '' })
+    expect(serverConfig({ PRIVY_APP_ID: 'company-app', PRIVY_CLIENT_ID: 'company-client' }, baked)).toMatchObject({ privyClientId: 'company-client' })
+    expect(serverConfig({ OPENPANEL_CLIENT_ID: 'company-op' }, baked)).toMatchObject({ openPanelClientId: 'company-op', openPanelApiUrl: '' })
+    // A partner alone at start does not split the build's pair.
+    expect(serverConfig({ PRIVY_CLIENT_ID: 'stray-client' }, baked)).toMatchObject({ privyAppId: 'baked-app', privyClientId: 'baked-client' })
+    expect(serverConfig({}, baked)).toMatchObject({
+      privyAppId: 'baked-app',
+      privyClientId: 'baked-client',
+      openPanelClientId: 'baked-op',
+      openPanelApiUrl: 'https://openpanel.baked.example.com/api',
+    })
+  })
+})

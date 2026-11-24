@@ -1,10 +1,10 @@
+import { runtimeConfig } from '../../../lib/runtime-config'
 import { NextApiRequest, NextApiResponse } from "next/types";
 import { allowCors } from "../../../utils/allow-cors";
 import { GraphQLClient, gql } from 'graphql-request';
 
 const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql';
+  runtimeConfig().switchboardEndpoint;
 
 interface VerifyRequest {
   token: string; // This is now a credentialId

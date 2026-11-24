@@ -8,13 +8,14 @@
 // A switchboard that predates these mutations answers with an unknown-schema
 // error; only then do the functions below fall back to the legacy document
 // writes (services/renown-credential-legacy.ts).
+import { runtimeConfig } from '../lib/runtime-config'
 import { ClientError, GraphQLClient, gql } from 'graphql-request'
 import { verifyMessage } from 'viem'
 import { legacyIssueCredential, legacyRevokeDocument } from './renown-credential-legacy'
 import { isFreshTimestamp, revokeMessage } from './renown-signed-messages'
 
 const SWITCHBOARD_URL =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT || 'https://switchboard.renown.vetra.io/graphql'
+  runtimeConfig().switchboardEndpoint
 
 const ISSUE_CREDENTIAL = gql`
   mutation IssueCredential($input: RenownCredential_InitInput!, $username: String, $userImage: String) {

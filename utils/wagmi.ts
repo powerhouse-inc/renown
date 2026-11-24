@@ -1,13 +1,14 @@
+import { runtimeConfig } from '../lib/runtime-config'
 import { http } from 'wagmi'
 import { mainnet, sepolia, polygon, optimism, arbitrum, base } from 'wagmi/chains'
 import { getDefaultConfig } from '@rainbow-me/rainbowkit'
 
-const INFURA_PROJECT_ID = process.env.NEXT_PUBLIC_VITE_INFURA_PROJECT_ID
-const WALLET_CONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID
+const INFURA_PROJECT_ID = runtimeConfig().infuraProjectId || undefined
+const WALLET_CONNECT_PROJECT_ID = runtimeConfig().walletConnectProjectId || undefined
 
 if (!WALLET_CONNECT_PROJECT_ID) {
   console.warn(
-    'NEXT_PUBLIC_VITE_WALLET_CONNECT_PROJECT_ID is not set — WalletConnect-based wallets will fail at connect time.',
+    'No WalletConnect project id is set (WALLET_CONNECT_PROJECT_ID) — WalletConnect-based wallets will fail at connect time.',
   )
 }
 

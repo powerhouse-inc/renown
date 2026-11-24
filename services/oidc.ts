@@ -1,3 +1,4 @@
+import { runtimeConfig } from "../lib/runtime-config"
 import { createSiweMessage } from "viem/siwe";
 import type { Hex } from "viem";
 
@@ -52,7 +53,7 @@ export class OidcLoginError extends Error {
  * the signature (and the user's session) to an attacker-controlled host.
  */
 export function resolveIssuer(queryIssuer?: string): string {
-    const configuredIssuer = process.env.NEXT_PUBLIC_RENOWN_OIDC_ISSUER;
+    const configuredIssuer = runtimeConfig().oidcIssuer || undefined;
     if (queryIssuer && (queryIssuer === DEFAULT_OIDC_ISSUER || queryIssuer === configuredIssuer)) {
         return queryIssuer;
     }

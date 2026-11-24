@@ -1,9 +1,9 @@
+import { runtimeConfig } from '../../lib/runtime-config'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { allowCors } from '../../utils/allow-cors'
 
 const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
+  runtimeConfig().switchboardEndpoint
 
 // Discovery endpoint: lets an updated @renown/sdk read from the Switchboard
 // reactor directly. Absent on old deployments, so the SDK falls back to REST.

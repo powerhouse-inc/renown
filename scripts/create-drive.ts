@@ -1,8 +1,8 @@
+import { runtimeConfig } from '../lib/runtime-config'
 import { GraphQLClient, gql } from 'graphql-request'
 
 const SWITCHBOARD_ENDPOINT =
-  process.env.NEXT_PUBLIC_SWITCHBOARD_ENDPOINT ||
-  'https://switchboard.renown.vetra.io/graphql'
+  runtimeConfig().switchboardEndpoint
 
 const CREATE_DRIVE_MUTATION = gql`
   mutation CreateDrive($id: String!, $name: String!, $slug: String!) {
