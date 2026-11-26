@@ -1,6 +1,7 @@
 name: E2E
 
-# The layout guards, the wallet/account specs and the organisation specs, in a real browser. The
+# The layout guards, the wallet/account specs, the organisation specs and the console sign-in
+# specs (CLI and host sessions, credential validity), in a real browser. The
 # Playwright config starts the stub switchboard and the dev server itself
 # (webServer, with NEXT_PUBLIC_E2E_AUTH=1 and the stub endpoint), and with
 # CI set it never reuses a running server and retries a failed test twice.
@@ -68,6 +69,11 @@ jobs:
           e2e/verify-orgs.spec.ts
           e2e/org-reports.spec.ts
           e2e/org-sdl-conformance.spec.ts
+          e2e/console-link.spec.ts
+          e2e/console-page.spec.ts
+          e2e/console-session-api.spec.ts
+          e2e/credential-validity.spec.ts
+          e2e/credential-validity-flow.spec.ts
           --workers=2
 
       # Always uploaded: the layout cases attach a full-page screenshot each (the gallery).
