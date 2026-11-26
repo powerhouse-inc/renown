@@ -7,9 +7,12 @@ interface ConsoleSuccessViewProps {
     ensName?: string | null;
     ensAvatar?: string | null;
     connectDid: string;
+    label?: string;
+    host?: string;
 }
 
-export function ConsoleSuccessView({ address, ensName, ensAvatar, connectDid }: ConsoleSuccessViewProps) {
+export function ConsoleSuccessView({ address, ensName, ensAvatar, connectDid, label, host }: ConsoleSuccessViewProps) {
+    const what = host ? "Session" : label ? `"${label}"` : "CLI";
     return (
         <div className="flex flex-col items-center w-full">
             <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-6">
@@ -34,17 +37,17 @@ export function ConsoleSuccessView({ address, ensName, ensAvatar, connectDid }: 
                     <h3 className="text-foreground font-medium">
                         {ensName || `${address.slice(0, 6)}...${address.slice(-4)}`}
                     </h3>
-                    <p className="text-success text-sm">CLI authorized successfully</p>
+                    <p className="text-success text-sm">{what} authorized successfully</p>
                 </div>
             </div>
             <div className="rounded-xl p-3 mb-4 bg-success/10 border border-success/20 w-full">
-                <p className="text-xs text-success mb-1">Authorized CLI DID</p>
+                <p className="text-xs text-success mb-1">{host ? `Session on ${host}` : label ? `Authorized ${label}` : "Authorized CLI DID"}</p>
                 <p className="text-sm font-mono text-success break-all">
                     {formatDid(connectDid)}
                 </p>
             </div>
             <p className="text-muted-foreground text-sm text-center">
-                The CLI will automatically detect your authorization.
+                {host ? "The host" : "The CLI"} will automatically detect your authorization.
                 <br />
                 You can safely close this browser tab.
             </p>

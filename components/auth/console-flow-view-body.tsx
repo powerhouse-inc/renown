@@ -12,6 +12,8 @@ interface ConsoleFlowViewBodyProps {
     ensName?: string | null;
     ensAvatar?: string | null;
     expiresInDays: number;
+    label?: string;
+    host?: string;
 }
 
 export function ConsoleFlowViewBody({
@@ -22,12 +24,14 @@ export function ConsoleFlowViewBody({
     ensName,
     ensAvatar,
     expiresInDays,
+    label,
+    host,
 }: ConsoleFlowViewBodyProps) {
     switch (view.kind) {
         case "loading":
             return <LoadingBody />;
         case "pre-login":
-            return <ConsolePreLogin sessionId={sessionId} />;
+            return <ConsolePreLogin sessionId={sessionId} label={label} host={host} />;
         case "needs-authorization":
             return (
                 <ConsoleConfirmAuthorization
@@ -36,6 +40,8 @@ export function ConsoleFlowViewBody({
                     ensName={view.ensName}
                     ensAvatar={view.ensAvatar}
                     expiresInDays={expiresInDays}
+                    label={label}
+                    host={host}
                 />
             );
         case "completed":
@@ -45,6 +51,8 @@ export function ConsoleFlowViewBody({
                     ensName={ensName}
                     ensAvatar={ensAvatar}
                     connectDid={connectDid!}
+                    label={label}
+                    host={host}
                 />
             );
         case "error":

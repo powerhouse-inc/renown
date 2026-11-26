@@ -22,8 +22,10 @@ interface ICredential {
 /**
  * @param expiresInDays Validity of credentials this hook issues; the
  * orchestrator's 7-day default when unset.
+ * @param app The `app` the credentials name (a console session's label);
+ * unset, it comes from `returnUrl`.
  */
-export function useCredential(appId: string, returnUrl?: string, expiresInDays?: number): ICredential {
+export function useCredential(appId: string, returnUrl?: string, expiresInDays?: number, app?: string): ICredential {
     const session = useSession();
     const { jwt, isAuthenticated, login, logout, isLoading: authLoading, isFetchingCredential } = useAuth(appId);
     const credential = jwt ?? undefined;
@@ -37,6 +39,7 @@ export function useCredential(appId: string, returnUrl?: string, expiresInDays?:
                 const jwtToken = await login({
                     appId,
                     returnUrl,
+                    app,
                     ensName: options?.ensName,
                     ensAvatar: options?.ensAvatar,
                     expiresInDays,
@@ -48,7 +51,7 @@ export function useCredential(appId: string, returnUrl?: string, expiresInDays?:
                 setIsFetching(false);
             }
         },
-        [login, expiresInDays]
+        [login, expiresInDays, app]
     );
 
     // Rejects when the revocation didn't happen (RevokeSignatureRejectedError

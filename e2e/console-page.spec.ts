@@ -63,6 +63,32 @@ test.describe('Console Login Page', () => {
     await page.goto('/console?session=very-long-session-id-with-many-characters-1234567890&connect=did:key:test')
     await expect(page.getByText('Authorize CLI')).toBeVisible({ timeout: 30_000 })
   })
+
+  test('a host session link names its label and host before sign-in', async ({ page }) => {
+    const sessionId = 'host-link-' + Date.now()
+    const host = encodeURIComponent('https://switchboard.example.com')
+    await page.goto(`/console?session=${sessionId}&connect=did:key:test&app=billing&host=${host}`)
+
+    await expect(page.getByRole('heading', { name: 'Approve a host session' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('"billing" on https://switchboard.example.com asks to sign document changes as you.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'billing' })).toBeVisible()
+    await expect(page.getByText('Host: https://switchboard.example.com')).toBeVisible()
+  })
+
+  test('a link with a host that is not a web address is refused', async ({ page }) => {
+    await page.goto(`/console?session=bad-host-${Date.now()}&connect=did:key:test&app=billing&host=javascript:alert(1)`)
+
+    await expect(page.getByText('Invalid Login Link')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('This link names a host that is not a web address.')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Approve|Authorize/ })).toHaveCount(0)
+  })
+
+  test('a link with a label it cannot show is refused', async ({ page }) => {
+    await page.goto(`/console?session=bad-label-${Date.now()}&connect=did:key:test&app=${'x'.repeat(65)}`)
+
+    await expect(page.getByText('Invalid Login Link')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('This link names its session in a way Renown cannot show.')).toBeVisible()
+  })
 })
 
 test.describe('Console Login Page - API Integration', () => {

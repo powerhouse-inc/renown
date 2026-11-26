@@ -12,15 +12,21 @@ interface IProps {
     connectDid?: string;
     /** Validity of the credential to issue, already parsed and clamped. */
     expiresInDays?: number;
+    /** The session's label, signed into the credential as its `app`. */
+    label?: string;
+    /** The host the session is for, when the link names one. */
+    host?: string;
 }
 
 const ConsoleFlow: React.FC<IProps> = ({
     sessionId,
     connectDid,
     expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+    label,
+    host,
 }) => {
     const { view, title, subtitle, address, ensName, ensAvatar, userDocId, disconnect } =
-        useConsoleAuthFlow({ sessionId, connectDid, expiresInDays });
+        useConsoleAuthFlow({ sessionId, connectDid, expiresInDays, label, host });
 
     if (view.kind === "invalid-link") {
         return <InvalidConsoleLink />;
@@ -53,6 +59,8 @@ const ConsoleFlow: React.FC<IProps> = ({
                         ensName={ensName}
                         ensAvatar={ensAvatar}
                         expiresInDays={expiresInDays}
+                        label={label}
+                        host={host}
                     />
                 </div>
             </RenownCard>

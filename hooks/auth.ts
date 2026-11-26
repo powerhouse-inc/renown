@@ -24,6 +24,8 @@ interface LoginOptions {
   driveId?: string
   userDocId?: string
   returnUrl?: string
+  /** The `app` the credential names; unset, it comes from `returnUrl`. */
+  app?: string
   ensName?: string | null
   ensAvatar?: string | null
   /** Validity of the issued credential; the orchestrator's default when unset. */
@@ -141,7 +143,7 @@ export function useAuth(appDid?: string): UseAuthReturn {
 
       try {
         const { credentialId, userDocumentId } = await orchestrator.issueDelegationVc(
-          deriveAppFromReturnUrl(options?.returnUrl),
+          options?.app ?? deriveAppFromReturnUrl(options?.returnUrl),
           options?.appId,
           {
             username: options?.ensName ?? shortAddress(session.address),

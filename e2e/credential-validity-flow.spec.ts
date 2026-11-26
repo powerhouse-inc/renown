@@ -143,6 +143,54 @@ test.describe('console flow credential validity', () => {
     expect(validityDays(issued())).toBe(90)
   })
 
+  test('a labelled host session shows its host, scope and end, and signs its label as the app', async ({ page }) => {
+    const issued = await interceptCredentialApi(page)
+    const sessionId = `host-session-${Date.now()}`
+    const host = encodeURIComponent('https://switchboard.example.com/')
+    await page.goto(`/console?session=${sessionId}&connect=${CLI_DID}&app=billing&host=${host}`)
+
+    const approve = page.getByRole('button', { name: 'Approve Session' })
+    await expect(approve).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Approve this session?')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'billing' })).toBeVisible()
+    await expect(page.getByText('Host: https://switchboard.example.com')).toBeVisible()
+    await expect(page.getByText('It cannot administer the host.')).toBeVisible()
+    // The default validity is stated too: a session's end is part of the consent.
+    await expect(page.getByText(/^Valid for 7 days, until /)).toBeVisible()
+
+    await approve.click()
+    await expect(page.getByText('Session Approved')).toBeVisible({ timeout: 30_000 })
+    const credential = issued()?.credential
+    expect((credential?.credentialSubject as { app?: string } | undefined)?.app).toBe('billing')
+    expect(validityDays(issued())).toBe(7)
+  })
+
+  test('a labelled CLI session signs its label as the app', async ({ page }) => {
+    const issued = await interceptCredentialApi(page)
+    const sessionId = `labelled-${Date.now()}`
+    await page.goto(`/console?session=${sessionId}&connect=${CLI_DID}&app=Studio%20agent&expiresInDays=30`)
+
+    const authorize = page.getByRole('button', { name: 'Authorize Studio agent' })
+    await expect(authorize).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(/^Valid for 30 days, until /)).toBeVisible()
+    await authorize.click()
+    await expect(page.getByText('Authorization Complete')).toBeVisible({ timeout: 30_000 })
+    expect((issued()?.credential.credentialSubject as { app?: string } | undefined)?.app).toBe('Studio agent')
+  })
+
+  test('a ph login link, which sends its did as the app, keeps the CLI texts and signs renown-app', async ({ page }) => {
+    const issued = await interceptCredentialApi(page)
+    const sessionId = `ph-login-${Date.now()}`
+    await page.goto(`/console?session=${sessionId}&connect=${CLI_DID}&app=${CLI_DID}`)
+
+    const authorize = page.getByRole('button', { name: 'Authorize CLI' })
+    await expect(authorize).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'Powerhouse CLI' })).toBeVisible()
+    await authorize.click()
+    await expect(page.getByText('Authorization Complete')).toBeVisible({ timeout: 30_000 })
+    expect((issued()?.credential.credentialSubject as { app?: string } | undefined)?.app).toBe('renown-app')
+  })
+
   test('without the parameter the console credential keeps the 7-day default', async ({ page }) => {
     const issued = await interceptCredentialApi(page)
     const sessionId = `validity-default-${Date.now()}`

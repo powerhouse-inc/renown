@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
 import { useEnsAvatar, useEnsName } from "wagmi";
-import { revokedAddressAtom, useAuth } from "./auth";
+import { useAuth } from "./auth";
 import { useCredential } from "./credential";
 import { useAuthBusy, useAuthInitializing, useSession } from "./use-wallet-adapter";
-import { useAutoSignCredential } from "./use-auto-sign-credential";
 import { useOpenPanelAnalytics, ANALYTICS_EVENTS } from "../services/analytics";
-import { DEFAULT_CREDENTIAL_VALIDITY_DAYS, isDefaultCredentialValidity } from "../utils/credential-validity";
+import { DEFAULT_CREDENTIAL_VALIDITY_DAYS } from "../utils/credential-validity";
 
 /**
  * Tagged union of the paint states the console authorization flow can be in.
@@ -39,52 +37,82 @@ interface UseConsoleAuthFlowArgs {
     connectDid?: string;
     /** Validity of the credential this flow issues; defaults to 7 days. */
     expiresInDays?: number;
+    /** The session's label, signed into the credential as its `app`. */
+    label?: string;
+    /** The host the session is for, when the link names one. */
+    host?: string;
+}
+
+/** The titles of each view, for a link with or without a label and a host. */
+function consoleTitles(view: ConsoleAuthFlowView, label?: string, host?: string): { title: string; subtitle: string } {
+    const asking = host
+        ? `${label ? `"${label}"` : "A session"} on ${host} asks to sign document changes as you.`
+        : label
+          ? `"${label}" asks to sign actions on your behalf using your identity.`
+          : "Authorize the Powerhouse CLI to sign actions on your behalf using your identity.";
+    switch (view.kind) {
+        case "invalid-link":
+            return {
+                title: "Invalid Login Link",
+                subtitle: "This console session is missing the CLI identity. Please run ph login again to start a new session.",
+            };
+        case "loading":
+            return {
+                title: "Signing you in",
+                subtitle: "Hang tight while we finish setting up your session.",
+            };
+        case "pre-login":
+            return {
+                title: host ? "Approve a host session" : label ? `Authorize ${label}` : "Authorize CLI",
+                subtitle: asking,
+            };
+        case "needs-authorization":
+            return {
+                title: host ? "Approve this session?" : "Confirm Authorization",
+                subtitle: asking,
+            };
+        case "completed":
+            return {
+                title: host ? "Session Approved" : "Authorization Complete",
+                subtitle: host
+                    ? "The host will pick up your approval. You can close this window."
+                    : "You can now close this window and return to your terminal.",
+            };
+        case "error":
+            return {
+                title: "Something went wrong",
+                subtitle: view.message,
+            };
+    }
 }
 
 export function useConsoleAuthFlow({
     sessionId,
     connectDid,
     expiresInDays = DEFAULT_CREDENTIAL_VALIDITY_DAYS,
+    label,
+    host,
 }: UseConsoleAuthFlowArgs): ConsoleAuthFlowResult {
     const session = useSession();
     const address = session?.address;
     const chainId = session?.chainId ?? 1;
-    // A non-default validity is never signed silently: the user confirms it
-    // on the authorization view, which states it.
-    const autoSign = (session?.autoSign ?? false) && isDefaultCredentialValidity(expiresInDays);
 
     const { data: ensName } = useEnsName({ address });
     const { data: ensAvatar } = useEnsAvatar({ name: ensName ?? undefined });
 
+    // A console link is never signed silently, whatever the wallet allows:
+    // anyone can send one, and signing it hands that key the right to act as
+    // the user. The user confirms on the authorization view.
     const {
         credential,
         hasCredential,
-        loading: credentialLoading,
         initializing: credentialInitializing,
-        createCredential,
-    } = useCredential(connectDid ?? "", undefined, expiresInDays);
+    } = useCredential(connectDid ?? "", undefined, expiresInDays, label);
     const { userDocId, did, signOut } = useAuth(connectDid);
 
     const { track } = useOpenPanelAnalytics();
     const authBusy = useAuthBusy();
     const authInitializing = useAuthInitializing();
-    const revokedAddress = useAtomValue(revokedAddressAtom);
-    const justRevoked = !!address && revokedAddress === address;
-
-    const { autoFailedForCurrentAddress } = useAutoSignCredential({
-        address,
-        autoSign,
-        initializing: credentialInitializing,
-        hasCredential,
-        loading: credentialLoading,
-        justRevoked,
-        createCredential,
-        ensName,
-        ensAvatar,
-    });
-
-    const isAutoSigning =
-        !!address && autoSign && !hasCredential && !autoFailedForCurrentAddress && !justRevoked;
 
     // Tying completion state to a key derived from address+connectDid means a
     // wallet switch or disconnect invalidates the record without needing an
@@ -103,9 +131,8 @@ export function useConsoleAuthFlow({
         completionRecord.key === completionKey ? completionRecord.error : null;
 
     // Hand the freshly minted credential off to the CLI session backend.
-    // Fires once `useCredential(connectDid)` reports a credential is present
-    // — regardless of whether it was created via the manual button or by
-    // the auto-sign hook above.
+    // Fires once `useCredential(connectDid)` reports a credential is present:
+    // one the user just confirmed, or one they confirmed for this key before.
     useEffect(() => {
         if (
             !connectDid ||
@@ -188,7 +215,6 @@ export function useConsoleAuthFlow({
         if (!connectDid) return { kind: "invalid-link" };
         if (authInitializing || authBusy) return { kind: "loading" };
         if (!address) return { kind: "pre-login" };
-        if (isAutoSigning) return { kind: "loading" };
         if (credentialInitializing) return { kind: "loading" };
         if (!hasCredential) {
             return {
@@ -206,7 +232,6 @@ export function useConsoleAuthFlow({
         authInitializing,
         authBusy,
         address,
-        isAutoSigning,
         credentialInitializing,
         hasCredential,
         ensName,
@@ -215,40 +240,7 @@ export function useConsoleAuthFlow({
         sessionCompleted,
     ]);
 
-    const { title, subtitle } = useMemo(() => {
-        switch (view.kind) {
-            case "invalid-link":
-                return {
-                    title: "Invalid Login Link",
-                    subtitle: "This console session is missing the CLI identity. Please run ph login again to start a new session.",
-                };
-            case "loading":
-                return {
-                    title: "Signing you in",
-                    subtitle: "Hang tight while we finish setting up your session.",
-                };
-            case "pre-login":
-                return {
-                    title: "Authorize CLI",
-                    subtitle: "Authorize the Powerhouse CLI to sign actions on your behalf using your identity.",
-                };
-            case "needs-authorization":
-                return {
-                    title: "Confirm Authorization",
-                    subtitle: "Authorize the Powerhouse CLI to sign actions on your behalf using your identity.",
-                };
-            case "completed":
-                return {
-                    title: "Authorization Complete",
-                    subtitle: "You can now close this window and return to your terminal.",
-                };
-            case "error":
-                return {
-                    title: "Something went wrong",
-                    subtitle: view.message,
-                };
-        }
-    }, [view]);
+    const { title, subtitle } = useMemo(() => consoleTitles(view, label, host), [view, label, host]);
 
     return {
         view,

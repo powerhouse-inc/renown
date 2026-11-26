@@ -12,6 +12,10 @@ interface ConsoleConfirmAuthorizationProps {
     ensName?: string | null;
     ensAvatar?: string | null;
     expiresInDays: number;
+    /** The session's label, signed into the credential as its `app`. */
+    label?: string;
+    /** The host the session is for, when the link names one. */
+    host?: string;
 }
 
 export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationProps> = ({
@@ -20,9 +24,11 @@ export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationPr
     ensName,
     ensAvatar,
     expiresInDays,
+    label,
+    host,
 }) => {
     const session = useSession();
-    const { createCredential, loading } = useCredential(connectDid, undefined, expiresInDays);
+    const { createCredential, loading } = useCredential(connectDid, undefined, expiresInDays, label);
     const { track } = useOpenPanelAnalytics();
 
     const handleCreateCredential = useCallback(() => {
@@ -35,20 +41,35 @@ export const ConsoleConfirmAuthorization: React.FC<ConsoleConfirmAuthorizationPr
 
     if (!session) return null;
 
+    const action = host ? "Approve Session" : label ? `Authorize ${label}` : "Authorize CLI";
+
     return (
         <div className="flex flex-col w-full gap-3">
-            <CliCard sessionId={sessionId} />
-            <CredentialValidityNotice expiresInDays={expiresInDays} />
+            <CliCard sessionId={sessionId} label={label} host={host} />
+            {host && (
+                <p role="note" className="rounded-xl bg-muted px-4 py-3 text-center text-sm text-foreground">
+                    May sign document changes as you on this host. It cannot administer the host.
+                </p>
+            )}
+            {/* A labelled session always states when it ends; an old link only when it asks for more than the default. */}
+            <CredentialValidityNotice expiresInDays={expiresInDays} always={!!label || !!host} />
+            <p className="text-sm font-medium text-center text-foreground">
+                Approve only a request you started yourself in the last few minutes.
+            </p>
             <Button
                 primary
                 onClick={handleCreateCredential}
                 className={`w-full ${loading ? "animate-pulse" : ""}`}
                 disabled={loading}
             >
-                {loading ? "Signing..." : "Authorize CLI"}
+                {loading ? "Signing..." : action}
             </Button>
             <p className="text-xs text-muted-foreground text-center mt-2">
-                By authorizing, you allow this CLI to sign documents on your behalf.
+                {host
+                    ? `By approving, you allow this session to sign document changes on your behalf on ${host}. You can withdraw it at any time on your Renown page.`
+                    : label
+                      ? `By authorizing, you allow "${label}" to sign documents on your behalf.`
+                      : "By authorizing, you allow this CLI to sign documents on your behalf."}
             </p>
         </div>
     );
